@@ -2,49 +2,50 @@
 // Static frontend is served from ./public via [assets]; API routes handled here.
 // KV binding: VOTES_KV
 
-// ---- Seed listings (verified 2026-09-30, 10 adults, Nov 25–29, totals incl. fees) ----
-// priceUSD here is a 4-night total; the frontend labels listings without
-// priceNights as 4 nights for that reason.
+// ---- Seed listings (verified 2026-09-30) ----
+// No prices here: prices come live from Airbnb for each trip's dates (see
+// "live prices" below). The hand-typed 4-night totals these used to carry
+// are stripped from saved state in getState.
 // image fields filled from og:image scrape where available; the rest lazy-enrich
 // at runtime via /api/enrich.
 const SEED = [
   { roomId: '1227535448419064801', url: 'https://www.airbnb.com/rooms/1227535448419064801?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Vista View Cottage', area: '落基山 · Estes Park', priceUSD: 1907, sleeps: 12, bedrooms: 4, beds: 5, bathrooms: 2.5,
+    title: 'Vista View Cottage', area: '落基山 · Estes Park', sleeps: 12, bedrooms: 4, beds: 5, bathrooms: 2.5,
     rating: 4.94, reviews: 18, image: 'https://a0.muscache.com/im/pictures/miso/Hosting-1227535448419064801/original/4d15e476-8a5a-4814-8731-a3463dd395b2.png', note: '环绕露台看山景，离公园近' },
   { roomId: '292274', url: 'https://www.airbnb.com/rooms/292274?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Brown Cabin: Charming Mountain House w/Views', area: '落基山 · Estes Park', priceUSD: 2089, sleeps: 12, bedrooms: 4, beds: 7, bathrooms: 2,
+    title: 'Brown Cabin: Charming Mountain House w/Views', area: '落基山 · Estes Park', sleeps: 12, bedrooms: 4, beds: 7, bathrooms: 2,
     rating: 4.8, reviews: 340, image: 'https://a0.muscache.com/im/pictures/fe7217ff-0b24-438d-880d-b94722c75bf5.jpg?im_w=1200', note: '1931年老木屋，大石壁炉，步行20分钟到公园' },
   { roomId: '8740974', url: 'https://www.airbnb.com/rooms/8740974?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Skyline - Michener House in the Sky', area: '落基山 · Estes Park', priceUSD: 2200, sleeps: 10, bedrooms: 5, beds: 6, bathrooms: 2,
+    title: 'Skyline - Michener House in the Sky', area: '落基山 · Estes Park', sleeps: 10, bedrooms: 5, beds: 6, bathrooms: 2,
     rating: 4.93, reviews: 131, image: 'https://a0.muscache.com/im/pictures/111377994/8f520b2f_original.jpg', note: '紧邻公园，大厨房+火坑露台' },
   { roomId: '1658870700646985100', url: 'https://www.airbnb.com/rooms/1658870700646985100?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: "Rocky's Riverside Retreat", area: '落基山 · Estes Park', priceUSD: 2402, sleeps: 10, bedrooms: 4, beds: 7, bathrooms: 2,
+    title: "Rocky's Riverside Retreat", area: '落基山 · Estes Park', sleeps: 10, bedrooms: 4, beds: 7, bathrooms: 2,
     rating: 4.67, reviews: 12, image: 'https://a0.muscache.com/im/pictures/hosting/Hosting-1658870700646985100/original/37d44665-ba6f-4e75-969f-9208f3e4866b.jpeg', note: '临 Fall River，河畔露台+烧烤' },
   { roomId: '724385787075754980', url: 'https://www.airbnb.com/rooms/724385787075754980?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Fall River Oasis · Private Hot Tub · RMNP', area: '落基山 · Estes Park', priceUSD: 2492, sleeps: 10, bedrooms: 4, beds: 5, bathrooms: 2.5,
+    title: 'Fall River Oasis · Private Hot Tub · RMNP', area: '落基山 · Estes Park', sleeps: 10, bedrooms: 4, beds: 5, bathrooms: 2.5,
     rating: 4.73, reviews: 15, image: 'https://a0.muscache.com/im/pictures/prohost-api/Hosting-724385787075754980/original/1dca8f7c-ba03-426e-852a-9165d7bf95a9.jpeg', note: '私家6人热水浴缸，全年可用' },
   { roomId: '39392880', url: 'https://www.airbnb.com/rooms/39392880?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Three Bedroom Cabin - Perfect Your Family', area: '落基山 · Estes Park', priceUSD: 2662, sleeps: 10, bedrooms: 3, beds: 5, bathrooms: 2,
+    title: 'Three Bedroom Cabin - Perfect Your Family', area: '落基山 · Estes Park', sleeps: 10, bedrooms: 3, beds: 5, bathrooms: 2,
     rating: 4.86, reviews: 71, image: 'https://a0.muscache.com/im/pictures/prohost-api/Hosting-39392880/original/01137add-633b-45ca-9fdb-84457f67255b.jpeg', note: '私家热水浴缸看山景，烧柴壁炉' },
   { roomId: '1555270180265800861', url: 'https://www.airbnb.com/rooms/1555270180265800861?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Charming Rustic Cozy Casita Near Sand Dunes', area: '大沙丘区域', priceUSD: 907, sleeps: 10, bedrooms: 2, beds: 10, bathrooms: 1,
+    title: 'Charming Rustic Cozy Casita Near Sand Dunes', area: '大沙丘区域', sleeps: 10, bedrooms: 2, beds: 10, bathrooms: 1,
     rating: 5.0, reviews: 9, image: 'https://a0.muscache.com/im/pictures/hosting/Hosting-1555270180265800861/original/47c78951-0836-4300-89a9-c5012216b6e2.jpeg', note: '乡村小木屋，烧烤 patio，最便宜' },
   { roomId: '1645317208833417440', url: 'https://www.airbnb.com/rooms/1645317208833417440?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Vintage home with space to entertain', area: '大沙丘区域', priceUSD: 1140, sleeps: 11, bedrooms: 4, beds: 5, bathrooms: 2,
+    title: 'Vintage home with space to entertain', area: '大沙丘区域', sleeps: 11, bedrooms: 4, beds: 5, bathrooms: 2,
     rating: 5.0, reviews: 3, image: 'https://a0.muscache.com/im/pictures/hosting/Hosting-1645317208833417440/original/8928aa7c-1af3-4409-8e26-b405ee471428.jpeg', note: '私家6人热水浴缸+台球桌' },
   { roomId: '1460891336891261388', url: 'https://www.airbnb.com/rooms/1460891336891261388?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Celestial Lodge: Stargazing, Pet Friendly & Groups', area: '大沙丘区域', priceUSD: 1228, sleeps: 14, bedrooms: 3, beds: 10, bathrooms: 2,
+    title: 'Celestial Lodge: Stargazing, Pet Friendly & Groups', area: '大沙丘区域', sleeps: 14, bedrooms: 3, beds: 10, bathrooms: 2,
     rating: 4.73, reviews: 26, image: 'https://a0.muscache.com/im/pictures/hosting/Hosting-1460891336891261388/original/93e2f782-f070-4ad2-b440-66b97c3525de.png', note: '暗夜观星平台，离沙丘近' },
   { roomId: '51935947', url: 'https://www.airbnb.com/rooms/51935947?adults=10&check_in=2026-11-25&check_out=2026-11-29',
-    title: 'Beautiful Retreat ~ Multi Family w/ Creek Access', area: '大沙丘区域', priceUSD: 1310, sleeps: 13, bedrooms: 5, beds: 10, bathrooms: 2,
+    title: 'Beautiful Retreat ~ Multi Family w/ Creek Access', area: '大沙丘区域', sleeps: 13, bedrooms: 5, beds: 10, bathrooms: 2,
     rating: 5.0, reviews: 10, image: 'https://a0.muscache.com/im/pictures/5f090ddb-2bc0-4b1a-bf9f-29b815cc1f34.jpg', note: '小溪+大火坑，Sangre de Cristo 山景' },
 ];
 
 // ---- Trips: each leg has its own shortlist under its own KV key ----
 // nov26 keeps the original 'state:v1' key so the existing list carries over.
 const TRIPS = {
-  nov25: { kvKey: 'state:nov25:v1', seed: [] },      // Nov 25–26, 9 people
-  nov26: { kvKey: 'state:v1', seed: SEED },          // Nov 26–29, 14 people
+  nov25: { kvKey: 'state:nov25:v1', seed: [], checkIn: '2026-11-25', checkOut: '2026-11-26', people: 9 },
+  nov26: { kvKey: 'state:v1', seed: SEED, checkIn: '2026-11-26', checkOut: '2026-11-29', people: 14 },
 };
 const DEFAULT_TRIP = 'nov26'; // requests without a trip (old cached pages) hit the original list
 const tripOf = t => TRIPS[t] || TRIPS[DEFAULT_TRIP];
@@ -172,6 +173,64 @@ async function fetchListingInfo(url) {
   return { ok: false };
 }
 
+// ---------- live prices ----------
+// Airbnb's listing page fetches its price box from this persisted GraphQL
+// query; we call it the same way. If Airbnb rotates the hash or key, price
+// lookups fail soft (the last known price stays, marked with its age).
+const AIRBNB_API_KEY = 'd306zoyjsyarp7ifhu67rjxn52tv0t20';
+const BOOKIT_HASH = '8c9165db910115bff8003e61f847ed907c9c51509ba043fa0610853d7c4de080';
+const PRICE_TTL_MS = 6 * 60 * 60 * 1000;
+
+async function queryBookIt(roomId, checkIn, checkOut, adults) {
+  const variables = {
+    id: btoa('DemandStayListing:' + roomId),
+    dateRange: { startDate: checkIn, endDate: checkOut },
+    guestCounts: { numberOfAdults: adults },
+    includePdpMigrationBookItCalendarSheetFragment: false, includePdpMigrationBookItFloatingFooterFragment: false,
+    includePdpMigrationBookItNavFragment: false, includePdpMigrationBookItSidebarFragment: true,
+    includeGalleryBookItCtaFragment: false, includeOverviewMerchandisingTipsFragment: false,
+    includeStaysPdpPriceHeatmapFragment: false, priceHeatmapDateRange: { startDate: checkIn, endDate: checkOut },
+    p3ImpressionId: 'p3_0_vote', selectedCancellationPolicyId: null, causeId: null, selectedGuestOptionId: null,
+  };
+  const url = 'https://www.airbnb.com/api/v3/StaysPdpBookItQuery/' + BOOKIT_HASH
+    + '?operationName=StaysPdpBookItQuery&locale=en&currency=USD'
+    + '&variables=' + encodeURIComponent(JSON.stringify(variables))
+    + '&extensions=' + encodeURIComponent(JSON.stringify({ persistedQuery: { version: 1, sha256Hash: BOOKIT_HASH } }));
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, headers: {
+      'X-Airbnb-API-Key': AIRBNB_API_KEY, 'User-Agent': SCRAPE_UA, 'Accept-Language': 'en-US,en;q=0.9', 'Content-Type': 'application/json' } });
+    if (!r.ok) return null;
+    const bookIt = (await r.json())?.data?.node?.pdpPresentation?.bookIt;
+    if (!bookIt) return null;
+    const line = bookIt.structuredDisplayPrice?.primaryLine;
+    const money = s => { const m = String(s || '').replace(/,/g, '').match(/\$(\d+(?:\.\d+)?)/); return m ? Math.round(Number(m[1])) : null; };
+    return {
+      available: bookIt.availability?.isAvailable === true,
+      reason: bookIt.availability?.unavailabilityReason || null,
+      total: line ? money(line.discountedPrice || line.price) : null,
+      original: line ? money(line.originalPrice) : null,
+    };
+  } catch (e) { return null; }
+  finally { clearTimeout(t); }
+}
+
+// Price for the trip's dates and head count. When the group is bigger than
+// the listing allows, price it at the listing's max so there's still a number.
+async function fetchLivePrice(listing, trip) {
+  if (!listing.roomId || !trip.checkIn) return null;
+  const nights = Math.round((Date.parse(trip.checkOut) - Date.parse(trip.checkIn)) / 86400000);
+  let guests = trip.people;
+  let r = await queryBookIt(listing.roomId, trip.checkIn, trip.checkOut, guests);
+  if (r && r.reason === 'GUEST' && listing.sleeps && listing.sleeps < guests) {
+    guests = listing.sleeps;
+    r = await queryBookIt(listing.roomId, trip.checkIn, trip.checkOut, guests);
+  }
+  if (!r) return null;
+  return { ...r, guests, nights, checkIn: trip.checkIn, checkOut: trip.checkOut, at: Date.now() };
+}
+
 function roomIdFrom(url) {
   const m = String(url || '').match(/airbnb\.[a-z.]+\/rooms\/(\d+)/i);
   return m ? m[1] : null;
@@ -185,6 +244,11 @@ async function getState(env, trip) {
     if (!Array.isArray(state.listings)) state.listings = [];
     if (!Array.isArray(state.members)) state.members = [];
     if (!Array.isArray(state.expenses)) state.expenses = [];
+    // Seed listings used to carry hand-typed 4-night prices for old dates.
+    // Drop them so only live Airbnb prices are shown. Prices typed into the
+    // manual-add form have priceNights and are kept. Not saved here (a write
+    // on read could clobber a concurrent vote); the next save persists it.
+    for (const l of state.listings) if (l.priceUSD != null && l.priceNights == null) delete l.priceUSD;
     return state;
   }
   const state = { listings: trip.seed.map(s => ({ id: uid(), ...s, addedBy: 'Ken', createdAt: Date.now(), votes: [] })), members: [], expenses: [], updatedAt: Date.now() };
@@ -473,6 +537,28 @@ async function handleLogin(req, env) {
   return j({ ok: true, user: { name: user.name, token: user.token }, users: publicUsers(users) });
 }
 
+// Refresh live prices for a trip's listings that are stale (or for one id).
+// Airbnb lookups run first; then fresh state is re-read and only the `live`
+// field is written, so concurrent votes/adds aren't clobbered.
+async function handlePrices(req, env) {
+  let body = {};
+  try { body = await req.json(); } catch (e) { /* ignore */ }
+  const trip = tripOf(body.trip);
+  const peek = await getState(env, trip);
+  const fresh = l => l.live && l.live.at > Date.now() - PRICE_TTL_MS && l.live.checkIn === trip.checkIn && l.live.checkOut === trip.checkOut;
+  const todo = peek.listings.filter(l => (body.id ? l.id === body.id : true) && (body.force || !fresh(l))).slice(0, 12);
+  const results = {};
+  for (let i = 0; i < todo.length; i += 4) { // a few at a time, to be gentle with Airbnb
+    await Promise.all(todo.slice(i, i + 4).map(async l => { const p = await fetchLivePrice(l, trip); if (p) results[l.id] = p; }));
+  }
+  const state = await getState(env, trip);
+  let changed = false;
+  for (const l of state.listings) if (results[l.id]) { l.live = results[l.id]; changed = true; }
+  if (changed) await saveState(env, trip, state);
+  return j({ ok: true, updated: Object.keys(results).length, tried: todo.length,
+    live: Object.fromEntries(state.listings.filter(l => l.live).map(l => [l.id, l.live])) });
+}
+
 async function handleMemberAdd(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
@@ -548,6 +634,7 @@ export default {
       return j({ ...state, ...splitView(await getSplit(env)) });
     }
     if (p === '/api/split' && request.method === 'GET') return j({ ok: true, ...splitView(await getSplit(env)) });
+    if (p === '/api/prices' && request.method === 'POST') return handlePrices(request, env);
     if (p === '/api/users' && request.method === 'GET') return j({ ok: true, users: publicUsers(await getUsers(env)) });
     if (p === '/api/login' && request.method === 'POST') return handleLogin(request, env);
     if (p === '/api/add' && request.method === 'POST') return handleAdd(request, env);
