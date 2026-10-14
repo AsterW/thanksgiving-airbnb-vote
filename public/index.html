@@ -359,11 +359,11 @@ function airbnbLink(l){
 // ---------- 价格：优先用 Airbnb 实时报价（按当前行程的日期和人数） ----------
 function liveOf(l){ return l.live && l.live.checkIn === T.checkIn && l.live.checkOut === T.checkOut ? l.live : null; }
 function isBooked(l){ const v = liveOf(l); return !!(v && !v.available); }
-// 用来排序/地图/分账的价格：有实时价用实时价，否则退回手动填的估价
+// 用来排序/地图的价格：有实时价用实时价，否则退回手动添加时填的价格
 function effPrice(l){
   const v = liveOf(l);
   if (v) return v.available ? v.total : null;
-  return l.priceUSD || null;
+  return l.priceNights ? l.priceUSD || null : null;
 }
 function ago(ts){
   const m = Math.round((Date.now() - ts) / 60000);
@@ -382,9 +382,9 @@ function priceBlock(l){
       + ' <span class="text-xs font-normal text-slate-500">/ ' + v.nights + '晚总价</span></div>'
       + '<div class="text-xs text-emerald-700 mt-0.5">✓ Airbnb 实时价' + (v.guests < T.people ? ' · 按 ' + v.guests + ' 人计' : '') + ' · ' + ago(v.at) + '</div>';
   }
-  // 还没查到实时价：早期预置房源的手动估价是 11/25–29 的 4 晚总价
-  if (l.priceUSD) return '<div class="text-lg font-bold text-slate-500">约 $' + Number(l.priceUSD).toLocaleString() + ' <span class="text-xs font-normal">/ ' + (l.priceNights || 4) + '晚</span></div>'
-    + '<div class="text-xs text-slate-400 mt-0.5">手动估价 · 实时价查询中…</div>';
+  // 还没查到实时价：手动添加时填过价格的先显示那个
+  if (l.priceUSD && l.priceNights) return '<div class="text-lg font-bold text-slate-500">约 $' + Number(l.priceUSD).toLocaleString() + ' <span class="text-xs font-normal">/ ' + l.priceNights + '晚</span></div>'
+    + '<div class="text-xs text-slate-400 mt-0.5">手动填的价格 · 实时价查询中…</div>';
   return '<div class="text-sm text-slate-500">实时价查询中…</div>';
 }
 
