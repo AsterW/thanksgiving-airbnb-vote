@@ -48,6 +48,23 @@ const seeds = await J('GET', '/api/state?trip=nov26');
 const seedListing = seeds.json.listings[0];
 check('seed listing exists', !!seedListing?.id);
 
+// Duplicate names: the same account must come back for case variants,
+// extra inner whitespace and padded spellings — never a second account.
+const dupTag = Date.now().toString(36);
+const d1 = await J('POST', '/api/login', { name: `Case ${dupTag}`, token: 'dup-dev-1' });
+const d2 = await J('POST', '/api/login', { name: `case ${dupTag}`, token: 'dup-dev-2' });
+check('case-variant join returns the same account', d1.json?.user?.token === d2.json?.user?.token && d2.json?.user?.name === `Case ${dupTag}`, JSON.stringify(d2.json));
+const s1 = await J('POST', '/api/login', { name: `Space  ${dupTag}`, token: 'dup-dev-3' });
+const s2 = await J('POST', '/api/login', { name: ` Space ${dupTag} `, token: 'dup-dev-4' });
+check('whitespace-variant join returns the same account', s1.json?.user?.token === s2.json?.user?.token && s1.json?.user?.name === `Space ${dupTag}`, JSON.stringify(s1.json));
+const [c1, c2] = await Promise.all([
+  J('POST', '/api/login', { name: `Race ${dupTag}`, token: 'dup-dev-5' }),
+  J('POST', '/api/login', { name: `Race ${dupTag}`, token: 'dup-dev-6' }),
+]);
+const listAfter = await J('GET', '/api/users');
+const raceCount = (listAfter.json?.users || []).filter(u => u.name.toLowerCase() === `race ${dupTag}`).length;
+check('simultaneous same-name joins create one account', raceCount === 1 && c1.json?.user?.token === c2.json?.user?.token, `count=${raceCount}`);
+
 // --- read endpoints with junk input
 for (const [name, p] of [
   ['state bogus trip', '/api/state?trip=BOGUS'],
