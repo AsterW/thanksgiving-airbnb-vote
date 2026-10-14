@@ -18,6 +18,9 @@ export function SessionProvider({ children }) {
   const [token, setToken] = useState(initialToken);
   const [users, setUsers] = useState([]);
   const [loginOpen, setLoginOpen] = useState(false);
+  // 邮箱验证码挑战：{ kind: 'login'|'bind', name, email?, emailHint? }。
+  // login = 选了绑邮箱的人但这台设备没有 ta 的 token；bind = 正在给某人绑邮箱。
+  const [challenge, setChallenge] = useState(null);
   const pending = useRef(null); // 登录后要接着做的事（比如投票），参数是 { name, token }
 
   const loadUsers = useCallback(async () => {
@@ -31,7 +34,7 @@ export function SessionProvider({ children }) {
     loadUsers(); // 别人可能刚注册，顺手刷新一下列表
   }, [loadUsers]);
 
-  const closeLogin = useCallback(() => { pending.current = null; setLoginOpen(false); }, []);
+  const closeLogin = useCallback(() => { pending.current = null; setChallenge(null); setLoginOpen(false); }, []);
 
   // 已登录就直接做；没登录先弹登录框，登录后再做
   const ensureName = useCallback(fn => {
@@ -39,8 +42,61 @@ export function SessionProvider({ children }) {
     else openLogin(fn);
   }, [name, token, openLogin]);
 
-  // 返回错误文字，成功返回 null
+  // 登录/绑定成功后：换上这个账号的身份，关弹窗，接着做刚才想做的事
+  const adopt = useCallback(r => {
+    setName(r.user.name); setToken(r.user.token); if (r.users) setUsers(r.users);
+    save('vn', r.user.name); save('vt', r.user.token);
+    setChallenge(null);
+    setLoginOpen(false);
+    const f = pending.current; pending.current = null;
+    if (f) f({ name: r.user.name, token: r.user.token });
+  }, []);
+
+  // 返回错误文字，成功返回 null。绑了邮箱的账号在这台设备上没有 token 时，
+  // 服务器回 needCode：不算失败，转入验证码流程（弹窗自己切到验证码视图）。
   const login = useCallback(async input => {
+    const n = String(input || '').trim();
+    if (!n) return null;
+    let r;
+    try { r = await api('/api/login', 'POST', { name: n, token }); } catch (e) { r = { ok: false, error: '网络有点问题，稍后再试' }; }
+    if (!r.ok) return r.error || '登录失败';
+    if (r.needCode) {
+      if (r.users) setUsers(r.users);
+      setChallenge({ kind: 'login', name: r.name, emailHint: r.emailHint });
+      return null;
+    }
+    adopt(r);
+    return null;
+  }, [token, adopt]);
+
+  // 发送验证码（bind 要带上该账号当前的 token 和想绑的邮箱；login 只带名字，
+  // 邮箱由服务器按已绑定记录发）。成功返回服务器结果（含 emailHint，开发模式
+  // 还含 devCode），失败返回错误文字。
+  const sendAuthCode = useCallback(async ({ name: n, token: t, email, purpose }) => {
+    let r;
+    try { r = await api('/api/auth/send-code', 'POST', { name: n, token: t, email, purpose }); }
+    catch (e) { return '网络有点问题，稍后再试'; }
+    return r.ok ? r : (r.error || '发送失败');
+  }, []);
+
+  // 校验验证码：login 过关 = 拿到该账号 token；bind 过关 = 邮箱绑上且 token
+  // 已轮换。两种都直接换上返回的身份。
+  const verifyAuthCode = useCallback(async code => {
+    if (!challenge) return '先选好你的名字';
+    let r;
+    try {
+      r = await api('/api/auth/verify', 'POST', {
+        name: challenge.name, code, purpose: challenge.kind,
+        deviceToken: token, // login 时把这台设备之前的投票并到账号名下
+      });
+    } catch (e) { return '网络有点问题，稍后再试'; }
+    if (!r.ok) return r.error || '验证失败';
+    adopt(r);
+    return null;
+  }, [challenge, token, adopt]);
+
+  // 新人加入并顺手绑邮箱：先建号登录，再发绑定验证码，进入验证码视图。
+  const joinWithEmail = useCallback(async (input, email) => {
     const n = String(input || '').trim();
     if (!n) return null;
     let r;
@@ -48,12 +104,12 @@ export function SessionProvider({ children }) {
     if (!r.ok) return r.error || '登录失败';
     setName(r.user.name); setToken(r.user.token); setUsers(r.users);
     save('vn', r.user.name); save('vt', r.user.token);
-    setLoginOpen(false);
-    const f = pending.current; pending.current = null;
-    if (f) f({ name: r.user.name, token: r.user.token });
+    const sent = await sendAuthCode({ name: r.user.name, token: r.user.token, email, purpose: 'bind' });
+    if (typeof sent === 'string') return sent; // 账号已建好，只是验证码没发出去
+    setChallenge({ kind: 'bind', name: r.user.name, email, emailHint: sent.emailHint, sent: true, devCode: sent.devCode });
     return null;
-  }, [token]);
+  }, [token, sendAuthCode]);
 
-  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login };
+  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
