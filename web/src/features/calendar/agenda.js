@@ -14,11 +14,13 @@ const addDays = (date, n) => { const d = new Date(date + 'T12:00:00Z'); d.setUTC
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 
 // 🏠 每段行程票数最高的那间：入住、住在、退房（Airbnb 没给具体时间，算全天）
-export function stayEvents(listingsByTrip) {
+export function stayEvents(listingsByTrip, voteByTrip = {}) {
   const out = [];
   for (const [key, T] of Object.entries(TRIPS)) {
-    const voted = (listingsByTrip[key] || []).filter(l => (l.votes || []).length);
-    const top = sortListings(voted, 'votes', T)[0];
+    const all = listingsByTrip[key] || [];
+    const vote = voteByTrip[key];
+    const chosen = vote && vote.chosenId ? all.find(l => l.id === vote.chosenId) : null; // 投票截止后：大家定下的那间
+    const top = chosen || sortListings(all.filter(l => (l.votes || []).length), 'votes', T)[0];
     if (!top) {
       out.push({ id: key + ':none', at: null, date: T.checkIn, icon: '🏠', tone: 'muted', title: T.date + ' 住哪还没定', detail: '去 AirBnb hunting 投票，票最高的会出现在这里' });
       continue;
@@ -27,7 +29,8 @@ export function stayEvents(listingsByTrip) {
     const warn = isBooked(top, T) ? ' · ⚠️ Airbnb 显示这几天已经订不了' : '';
     const link = 'https://www.airbnb.com/rooms/' + top.roomId + '?adults=' + T.people + '&check_in=' + T.checkIn + '&check_out=' + T.checkOut;
     const base = { tone: warn ? 'warn' : 'stay', link };
-    out.push({ ...base, id: key + ':in', at: null, date: T.checkIn, icon: '🏠', title: '入住 ' + top.title, detail: '票数最高（' + votes + ' 票）' + (top.area ? ' · ' + top.area : '') + ' · 住 ' + T.nights + ' 晚' + warn });
+    const status = chosen ? (vote.booking?.status === 'booked' ? '✅ 已订好' : '🏆 大家定了这间（' + votes + ' 票）') : '目前票数最高（' + votes + ' 票）· 还在投票';
+    out.push({ ...base, id: key + ':in', at: null, date: T.checkIn, icon: '🏠', title: '入住 ' + top.title, detail: status + (top.area ? ' · ' + top.area : '') + ' · 住 ' + T.nights + ' 晚' + warn });
     for (let d = addDays(T.checkIn, 1); d < T.checkOut; d = addDays(d, 1)) {
       out.push({ ...base, id: key + ':' + d, at: null, date: d, icon: '🛏️', title: '住在 ' + top.title, detail: top.area || '' });
     }
