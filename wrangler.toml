@@ -45,3 +45,14 @@ class_name = "MahjongHall"
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["GuandanHall", "MahjongHall"]
+
+# The storekeeper: one Durable Object (StoreDO) owning every mutable
+# app document, so concurrent writes serialize instead of overwriting
+# each other (KV has no locks; see worker/store/store.js).
+[[durable_objects.bindings]]
+name = "STORE"
+class_name = "StoreDO"
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["StoreDO"]
