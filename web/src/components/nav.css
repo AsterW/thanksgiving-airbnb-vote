@@ -9,9 +9,14 @@
 .nav-item.active::before { content:''; position:absolute; left:-1rem; top:22%; bottom:22%; width:4px; border-radius:0 4px 4px 0; background:linear-gradient(#a5b4fc,#f9a8d4); }
 .nav-sub { display:block; font-size:.72rem; font-weight:500; opacity:.65; }
 /* 手机上变成底部标签栏 */
-/* 页面多了一行放不下：横着滑，字不换行 */
-#bottomNav { padding-bottom: env(safe-area-inset-bottom, 0px); overflow-x:auto; scrollbar-width:none; }
-#bottomNav::-webkit-scrollbar { display:none; }
+/* 页面多了一行放不下：横着滑，字不换行。滑的是里面那条（.bnav-strip），
+   这样两边淡出只淡标签，不淡底栏的白底；哪边还有标签，哪边就淡出 */
+#bottomNav { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.bnav-strip { position:relative; display:flex; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; }
+.bnav-strip::-webkit-scrollbar { display:none; }
+.bnav-strip.more-r { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); }
+.bnav-strip.more-l { -webkit-mask-image:linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); }
+.bnav-strip.more-l.more-r { -webkit-mask-image:linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); }
 .bnav-item { flex:1 0 4.6rem; display:flex; flex-direction:column; align-items:center; gap:2px; padding:.55rem .25rem .5rem; font-size:.72rem; font-weight:600; color:#64748b; white-space:nowrap; }
 .bnav-item .nav-ico { font-size:1.3rem; transition: transform .2s; }
 .bnav-item.active { color:#4f46e5; }

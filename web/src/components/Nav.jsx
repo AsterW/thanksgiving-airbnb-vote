@@ -1,4 +1,6 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { VIEWS } from '../lib/config.js';
+import { reduceMotion } from '../lib/motion.js';
 import './nav.css';
 
 // 左侧导航（md 以上）
@@ -23,15 +25,36 @@ export function Sidebar({ view, onView }) {
   );
 }
 
-// 手机底部标签栏
+// 手机底部标签栏：放不下就左右划。哪边还有标签，哪边就淡出；当前页的标签总会滚到看得见的地方
 export function BottomNav({ view, onView }) {
+  const strip = useRef(null);
+  const [more, setMore] = useState({ l: false, r: false });
+  const measure = useCallback(() => {
+    const n = strip.current;
+    if (!n) return;
+    const l = n.scrollLeft > 4, r = n.scrollLeft + n.clientWidth < n.scrollWidth - 4;
+    setMore(m => (m.l === l && m.r === r ? m : { l, r }));
+  }, []);
+  useEffect(() => {
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+  const first = useRef(true);
+  useEffect(() => {
+    const n = strip.current, b = n?.querySelector('[aria-current="page"]');
+    if (b) n.scrollTo({ left: b.offsetLeft - (n.clientWidth - b.offsetWidth) / 2, behavior: first.current || reduceMotion ? 'auto' : 'smooth' });
+    first.current = false;
+  }, [view]);
   return (
-    <nav id="bottomNav" className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 flex" aria-label="主导航">
-      {Object.entries(VIEWS).map(([k, v]) => (
-        <button key={k} className={'bnav-item' + (k === view ? ' active' : '')} aria-current={k === view ? 'page' : undefined} onClick={() => onView(k)}>
-          <span className="nav-ico">{v.icon}</span>{v.nav}
-        </button>
-      ))}
-    </nav>
+    <div id="bottomNav" className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200">
+      <nav ref={strip} onScroll={measure} className={'bnav-strip' + (more.l ? ' more-l' : '') + (more.r ? ' more-r' : '')} aria-label="主导航">
+        {Object.entries(VIEWS).map(([k, v]) => (
+          <button key={k} className={'bnav-item' + (k === view ? ' active' : '')} aria-current={k === view ? 'page' : undefined} onClick={() => onView(k)}>
+            <span className="nav-ico">{v.icon}</span>{v.nav}
+          </button>
+        ))}
+      </nav>
+    </div>
   );
 }
