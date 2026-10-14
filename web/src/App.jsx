@@ -26,13 +26,33 @@ function replayEnter(el, cls) {
 function Pane({ active, animKey, children }) {
   const ref = useRef(null);
   const prev = useRef(null);
+  const defer = useRef({ raf: 0, timer: 0 });
   useLayoutEffect(() => {
     const before = prev.current;
     prev.current = { active, animKey };
     if (!before || !active || !ref.current) return;
-    if (!before.active) replayEnter(ref.current, 'view-enter');
-    else if (before.animKey !== animKey) replayEnter(ref.current, 'trip-enter');
+    if (!before.active) { replayEnter(ref.current, 'view-enter'); return; }
+    if (before.animKey === animKey) return;
+    // 切行程和切标签页不一样：新行程的内容要在这一帧大改（价格重排、
+    // 地图钉子全量重建、取景重置，都在随后的被动 effect 里跑）。转场
+    // 动画要是和这波重建同时开跑，模糊的每一帧都在重绘正在变的内容，
+    // 就是选房页切行程时那个回弹卡；其他页切回来内容不动，所以顺。
+    // 解法：先把面板藏一瞬（.trip-pre），推迟两帧等新内容画完、钉子
+    // 建完，再在静止的画面上开始转场。
+    const el = ref.current;
+    cancelAnimationFrame(defer.current.raf);
+    clearTimeout(defer.current.timer);
+    el.classList.add('trip-pre');
+    defer.current.timer = setTimeout(() => el.classList.remove('trip-pre'), 400); // 兜底：rAF 没跑成也不能把面板留黑
+    defer.current.raf = requestAnimationFrame(() => {
+      defer.current.raf = requestAnimationFrame(() => {
+        clearTimeout(defer.current.timer);
+        el.classList.remove('trip-pre');
+        replayEnter(el, 'trip-enter');
+      });
+    });
   }, [active, animKey]);
+  useEffect(() => () => { cancelAnimationFrame(defer.current.raf); clearTimeout(defer.current.timer); }, []);
   return <div ref={ref} hidden={!active}>{children}</div>;
 }
 
