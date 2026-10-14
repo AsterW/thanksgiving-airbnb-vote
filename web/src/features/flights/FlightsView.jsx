@@ -39,8 +39,6 @@ export default function FlightsView({ active }) {
 
   return (
     <div className="space-y-5">
-      <FlightForm people={people} onSaved={r => setPeople(r.people)} />
-
       <section className="glass-card rounded-2xl overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 p-4">
           <h2 className="font-bold text-lg mr-2">🗺️ 大家的航线</h2>
@@ -60,11 +58,13 @@ export default function FlightsView({ active }) {
         <div className="map-box"><FlightMap people={travelers} mode={mode} /></div>
       </section>
 
+      <FlightForm people={people} onSaved={r => setPeople(r.people)} />
+
       {missing.length > 0 && (
         <section className="glass-warn rounded-2xl p-4 text-sm">
           <b>还没填全（{missing.length}）：</b>
           {missing.map(p => <span key={p.name} className="chip">{p.name}{!p.arrival && !p.departure ? '' : !p.arrival ? ' · 缺到达' : ' · 缺离开'}</span>)}
-          <span className="text-slate-500 ml-1">不坐飞机的人在上面勾「不坐飞机」就不会出现在这里</span>
+          <span className="text-slate-500 ml-1">不坐飞机的人在上面「🧳 填航班」里勾一下「不坐飞机」就不会出现在这里</span>
         </section>
       )}
 
