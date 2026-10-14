@@ -206,12 +206,12 @@ let trip = TRIPS[hashTrip] ? hashTrip : 'nov25';
 // 左侧导航的两个页面
 const VIEWS = {
   hunt:  { title: '🏠 AirBnb hunting · 一起选房', sub: '看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它' },
-  split: { title: '💰 Split that bill · 分账', sub: '共同支出记在这里，自动算清谁该给谁多少钱' },
+  split: { title: '💰 Split that bill · 分账', sub: '全员一本账 · 共同支出记在这里，自动算清谁该给谁多少钱' },
 };
 let view = VIEWS[hashView] ? hashView : 'hunt';
 function syncHash(){ history.replaceState(null, '', '#' + trip + (view === 'hunt' ? '' : '/' + view)); }
 let T = TRIPS[trip];
-let STATE = { listings: [], members: [], expenses: [], balances: {}, settlements: [] };
+let STATE = { listings: [], expenses: [], balances: {}, settlements: [] };
 let myToken = localStorage.getItem('vt');
 if (!myToken) { myToken = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); localStorage.setItem('vt', myToken); }
 let myName = localStorage.getItem('vn') || '';
@@ -376,7 +376,10 @@ function celebrate(id){
 
 // 切换行程时重画标题、标签页、区域筛选和手动表单
 function renderTrip(){
-  $('#tripSub').textContent = T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · ' + VIEWS[view].sub;
+  // 分账是全员一本账，不分行程：不显示行程标签页和日期人数
+  const forTrip = view !== 'split';
+  $('#tripSub').textContent = (forTrip ? T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · ' : '') + VIEWS[view].sub;
+  $('#tabs').hidden = !forTrip;
   $('#tabs').innerHTML = Object.keys(TRIPS).map(k => {
     const t = TRIPS[k];
     return '<button data-trip="' + k + '" class="trip-tab rounded-full px-5 py-2 font-bold' + (k === trip ? ' active' : '') + '">'
@@ -404,6 +407,7 @@ function switchView(v){
   syncHash();
   renderNav();
   renderTrip();
+  if (v === 'split') loadSplit(); // 拿最新的账，别人可能刚记了
   const el = $('#view-' + v);
   el.classList.remove('view-enter'); void el.offsetWidth; el.classList.add('view-enter');
   window.scrollTo({ top: 0 });
@@ -414,10 +418,9 @@ function switchTrip(k){
   trip = k; T = TRIPS[k]; filter = 'all';
   if (reorderTimer) { clearTimeout(reorderTimer); reorderTimer = null; } // 别让上一页投票后的重排画到新标签页
   syncHash();
-  STATE = { listings: [], members: [], expenses: [], balances: {}, settlements: [] };
-  $('#grid').innerHTML = ''; $('#countLbl').textContent = ''; $('#addMsg').textContent = ''; $('#eMsg').textContent = '';
+  STATE = { ...STATE, listings: [] }; // 账本是全员共用的，切行程不用清
+  $('#grid').innerHTML = ''; $('#countLbl').textContent = ''; $('#addMsg').textContent = '';
   renderTrip();
-  renderSplit();
   refresh();
 }
 
@@ -556,14 +559,12 @@ $('#manualBtn').onclick = async () => {
 function fmtMoney(cents){
   return '$' + (Math.abs(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-// 成员名单：手动加的成员 + 投过票的人 + 支出里出现过的人
+// 成员名单：全员共用的用户列表（登录、投票、分账都是这一份）+ 账里出现过的名字
 function knownNames(){
   const out = [];
-  const push = n => { n = String(n || '').trim(); if (n && !out.includes(n)) out.push(n); };
-  (STATE.members || []).forEach(push);
-  push(myName);
+  const push = n => { n = String(n || '').trim(); if (n && !out.some(x => x.toLowerCase() === n.toLowerCase())) out.push(n); };
   USERS.forEach(u => push(u.name));
-  (STATE.listings || []).forEach(l => (l.votes || []).forEach(v => push(v.name)));
+  push(myName);
   (STATE.expenses || []).forEach(e => { push(e.paidBy); (e.splitAmong || []).forEach(push); });
   return out;
 }
@@ -601,15 +602,19 @@ function renderSplit(){
     : '<p class="text-sm text-slate-400">还没有支出记录</p>';
 }
 function applySplitView(r){
-  if (r.members) STATE.members = r.members;
   if (r.expenses) STATE.expenses = r.expenses;
   if (r.balances) STATE.balances = r.balances;
   if (r.settlements) STATE.settlements = r.settlements;
+  if (r.users) { USERS = r.users; renderUserSel(); }
 }
+async function loadSplit(){
+  try { const r = await api('/api/split'); if (r.ok) { applySplitView(r); renderSplit(); } } catch(e){}
+}
+// 加成员 = 加进全员共用的用户列表，之后登录时直接选名字
 async function addMember(){
   const v = $('#memberInput').value.trim();
   if (!v) return;
-  const r = await api('/api/member', 'POST', { trip, name: v });
+  const r = await api('/api/member', 'POST', { name: v });
   if (r.ok) { $('#memberInput').value = ''; applySplitView(r); renderSplit(); }
   else alert('添加失败：' + (r.error || ''));
 }
@@ -618,13 +623,13 @@ async function addExpense(){
   const amountUSD = $('#eAmount').value ? Number($('#eAmount').value) : null;
   if (!amountUSD) { $('#eMsg').textContent = '先填金额'; return; }
   if (!$('#ePaidBy').value) { $('#eMsg').textContent = '先加成员并选择付款人'; return; }
-  const r = await api('/api/expense', 'POST', { trip, description: $('#eDesc').value.trim(), amountUSD, paidBy: $('#ePaidBy').value, splitAmong });
+  const r = await api('/api/expense', 'POST', { description: $('#eDesc').value.trim(), amountUSD, paidBy: $('#ePaidBy').value, splitAmong });
   if (r.ok) { $('#eDesc').value = ''; $('#eAmount').value = ''; $('#eMsg').textContent = '记上了 ✅'; applySplitView(r); renderSplit(); }
   else $('#eMsg').textContent = r.error || '记账失败';
 }
 async function removeExpense(id){
   if (!confirm('删除这笔支出？')) return;
-  const r = await api('/api/expense-remove', 'POST', { trip, id });
+  const r = await api('/api/expense-remove', 'POST', { id });
   if (r.ok) { applySplitView(r); renderSplit(); } else alert('删除失败，稍后再试');
 }
 // 卡片上的「用这间分账」：把房源标题和总价预填进分账表单
