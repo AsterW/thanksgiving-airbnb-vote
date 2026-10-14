@@ -14,7 +14,7 @@
 // workerd supports, so local dev (and these tests) pin a supported one.
 // Production deploys don't use this flag and are unaffected.
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -22,7 +22,10 @@ const PORT = process.env.TEST_PORT || '8791';
 const BASE = `http://localhost:${PORT}`;
 const persist = mkdtempSync(join(tmpdir(), 'robustness-state-'));
 
-const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist], {
+// EMAIL_DEV_MODE=1 makes the email-code endpoints return codes in their
+// responses instead of sending mail (worker/users/auth.js) so the email
+// suite can run end to end. Local test instance only — never production.
+const server = spawn('npx', ['wrangler', 'dev', '--port', PORT, '--local', '--compatibility-date', '2026-05-03', '--persist-to', persist, '--var', 'EMAIL_DEV_MODE:1'], {
   detached: true, stdio: ['ignore', 'pipe', 'pipe'],
 });
 let serverLog = '';
@@ -73,8 +76,12 @@ try {
     console.error('worker did not come up; wrangler output tail:\n' + serverLog.slice(-2000));
   } else {
     const fuzz = await runSuite('fuzz.mjs');
+    // The email-flow suite ships with the email-binding feature; run it
+    // when present so this runner works before and after that lands.
+    const emailPath = new URL('email.mjs', import.meta.url).pathname;
+    const email = existsSync(emailPath) ? await runSuite('email.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && storms;
+    ok = fuzz && email && storms;
   }
 } finally {
   stopServer();
