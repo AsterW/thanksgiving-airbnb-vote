@@ -70,17 +70,28 @@ function animate(m, group, drawn, instant, phases) {
   };
   let raf = 0;
   const tick = now => {
+    const zoom = m.getZoom(), origin = m.getPixelOrigin(), crs = m.options.crs;
+    // 不取整的图层坐标：抖动的根源是 Leaflet 内部坐标全是整像素——
+    // setLatLng 把位置取整（慢飞机一帧挪不到 1px，只能一格一格跳），
+    // 朝向又是从取整后的两点算的（向量才几 px 长，角度每帧乱跳好几度，机头直晃）
+    const exact = (pts, t) => crs.latLngToPoint(L.latLng(at(pts, t)), zoom).subtract(origin);
     for (const p of planes) {
       // rAF 给的时间可能比加飞机那一刻还早一点，别让进度变成负数
       const t = (Math.max(0, now - p.start) % p.period) / p.period;
-      p.plane.setLatLng(at(p.pts, t));
+      const ll = L.latLng(at(p.pts, t));
+      p.plane.setLatLng(ll);
       const el = p.plane.getElement();
       if (!el) continue;
-      // 机头朝向看前方一点点的位置，而不是当前这一小段的端点：转弯时不会一格一格地顿
-      const pa = m.latLngToContainerPoint(at(p.pts, t));
-      const pb = m.latLngToContainerPoint(at(p.pts, Math.min(1, t + 0.012)));
       const glyph = el.firstChild;
-      if (glyph) glyph.style.transform = 'translate(-50%, -50%) rotate(' + (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI + 90) + 'deg)';
+      if (glyph) {
+        // 位置的小数尾巴补到图标上：标记本体站在整像素点，图标再滑那不到半像素，移动就连续了
+        const ex = exact(p.pts, t), placed = m.latLngToLayerPoint(ll);
+        const fx = ex.x - placed.x, fy = ex.y - placed.y;
+        // 朝向用未取整坐标、看前后一小段的平均方向：转弯平滑，机头不抖
+        const pa = exact(p.pts, Math.max(0, t - 0.015)), pb = exact(p.pts, Math.min(1, t + 0.015));
+        const deg = Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI + 90;
+        glyph.style.transform = 'translate(calc(-50% + ' + fx.toFixed(2) + 'px), calc(-50% + ' + fy.toFixed(2) + 'px)) rotate(' + deg.toFixed(2) + 'deg)';
+      }
       // 一圈的头尾各淡入淡出一下：飞到终点先淡出、回到起点再淡入，不会「啪」地瞬移回去
       const fade = Math.min(1, t / 0.07, (1 - t) / 0.07);
       el.style.opacity = String(Math.max(0, fade));
