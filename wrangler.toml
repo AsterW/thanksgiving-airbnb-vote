@@ -45,3 +45,12 @@ class_name = "MahjongHall"
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["GuandanHall", "MahjongHall"]
+
+# 鲁班七号躲技能 leaderboard: one Durable Object that replays and keeps best runs.
+[[durable_objects.bindings]]
+name = "DODGE"
+class_name = "DodgeBoard"
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["DodgeBoard"]

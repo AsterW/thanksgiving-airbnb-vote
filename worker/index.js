@@ -16,6 +16,7 @@ export { BlackjackTable } from './blackjack/table.js';
 export { DdzHall } from './ddz/hall.js';
 export { GuandanHall } from './guandan/hall.js';
 export { MahjongHall } from './mahjong/hall.js';
+export { DodgeBoard } from './dodge/board.js';
 
 const ROUTES = { ...listingRoutes, ...userRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes };
 
@@ -28,6 +29,8 @@ export default {
     if (url.pathname === '/api/ddz') return env.DDZ_HALL.get(env.DDZ_HALL.idFromName('hall')).fetch(request);
     if (url.pathname === '/api/guandan') return env.GD_HALL.get(env.GD_HALL.idFromName('hall')).fetch(request);
     if (url.pathname === '/api/mahjong') return env.MJ_HALL.get(env.MJ_HALL.idFromName('hall')).fetch(request);
+    // 鲁班七号躲技能: one leaderboard object checks and keeps everyone's best run.
+    if (url.pathname.startsWith('/api/dodge/')) return env.DODGE.get(env.DODGE.idFromName('board')).fetch(request);
     const handler = ROUTES[request.method + ' ' + url.pathname];
     if (handler) return handler(request, env, url);
     return env.ASSETS.fetch(request);

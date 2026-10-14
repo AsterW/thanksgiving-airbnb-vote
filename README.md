@@ -32,6 +32,12 @@ works for any group picking a place together.
   everyone's own phone. Each game has its own leaderboard (chips / 豆子), play
   points only. On a phone held upright the cards / tiles are bigger and the
   hand wraps into rows; held sideways while seated, the table fills the screen
+- 鲁班七号躲技能 (in the Gameroom): a single-player dodge game. Enemy skills
+  (钟馗's hook, 安琪拉's fireballs, 王昭君's ice, 小乔's fan, 后羿's arrow,
+  姜子牙's beam) warn on the ground, then fire, more and faster as time goes
+  on; one hit and the run is over. PC: right-click to move, F / D for 闪现.
+  Phone: sideways full screen, joystick + 闪现. One all-time leaderboard of
+  each person's longest survival
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
   claim, and suggested times to be at the airport for departures
@@ -43,7 +49,7 @@ works for any group picking a place together.
 ## How it works
 
 - **Frontend** (`web/`): React + Vite + Tailwind, one folder per feature
-  (`web/src/features/hunt`, `food`, `split`, `games`, `blackjack`, `ddz`, `guandan`, `mahjong`). People log in by picking
+  (`web/src/features/hunt`, `food`, `split`, `games`, `blackjack`, `ddz`, `guandan`, `mahjong`, `dodge`). People log in by picking
   their name from the group's user list; votes are tied to that user's token.
 - **Backend** (`worker/`): a Cloudflare Worker, one folder per feature, each
   exporting its own route table that `worker/index.js` merges. A small JSON API:
@@ -71,6 +77,13 @@ works for any group picking a place together.
   豆子 are saved the same way as Blackjack chips, in each hall's own storage,
   so every game's leaderboard is separate and play never touches the KV
   write budget.
+- **鲁班七号躲技能** (`POST /api/dodge/start`, `/api/dodge/finish`,
+  `GET /api/dodge/board`): the game is a deterministic simulation
+  (`worker/dodge/sim.js`, also bundled into the page) that runs in the
+  browser. A run starts with a seed from the `DodgeBoard` Durable Object; at
+  the end the browser sends its recorded inputs and the object replays them
+  to work out the real survival time, so scores can't be made up. Bests are
+  kept in the object's storage, not KV.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader
@@ -124,7 +137,7 @@ Notes:
 | `web/src/components/` | Shared UI: splash, nav, header, login, toast |
 | `web/src/lib/`, `web/src/session/` | Shared helpers, trip/page config, the logged-in user |
 | `worker/index.js` | Worker entry: merges the route tables, serves `dist/` |
-| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`, `games/` (shared game hall), `ddz/`, `guandan/`, `mahjong/`: storage, logic and routes |
+| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`, `games/` (shared game hall), `ddz/`, `guandan/`, `mahjong/`, `dodge/`: storage, logic and routes |
 | `worker/config/` | Trips and seed listings |
 | `wrangler.toml` | Deploy config (build step, KV, assets, Durable Objects) |
 | `CONTRIBUTING.md` | Where new code goes, and how to keep PRs from colliding |
