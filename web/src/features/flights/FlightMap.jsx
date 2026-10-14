@@ -127,7 +127,9 @@ export default function FlightMap({ people, mode }) {
   }).join('|');
 
   useEffect(() => {
-    const m = L.map(box.current, { scrollWheelZoom: false, worldCopyJump: true, zoomSnap: 0.25 });
+    // 视图中心锁死：不许拖动平移（dragging 关掉后手机上滑过地图也不会被地图抢走滚动），
+    // 方向键平移也关掉；缩放保留（滚轮/双指都是绕中心缩，中心不会跑）
+    const m = L.map(box.current, { scrollWheelZoom: false, worldCopyJump: true, zoomSnap: 0.25, dragging: false, keyboard: false });
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 12, className: 'osm-tiles',
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · 机场数据 <a href="https://openflights.org/data">OpenFlights</a>' }).addTo(m);
     m.setView([39.86, -104.67], 4);
