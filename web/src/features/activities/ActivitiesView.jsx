@@ -50,6 +50,10 @@ export default function ActivitiesView({ active }) {
     .map(x => ({ area: x, items: activities.filter(a => a.area === x).sort(byVotes) }))
     .filter(g => g.items.length), [activities, areas, area]);
 
+  // 地图和下面列表看同一批活动：选了某个区域组，地图就只钉那一组并重新取景
+  //（之前地图永远收到全量活动，和分组筛选脱节）
+  const mapItems = useMemo(() => groups.flatMap(g => g.items), [groups]);
+
   // 和 Airbnb 房源投票完全一致：成功投出 → 🎉 toast + 按钮弹跳 + 彩带庆祝；
   // 取消投票安安静静，不庆祝。
   async function vote(a, btn) {
@@ -117,7 +121,7 @@ export default function ActivitiesView({ active }) {
           🗺️ 活动地图
         </button>
       </div>
-      {mapOpen && <ActivitiesMap items={activities} token={token} visible={mapOpen} onFocus={focusCard} />}
+      {mapOpen && <ActivitiesMap items={mapItems} token={token} visible={mapOpen} onFocus={focusCard} />}
       {groups.map(g => (
         <section key={g.area} className="mb-8">
           <h2 className="font-bold text-lg mb-3">{g.area}</h2>
