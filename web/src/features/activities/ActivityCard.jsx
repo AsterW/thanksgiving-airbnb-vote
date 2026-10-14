@@ -1,18 +1,37 @@
-// One activity candidate: banner with its emoji, what/where blurb, who
-// voted, a vote toggle and a link out to the venue's own website. When
-// the card has a location pin, the place name links to Google Maps and
-// the ✎ opens the map picker; without one, the card offers to add it.
+import { useState } from 'react';
+
+// One activity candidate: banner — the source page's own picture when
+// the card has one, a gradient with its emoji otherwise — what/where
+// blurb, who voted, a vote toggle and a link out to the venue's own
+// website. When the card has a location pin, the place name links to
+// Google Maps and the ✎ opens the map picker; without one, the card
+// offers to add it.
 export default function ActivityCard({ a, token, banner, pop, onVote, onRemove, onSetPlace }) {
   const votes = a.votes || [];
   const voted = votes.some(v => v.token === token);
   const hasPin = a.lat != null && a.lng != null;
   const gmaps = hasPin ? 'https://www.google.com/maps/search/?api=1&query=' + a.lat + ',' + a.lng : null;
+  // Some CDNs refuse hotlinked images; if the picture won't load, drop
+  // back to the gradient banner instead of showing a broken-image box.
+  const [imgBad, setImgBad] = useState(false);
+  const showImg = !!a.img && !imgBad;
   return (
     <article data-id={a.id} className="glass-card rounded-2xl overflow-hidden flex flex-col">
-      <div className="relative h-20 flex items-center justify-center text-4xl" style={{ background: banner }}>
-        <span aria-hidden="true">{a.emoji}</span>
-        <button onClick={() => onRemove(a)} title="删除这个活动" className="absolute top-2 right-2 bg-black/40 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>
-      </div>
+      {showImg ? (
+        <div className="relative h-32 overflow-hidden" style={{ background: banner }}>
+          <img src={a.img} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setImgBad(true)}
+            className="absolute inset-0 w-full h-full object-cover" />
+          <span className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/35 to-transparent" aria-hidden="true" />
+          <button onClick={() => onRemove(a)} title="删除这个活动" className="absolute top-2 right-2 bg-black/40 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>
+        </div>
+      ) : (
+        <div className="relative h-20 flex items-center justify-center overflow-hidden" style={{ background: banner }}>
+          <span aria-hidden="true" className="absolute -right-3 -bottom-7 text-[92px] leading-none opacity-20 rotate-[-10deg] select-none">{a.emoji}</span>
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/25 to-transparent" />
+          <span aria-hidden="true" className="relative text-4xl drop-shadow">{a.emoji}</span>
+          <button onClick={() => onRemove(a)} title="删除这个活动" className="absolute top-2 right-2 bg-black/40 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>
+        </div>
+      )}
       <div className="p-4 flex flex-col flex-1">
         <h3 className="font-bold leading-snug mb-1">{a.title}</h3>
         <p className="text-xs text-slate-400 mb-2">{a.area} · 推荐来源：{a.source}</p>

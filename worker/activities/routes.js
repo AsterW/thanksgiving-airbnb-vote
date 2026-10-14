@@ -64,7 +64,7 @@ async function handleActivityAdd(req, env) {
       if (!place && rl.lat != null) place = { place: rl.name, lat: rl.lat, lng: rl.lng };
     }
   }
-  const info = linkName ? { ok: true, title: '', blurb: '' } : await fetchLinkInfo(url);
+  const info = linkName ? { ok: true, title: '', blurb: '', img: '' } : await fetchLinkInfo(url);
   const doc = await getActivities(env);
   if (doc.items.some(a => a.url === url)) return j({ ok: false, error: '这个链接已经在列表里了' });
   const givenTitle = String(body.title || '').trim().slice(0, 120);
@@ -75,6 +75,7 @@ async function handleActivityAdd(req, env) {
     area: CUSTOM_AREA,
     title: givenTitle || linkName || info.title || parsed.hostname.replace(/^www\./, ''),
     blurb: info.blurb || '',
+    img: info.img || '',
     url,
     source: by ? '群友添加 · ' + by : '群友添加',
     custom: true,
@@ -119,10 +120,27 @@ async function handleActivityPlace(req, env) {
   return j({ ok: true, activity: act });
 }
 
+// Set or clear a card's banner picture. Cards added before the parser
+// learned to grab the page's share image wear a plain emoji banner;
+// this is the repair path for them. Same trust model as place/remove:
+// absolute http(s) URLs only, anything else clears the picture.
+async function handleActivityImage(req, env) {
+  let body = {};
+  try { body = await req.json(); } catch (e) { /* ignore */ }
+  const doc = await getActivities(env);
+  const act = doc.items.find(a => a.id === body.id);
+  if (!act) return j({ ok: false, error: '活动不存在' });
+  const img = String(body.img || '').trim().slice(0, 1000);
+  act.img = /^https?:\/\//i.test(img) ? img : '';
+  await saveActivities(env, doc);
+  return j({ ok: true, activity: act });
+}
+
 export const routes = {
   'GET /api/activities': async (req, env) => j({ ok: true, activities: (await getActivities(env)).items }),
   'POST /api/activity-vote': handleActivityVote,
   'POST /api/activity-add': handleActivityAdd,
   'POST /api/activity-remove': handleActivityRemove,
   'POST /api/activity-place': handleActivityPlace,
+  'POST /api/activity-image': handleActivityImage,
 };
