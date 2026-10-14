@@ -4,7 +4,7 @@ import { j, uid } from '../lib/http.js';
 import { cleanName } from '../users/users.js';
 import { expandLink, isMapsLink, readLink } from './maps.js';
 import { placePhotos } from './photos.js';
-import { getFood, saveFood } from './store.js';
+import { getFood, updateFood } from './store.js';
 
 const readBody = async req => { try { return await req.json(); } catch (e) { return {}; } };
 
@@ -23,35 +23,41 @@ async function handleAdd(req, env) {
   const mapsUrl = await expandLink(link);
   const { name, lat, lng } = mapsUrl ? readLink(mapsUrl) : { name: '' };
   if (!name) return j({ ok: false, error: '找不到这家餐厅。在 Google 地图里打开店铺页，点“分享”复制链接再试' });
-  let food = await getFood(env, body.trip);
-  let existing = food.places.find(p => p.name.toLowerCase() === name.toLowerCase());
-  if (existing) return j({ ok: true, deduped: true, place: existing, places: food.places });
+  const pre = await getFood(env, body.trip);
+  const preExisting = pre.places.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (preExisting) return j({ ok: true, deduped: true, place: preExisting, places: pre.places });
   const images = await placePhotos(mapsUrl);
-  // Fetching photos took a while: re-read so concurrent votes and adds aren't lost.
-  food = await getFood(env, body.trip);
-  existing = food.places.find(p => p.name.toLowerCase() === name.toLowerCase());
-  if (existing) return j({ ok: true, deduped: true, place: existing, places: food.places });
+  // Fetching photos took a while: the insert happens in a transaction
+  // against the freshest document, with the dedupe check re-run inside
+  // (another request may have added the same place meanwhile).
   const place = {
     id: uid(), name, url: mapsUrl, lat, lng, images,
     note: String(body.note || '').trim().slice(0, 120), addedBy: cleanName(body.addedBy),
     createdAt: Date.now(), votes: [],
   };
-  food.places.unshift(place);
-  await saveFood(env, body.trip, food);
-  return j({ ok: true, place, places: food.places });
+  const out = await updateFood(env, body.trip, food => {
+    const existing = food.places.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existing) return { deduped: true, place: existing, places: food.places };
+    food.places.unshift(place);
+    return { place, places: food.places };
+  });
+  if (out.deduped) return j({ ok: true, deduped: true, place: out.place, places: out.places });
+  return j({ ok: true, place: out.place, places: out.places });
 }
 
 // Same toggle as listings: with a name it's a vote, without one it's taking it back.
 async function handleVote(req, env) {
   const { trip, id, token, name } = await readBody(req);
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
-  const food = await getFood(env, trip);
-  const place = food.places.find(p => p.id === id);
-  if (!place) return j({ ok: false, error: '这家已经被删掉了' });
-  place.votes = place.votes.filter(v => v.token !== token);
-  if (name) place.votes.push({ token: String(token).slice(0, 80), name: cleanName(name), at: Date.now() });
-  await saveFood(env, trip, food);
-  return j({ ok: true, votes: place.votes });
+  const out = await updateFood(env, trip, food => {
+    const place = food.places.find(p => p.id === id);
+    if (!place) return { error: '这家已经被删掉了' };
+    place.votes = place.votes.filter(v => v.token !== token);
+    if (name) place.votes.push({ token: String(token).slice(0, 80), name: cleanName(name), at: Date.now() });
+    return { votes: place.votes };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, votes: out.votes });
 }
 
 // Photos for a place added before photos existed (no `images` field yet).
@@ -62,22 +68,27 @@ async function handlePhotos(req, env) {
   if (!peek) return j({ ok: false, error: '这家已经被删掉了' });
   if (Array.isArray(peek.images)) return j({ ok: true, images: peek.images });
   const images = await placePhotos(peek.url);
-  const food = await getFood(env, trip); // re-read after the slow fetch
-  const place = food.places.find(p => p.id === id);
-  if (!place) return j({ ok: false, error: '这家已经被删掉了' });
-  place.images = images;
-  await saveFood(env, trip, food);
+  // Apply onto the freshest document (the fetch above was slow).
+  const out = await updateFood(env, trip, food => {
+    const place = food.places.find(p => p.id === id);
+    if (!place) return { error: '这家已经被删掉了' };
+    place.images = images;
+    return {};
+  });
+  if (out.error) return j({ ok: false, error: out.error });
   return j({ ok: true, images });
 }
 
 async function handleRemove(req, env) {
   const { trip, id } = await readBody(req);
-  const food = await getFood(env, trip);
-  const i = food.places.findIndex(p => p.id === id);
-  if (i < 0) return j({ ok: false, error: '这家已经被删掉了' });
-  food.places.splice(i, 1);
-  await saveFood(env, trip, food);
-  return j({ ok: true, places: food.places });
+  const out = await updateFood(env, trip, food => {
+    const i = food.places.findIndex(p => p.id === id);
+    if (i < 0) return { error: '这家已经被删掉了' };
+    food.places.splice(i, 1);
+    return { places: food.places };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, places: out.places });
 }
 
 export const routes = {

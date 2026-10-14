@@ -46,11 +46,22 @@ class_name = "MahjongHall"
 tag = "v3"
 new_sqlite_classes = ["GuandanHall", "MahjongHall"]
 
+# The storekeeper: one Durable Object (StoreDO) owning every mutable
+# app document, so concurrent writes serialize instead of overwriting
+# each other (KV has no locks; see worker/store/store.js).
+[[durable_objects.bindings]]
+name = "STORE"
+class_name = "StoreDO"
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["StoreDO"]
+
 # 鲁班七号躲技能 leaderboard: one Durable Object that replays and keeps best runs.
 [[durable_objects.bindings]]
 name = "DODGE"
 class_name = "DodgeBoard"
 
 [[migrations]]
-tag = "v4"
+tag = "v5"
 new_sqlite_classes = ["DodgeBoard"]

@@ -2,8 +2,10 @@
 // number, date, the other airport and the two local times; the server checks
 // the airports against the airport list, works out UTC times and duration
 // across time zones, and sends back airport details for the map.
-// KV flights:v1, keyed by lower-cased user name.
+// Stored in the store (worker/store) under flights:v1 — its old KV key,
+// imported on first read — keyed by lower-cased user name.
 import { j } from '../lib/http.js';
+import { readDoc, transact } from '../lib/store.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
 import { AIRPORTS } from './airports.js';
 import { localToUtc, utcToLocalDate } from './time.js';
@@ -16,8 +18,18 @@ const airport = code => {
 };
 
 async function getFlights(env) {
-  const raw = await env.VOTES_KV.get(KEY);
-  return raw ? JSON.parse(raw) : {};
+  const { doc } = await readDoc(env, KEY);
+  return doc || {};
+}
+
+// fn(all) mutates the freshest flights document and returns the
+// handler's result; the commit is version-checked (see lib/store.js).
+async function updateFlights(env, fn) {
+  return transact(env, KEY, async doc => {
+    const all = doc || {};
+    const result = await fn(all);
+    return { doc: all, result };
+  });
 }
 
 // The caller, if their name and token match the user list.
@@ -77,10 +89,11 @@ async function handleSave(req, env) {
   if (!target) return j({ ok: false, error: '没有这个人' });
   const a = readFlight(body.arrival, '到达航班'), d = readFlight(body.departure, '离开航班');
   if (a.error || d.error) return j({ ok: false, error: a.error || d.error });
-  const all = await getFlights(env);
   const key = target.name.toLowerCase();
-  all[key] = { ...all[key], arrival: a.flight, departure: d.flight, noFlight: !!body.noFlight, updatedAt: Date.now(), updatedBy: user.name };
-  await env.VOTES_KV.put(KEY, JSON.stringify(all));
+  const all = await updateFlights(env, all => {
+    all[key] = { ...all[key], arrival: a.flight, departure: d.flight, noFlight: !!body.noFlight, updatedAt: Date.now(), updatedBy: user.name };
+    return all;
+  });
   return j(view(users, all));
 }
 
@@ -90,13 +103,14 @@ async function handlePickup(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const { users, user } = await caller(env, body.name, body.token);
   if (!user) return j({ ok: false, error: '先登录' });
-  const all = await getFlights(env);
-  for (const who of Array.isArray(body.who) ? body.who.slice(0, 30) : []) {
-    const key = cleanName(who).toLowerCase();
-    if (!all[key]?.arrival) continue;
-    all[key].pickupBy = body.claim ? user.name : '';
-  }
-  await env.VOTES_KV.put(KEY, JSON.stringify(all));
+  const all = await updateFlights(env, all => {
+    for (const who of Array.isArray(body.who) ? body.who.slice(0, 30) : []) {
+      const key = cleanName(who).toLowerCase();
+      if (!all[key]?.arrival) continue;
+      all[key].pickupBy = body.claim ? user.name : '';
+    }
+    return all;
+  });
   return j(view(users, all));
 }
 

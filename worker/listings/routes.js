@@ -3,7 +3,7 @@
 import { j, uid } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
 import { fetchListingInfo, roomIdFrom } from './scrape.js';
-import { getState, saveState } from './state.js';
+import { getState, updateState } from './state.js';
 import { handlePrices } from './prices.js';
 import { needsArea, pickArea, routes as zoneRoutes } from './zones.js';
 import { closedError, voteView, votingOpen, routes as decisionRoutes } from './decision.js';
@@ -30,11 +30,10 @@ async function handleAdd(req, env) {
   const info = await fetchListingInfo(url);
   // Pick its area (may look up the town name) before re-reading state, for the same reason.
   const { area } = await pickArea(trip, preState.listings, { lat: info.lat, lng: info.lng });
-  // Re-read fresh state now that the slow work is done, and re-check
-  // dedupe: another request may have added this same room meanwhile.
-  const state = await getState(env, trip);
-  const existing = state.listings.find(l => l.roomId === roomId);
-  if (existing) return j({ ok: true, listing: existing, deduped: true });
+  // Apply onto the freshest state inside a store transaction, and
+  // re-check dedupe there: another request may have added this same
+  // room meanwhile (the transaction re-runs this if a write lands
+  // between our read and commit, so the check is authoritative).
   const listing = {
     id: uid(), roomId, url,
     title: (info.title || '').slice(0, 120) || '未命名房源',
@@ -43,9 +42,14 @@ async function handleAdd(req, env) {
     sleeps: info.guests || null, bedrooms: info.bedrooms, beds: info.beds, bathrooms: info.bathrooms,
     rating: info.rating || null, reviews: info.reviews || null, note: '', addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: []
   };
-  state.listings.unshift(listing);
-  await saveState(env, trip, state);
-  return j({ ok: true, listing, fetched: info.ok });
+  const out = await updateState(env, trip, state => {
+    const existing = state.listings.find(l => l.roomId === roomId);
+    if (existing) return { deduped: true, listing: existing };
+    state.listings.unshift(listing);
+    return { listing };
+  });
+  if (out.deduped) return j({ ok: true, listing: out.listing, deduped: true });
+  return j({ ok: true, listing: out.listing, fetched: info.ok });
 }
 
 async function handleAddManual(req, env) {
@@ -57,8 +61,6 @@ async function handleAddManual(req, env) {
   if (!roomId || !title) return j({ ok: false, error: '链接和标题是必填的' });
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
-  const state = await getState(env, trip);
-  if (state.listings.find(l => l.roomId === roomId)) return j({ ok: false, error: '这间已经在清单里了' });
   const num = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
   const listing = { id: uid(), roomId, url, title,
     image: String(body.image || '').trim().slice(0, 500), area: String(body.area || '').slice(0, 40),
@@ -66,9 +68,13 @@ async function handleAddManual(req, env) {
     beds: num(body.beds), bathrooms: num(body.bathrooms),
     rating: null, reviews: null, note: String(body.note || '').slice(0, 200),
     addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: [] };
-  state.listings.unshift(listing);
-  await saveState(env, trip, state);
-  return j({ ok: true, listing });
+  const out = await updateState(env, trip, state => {
+    if (state.listings.find(l => l.roomId === roomId)) return { error: '这间已经在清单里了' };
+    state.listings.unshift(listing);
+    return { listing };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, listing: out.listing });
 }
 
 async function handleVote(req, env) {
@@ -78,17 +84,19 @@ async function handleVote(req, env) {
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
-  const state = await getState(env, trip);
-  const listing = state.listings.find(l => l.id === id);
-  if (!listing) return j({ ok: false, error: '房源不存在' });
-  listing.votes = (listing.votes || []).filter(v => v.token !== token);
-  let voted = false;
-  if (name) {
-    listing.votes.push({ token: String(token).slice(0, 80), name: String(name).slice(0, 20), at: Date.now() });
-    voted = true;
-  }
-  await saveState(env, trip, state);
-  return j({ ok: true, votes: listing.votes, voted });
+  const out = await updateState(env, trip, state => {
+    const listing = state.listings.find(l => l.id === id);
+    if (!listing) return { error: '房源不存在' };
+    listing.votes = (listing.votes || []).filter(v => v.token !== token);
+    let voted = false;
+    if (name) {
+      listing.votes.push({ token: String(token).slice(0, 80), name: String(name).slice(0, 20), at: Date.now() });
+      voted = true;
+    }
+    return { votes: listing.votes, voted };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, votes: out.votes, voted: out.voted });
 }
 
 async function handleRemove(req, env) {
@@ -96,11 +104,13 @@ async function handleRemove(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
-  const state = await getState(env, trip);
-  const i = state.listings.findIndex(l => l.id === body.id);
-  if (i < 0) return j({ ok: false, error: '房源不存在' });
-  state.listings.splice(i, 1);
-  await saveState(env, trip, state);
+  const out = await updateState(env, trip, state => {
+    const i = state.listings.findIndex(l => l.id === body.id);
+    if (i < 0) return { error: '房源不存在' };
+    state.listings.splice(i, 1);
+    return {};
+  });
+  if (out.error) return j({ ok: false, error: out.error });
   return j({ ok: true });
 }
 
@@ -118,24 +128,26 @@ async function handleEnrich(req, env) {
   if (!info.ok) return j({ ok: false });
   const located = { ...peek, lat: peek.lat ?? info.lat, lng: peek.lng ?? info.lng };
   const { area } = needsArea(located) ? await pickArea(trip, peekState.listings, located) : { area: null };
-  // Re-read fresh state after scraping and merge onto the live listing.
+  // Merge onto the live listing inside a transaction, after scraping.
   // If it was removed while we were scraping, don't resurrect it.
-  const state = await getState(env, trip);
-  const listing = state.listings.find(l => l.id === body.id);
-  if (!listing) return j({ ok: false });
-  if ((!listing.title || listing.title === '未命名房源') && info.title) listing.title = info.title.slice(0, 120);
-  if (!listing.image && info.image) listing.image = info.image;
-  if ((info.images || []).length > (listing.images || []).length) listing.images = info.images;
-  if ('lat' in info && listing.lat == null) { listing.lat = info.lat; listing.lng = info.lng; }
-  if (area && !listing.area && !listing.areaManual) listing.area = area;
-  if (listing.bedrooms == null && info.bedrooms != null) listing.bedrooms = info.bedrooms;
-  if (listing.bathrooms == null && info.bathrooms != null) listing.bathrooms = info.bathrooms;
-  if (listing.beds == null && info.beds != null) listing.beds = info.beds;
-  if (listing.sleeps == null && info.guests != null) listing.sleeps = info.guests;
-  if (listing.rating == null && info.rating != null) listing.rating = info.rating;
-  if (listing.reviews == null && info.reviews != null) listing.reviews = info.reviews;
-  await saveState(env, trip, state);
-  return j({ ok: true, listing });
+  const out = await updateState(env, trip, state => {
+    const listing = state.listings.find(l => l.id === body.id);
+    if (!listing) return { gone: true };
+    if ((!listing.title || listing.title === '未命名房源') && info.title) listing.title = info.title.slice(0, 120);
+    if (!listing.image && info.image) listing.image = info.image;
+    if ((info.images || []).length > (listing.images || []).length) listing.images = info.images;
+    if ('lat' in info && listing.lat == null) { listing.lat = info.lat; listing.lng = info.lng; }
+    if (area && !listing.area && !listing.areaManual) listing.area = area;
+    if (listing.bedrooms == null && info.bedrooms != null) listing.bedrooms = info.bedrooms;
+    if (listing.bathrooms == null && info.bathrooms != null) listing.bathrooms = info.bathrooms;
+    if (listing.beds == null && info.beds != null) listing.beds = info.beds;
+    if (listing.sleeps == null && info.guests != null) listing.sleeps = info.guests;
+    if (listing.rating == null && info.rating != null) listing.rating = info.rating;
+    if (listing.reviews == null && info.reviews != null) listing.reviews = info.reviews;
+    return { listing };
+  });
+  if (out.gone) return j({ ok: false });
+  return j({ ok: true, listing: out.listing });
 }
 
 // The trip's listings plus the whole group's ledger. members/expenses
