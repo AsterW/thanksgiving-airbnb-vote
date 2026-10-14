@@ -1,3 +1,21 @@
 /* Activities page: vote button's filled state (base styling is Tailwind
    classes on the button, same as the hunt cards). */
 .act-vote-btn.voted { background:#e11d48 !important; color:#fff !important; border-color:#e11d48 !important; }
+
+/* Activities overview map (mirrors the food map's pin language). */
+.act-map-box { position:relative; z-index:0; isolation:isolate; }
+.act-map { height:320px; }
+@media (min-width:768px) { .act-map { height:400px; } }
+.apin-wrap { background:none; border:none; }
+.apin { position:absolute; left:0; bottom:0; transform:translate(-50%, -6px); white-space:nowrap; background:#fff; color:#0f172a; font-weight:700; font-size:12px;
+  padding:4px 8px; border-radius:999px; box-shadow:0 2px 8px rgba(15,23,42,.25); border-top:5px solid #059669; }
+.apin::after { content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); border:5px solid transparent; border-bottom:0; border-top-color:inherit; }
+.apin .apin-votes { color:#e11d48; margin-left:4px; }
+.apin.mine { background:#e11d48; color:#fff; border-top-color:#e11d48; }
+.apin.mine .apin-votes { color:#ffe4e6; }
+.apin:hover { background:#1e1b4b; color:#fff; border-top-color:#1e1b4b; transform:translate(-50%, -6px) scale(1.1); z-index:1000; }
+
+/* Location picker modal: the Leaflet box and its big draggable pin. */
+.loc-map { height:320px; }
+.loc-pin-wrap { background:none; border:none; }
+.loc-pin { font-size:30px; line-height:1; text-align:center; filter:drop-shadow(0 2px 3px rgba(0,0,0,.4)); cursor:grab; }
