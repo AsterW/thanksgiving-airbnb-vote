@@ -32,3 +32,12 @@ class_name = "DdzHall"
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["DdzHall"]
+
+# 掼蛋 and 川麻 rooms: one Durable Object each, three tables of four.
+[[durable_objects.bindings]]
+name = "GD_HALL"
+class_name = "GuandanHall"
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["GuandanHall"]

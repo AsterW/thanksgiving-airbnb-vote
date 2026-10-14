@@ -2,13 +2,18 @@ import { useState } from 'react';
 import { load, save } from '../../lib/storage.js';
 import BlackjackView from '../blackjack/BlackjackView.jsx';
 import DdzView from '../ddz/DdzView.jsx';
+import GuandanView from '../guandan/GuandanView.jsx';
 
 // Gameroom：几个小游戏放在一个标签页里，每个有自己的筹码 / 豆子榜。
 // 每个游戏一直挂着（切走只是藏起来），各自按 active 决定连不连服务器。
-const GAMES = [{ key: 'bj', label: '🃏 Blackjack' }, { key: 'ddz', label: '🀄 斗地主' }];
+const GAMES = [
+  { key: 'bj', label: '🃏 Blackjack', View: BlackjackView },
+  { key: 'ddz', label: '👑 斗地主', View: DdzView },
+  { key: 'gd', label: '🥚 掼蛋', View: GuandanView },
+];
 
 export default function GamesView({ active }) {
-  const [game, setGame] = useState(() => (load('game') === 'ddz' ? 'ddz' : 'bj'));
+  const [game, setGame] = useState(() => (GAMES.some(g => g.key === load('game')) ? load('game') : 'bj'));
   const pick = g => { setGame(g); save('game', g); };
   return (
     <>
@@ -18,8 +23,7 @@ export default function GamesView({ active }) {
             className={'rounded-full px-5 py-2 font-bold ' + (g.key === game ? 'bg-indigo-600 text-white shadow' : 'glass-pill text-slate-600')}>{g.label}</button>
         ))}
       </div>
-      <div hidden={game !== 'bj'}><BlackjackView active={active && game === 'bj'} /></div>
-      <div hidden={game !== 'ddz'}><DdzView active={active && game === 'ddz'} /></div>
+      {GAMES.map(({ key, View }) => <div key={key} hidden={game !== key}><View active={active && game === key} /></div>)}
     </>
   );
 }
