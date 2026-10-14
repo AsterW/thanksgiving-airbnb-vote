@@ -10,10 +10,13 @@ body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 .view-enter { animation: view-in .35s ease; }
 @keyframes view-in { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
 @media (prefers-reduced-motion: reduce) { .view-enter { animation:none; } }
-/* 切换行程（25–26 ↔ 26–29）时内容柔和上浮淡入：比切页面的 view-in 稍慢、位移稍大，
-   让「换了一整套清单」的感觉顺滑，不生硬闪换 */
-.trip-enter { animation: trip-in .45s cubic-bezier(.22,.9,.3,1); }
-@keyframes trip-in { from { opacity:0; transform: translateY(14px); } to { opacity:1; transform:none; } }
+/* 切换行程（25–26 ↔ 26–29）时走 iOS 式的水晶溶解：内容先微微虚化、
+   缩小一丝，再在弹簧曲线上清晰落定——不位移、不闪烁，像换了一层玻璃 */
+.trip-enter { animation: trip-in .55s cubic-bezier(.22,1,.36,1); will-change: opacity, transform, filter; }
+@keyframes trip-in {
+  from { opacity:.25; transform: scale(.982); filter: blur(7px); }
+  to { opacity:1; transform: scale(1); filter: blur(0); }
+}
 @media (prefers-reduced-motion: reduce) { .trip-enter { animation:none; } }
 
 /* ==== Liquid Glass · 阶段 1：外壳（侧栏 / 底部栏 / 页头）====
