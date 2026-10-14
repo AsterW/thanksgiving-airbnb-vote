@@ -32,17 +32,20 @@ const PLANE = color => '<div class="fl-plane"><svg viewBox="0 0 24 24" width="22
 
 // 动起来：每条航线先顺着飞行方向画出来（到达从外地画进丹佛，离开从丹佛画出去），
 // 然后线上的虚线一直往前流，小飞机沿着航线慢慢绕圈飞。系统开了「减少动态效果」就不动。
-// instant=true 时不重播画线动画：只是数据刷新（别人刚填了航班）时，线和飞机直接到位，
-// 不然每次有人保存，整张图都要闪一遍、飞机全部从头飞。
-function animate(m, group, drawn, instant) {
+// instant=true 时不重播画线动画。phases 是跨重画保留的进度表（key -> 0..1）：
+// 重画时每架飞机从它刚才的位置接着飞，不回起点，免得一刷新就满图瞬移。
+function animate(m, group, drawn, instant, phases) {
   const timers = [], planes = [];
-  const spawn = ({ flow, pts, color, minutes }, i) => {
+  const spawn = (d, i) => {
+    const { flow, pts, color, minutes } = d;
     flow.addTo(group);
     const plane = L.marker(pts[0], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'pin-wrap', html: PLANE(color), iconSize: [0, 0] }) }).addTo(m);
     // 飞得慢一点、稳一点：时长按真实飞行时间拉长（2 小时约 13 秒一圈，13 小时封顶 30 秒），
     // 每架错开相位起飞，不会齐刷刷从起点排队出发
     const period = Math.min(30000, Math.max(9000, 6000 + minutes * 45));
-    planes.push({ plane, pts, period, start: performance.now() - (i * 0.37 % 1) * period });
+    const saved = phases.get(d.key);
+    const start = performance.now() - (saved != null ? saved : (i * 0.37 % 1)) * period;
+    planes.push({ plane, pts, period, start, key: d.key });
   };
   drawn.forEach((d, i) => {
     if (instant) { spawn(d, i); return; }
@@ -85,13 +88,32 @@ function animate(m, group, drawn, instant) {
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
-  return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); planes.forEach(p => p.plane.remove()); };
+  return () => {
+    timers.forEach(clearTimeout);
+    cancelAnimationFrame(raf);
+    // 拆之前把每架飞机的进度记下来，下次重画接着飞
+    const now = performance.now();
+    for (const p of planes) {
+      phases.set(p.key, (Math.max(0, now - p.start) % p.period) / p.period);
+      p.plane.remove();
+    }
+  };
 }
 
 // 大家的航线：到达 / 离开分开看。同一条航线的人合成一条线，线越粗人越多
 export default function FlightMap({ people, mode }) {
   const box = useRef(null), map = useRef(null), layer = useRef(null);
   const shownMode = useRef(null); // 画线动画只在第一次看这个模式时播，之后的数据刷新直接到位
+  const phases = useRef(new Map()); // 每条航线的飞机进度，跨重画保留
+  const latest = useRef({ people, mode });
+  latest.current = { people, mode };
+  // 内容签名：上层每次渲染都给新数组（travelers 是现 filter 的），只认对象身份的话
+  // 任何一次重渲染都会把地图推倒重来——线重画、飞机回起点、视图重新 fit。
+  // 改成只看内容：航班没变，地图一个像素都不许动。
+  const sig = mode + '|' + people.map(p => {
+    const f = mode === 'arrival' ? p.arrival : p.departure;
+    return f ? [p.name, f.flight, f.from.iata, f.to.iata, f.depUtc, f.arrUtc].join(':') : p.name + ':-';
+  }).join('|');
 
   useEffect(() => {
     const m = L.map(box.current, { scrollWheelZoom: false, worldCopyJump: true, zoomSnap: 0.25 });
@@ -108,6 +130,7 @@ export default function FlightMap({ people, mode }) {
   useEffect(() => {
     const m = map.current;
     if (!m) return;
+    const { people, mode } = latest.current;
     layer.current.clearLayers();
     const legs = people.map(p => ({ name: p.name, f: mode === 'arrival' ? p.arrival : p.departure })).filter(x => x.f);
     const routes = new Map();
@@ -133,7 +156,7 @@ export default function FlightMap({ people, mode }) {
       const line = L.polyline(pts, { color, weight, opacity: 0.85 }).bindTooltip(tip, { sticky: true }).addTo(layer.current);
       // 往前流的白色虚线（线画完之后才加进图层组，切换时跟着一起清掉），方向就是飞行方向
       const flow = L.polyline(pts, { color: '#fff', weight: Math.max(1.5, weight - 2), opacity: 0.9, className: 'fl-flow', interactive: false });
-      drawn.push({ line, flow, pts, color, minutes: Math.max(...rt.legs.map(x => x.f.minutes)) });
+      drawn.push({ line, flow, pts, color, key: mode + ':' + rt.from.iata + '-' + rt.to.iata, minutes: Math.max(...rt.legs.map(x => x.f.minutes)) });
       // 端点：一个机场只画一个点，记下在这儿上下飞机的人
       for (const [ap, end] of [[rt.from, pts[0]], [rt.to, pts[pts.length - 1]]]) {
         const a = airports.get(ap.iata) || { ap, at: end, names: new Set() };
@@ -153,8 +176,11 @@ export default function FlightMap({ people, mode }) {
     if (reduceMotion) { drawn.forEach(d => d.flow.addTo(layer.current)); return; }
     const instant = shownMode.current === mode;
     shownMode.current = mode;
-    return animate(m, layer.current, drawn, instant);
-  }, [people, mode]);
+    return animate(m, layer.current, drawn, instant, phases.current);
+    // 只认内容签名：people 数组身份变了但内容没变时，这个 effect 根本不重跑，
+    // 地图不重 fit、飞机不重启。数据真变了才重画（且飞机接着原来的进度飞）。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sig]);
 
   return <div ref={box} className="flight-map"></div>;
 }
