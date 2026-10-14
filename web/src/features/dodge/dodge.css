@@ -24,3 +24,7 @@
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
 html.dg-lock, html.dg-lock body { overflow:hidden; overscroll-behavior:none; }
 .dg-pause { position:absolute; top:.5rem; left:.6rem; width:2.4rem; height:2.4rem; border-radius:9999px; background:rgba(0,0,0,.35); color:#fff; font-size:1rem; z-index:2; }
+/* nothing in the game is for selecting or copying: a long-press on iPhone would otherwise select text and pop up 拷贝 */
+.dg-full, .dg-stage, .dg-over, .dg-box { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+html.dg-lock, html.dg-lock body { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.dg-tip { font-size:.8rem; line-height:1.4; color:#fef3c7; background:rgba(0,0,0,.25); border-radius:.75rem; padding:.45rem .7rem; max-width:28rem; }

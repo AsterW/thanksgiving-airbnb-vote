@@ -26,3 +26,6 @@
 .gt-full .gt-btn { padding:.4rem .9rem; }
 .gt-exit { position:absolute; top:.3rem; right:.5rem; width:2rem; height:2rem; border-radius:9999px; background:rgba(0,0,0,.3); color:#fff; font-weight:800; z-index:2; }
 html.gt-lock, html.gt-lock body { overflow:hidden; overscroll-behavior:none; }
+/* card tables are for tapping, not selecting: no text selection or long-press copy menu */
+.gt-felt { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+html.gt-lock, html.gt-lock body { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
