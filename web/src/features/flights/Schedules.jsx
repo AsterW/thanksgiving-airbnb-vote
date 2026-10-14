@@ -1,5 +1,5 @@
 import { useSession } from '../../session/SessionContext.jsx';
-import { CURB_MIN, AIRPORT_EARLY_MIN, duration, localTime } from './plan.js';
+import { CURB_MIN, AIRPORT_EARLY_MIN, CAR_RETURN_MIN, duration, localTime } from './plan.js';
 
 const leg = (f, tz, field) => localTime(f[field], tz, false);
 
@@ -40,26 +40,29 @@ export function Pickups({ runs, onClaim }) {
   );
 }
 
-// 🛫 送机：每个人最晚几点到机场，时间相近的可以拼车
+// 🛫 离开：全员一起去机场还租的车，按最早起飞的那班倒推整组的时间
 export function Departures({ runs }) {
   return (
     <section className="bg-white rounded-2xl shadow p-5">
-      <h2 className="font-bold text-lg">🛫 离开：建议到机场时间</h2>
-      <p className="text-xs text-slate-500 mb-3">国内航班起飞前 {AIRPORT_EARLY_MIN.domestic / 60} 小时到机场，国际 {AIRPORT_EARLY_MIN.international / 60} 小时（DEN 安检常常排长队）；时间接近的放在一组，可以拼一辆车。从住的地方出发还要加上开车时间</p>
+      <h2 className="font-bold text-lg">🛫 离开：全员到机场时间</h2>
+      <p className="text-xs text-slate-500 mb-3">大家一起去机场还车，所以按最早起飞的那班算：国内航班起飞前 {AIRPORT_EARLY_MIN.domestic / 60} 小时、国际 {AIRPORT_EARLY_MIN.international / 60} 小时到航站楼（DEN 安检常常排长队），再提前 {CAR_RETURN_MIN} 分钟到租车点还车、坐摆渡车。从住的地方出发还要加上开车时间</p>
       {!runs.length && <p className="text-sm text-slate-400">还没有人填离开航班</p>}
       <div className="space-y-3">
         {runs.map(r => (
-          <div key={r.airport.iata + r.first} className="rounded-xl border-l-4 border-indigo-400 bg-indigo-50/50 p-3">
+          <div key={r.airport.iata} className="rounded-xl border-l-4 border-indigo-400 bg-indigo-50/50 p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-black text-lg tabular-nums">{localTime(r.arriveBy, r.airport.tz)}</span>
-              <span className="text-sm">前到 <b>{r.airport.iata}</b> {r.airport.city}{r.items.length > 1 ? ' · 🚗 ' + r.items.length + ' 人可以拼车' : ''}</span>
+              <span className="text-sm">全员 {r.items.length} 人到 <b>{r.airport.iata}</b> 租车点还车 🚗</span>
+              <span className="text-sm text-slate-500">· {localTime(r.terminalBy, r.airport.tz, false)} 前到航站楼</span>
             </div>
             <ul className="mt-2 text-sm space-y-1">
               {r.items.map(i => (
                 <li key={i.name} className="flex flex-wrap gap-x-2">
                   <b>{i.name}</b>
                   <span className="text-slate-600">{i.f.flight} {leg(i.f, r.airport.tz, 'depUtc')} 起飞 → {i.f.to.iata} {i.f.to.city} {leg(i.f, i.f.to.tz, 'arrUtc')}</span>
-                  <span className="text-slate-400">最晚 {localTime(i.t, r.airport.tz, false)} 到 · 飞 {duration(i.f.minutes)}</span>
+                  <span className={i.f.depUtc - r.terminalBy > 4 * 3600000 ? 'text-amber-600' : 'text-slate-400'}>
+                    到航站楼后等 {duration(Math.round((i.f.depUtc - r.terminalBy) / 60000))} · 飞 {duration(i.f.minutes)}
+                  </span>
                 </li>
               ))}
             </ul>
