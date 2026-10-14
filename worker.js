@@ -174,8 +174,15 @@ function roomIdFrom(url) {
 
 async function getState(env, trip) {
   const raw = await env.VOTES_KV.get(trip.kvKey);
-  if (raw) return JSON.parse(raw);
-  const state = { listings: trip.seed.map(s => ({ id: uid(), ...s, addedBy: 'Ken', createdAt: Date.now(), votes: [] })), updatedAt: Date.now() };
+  if (raw) {
+    const state = JSON.parse(raw);
+    // Migrate states saved before splitwise existed.
+    if (!Array.isArray(state.listings)) state.listings = [];
+    if (!Array.isArray(state.members)) state.members = [];
+    if (!Array.isArray(state.expenses)) state.expenses = [];
+    return state;
+  }
+  const state = { listings: trip.seed.map(s => ({ id: uid(), ...s, addedBy: 'Ken', createdAt: Date.now(), votes: [] })), members: [], expenses: [], updatedAt: Date.now() };
   await env.VOTES_KV.put(trip.kvKey, JSON.stringify(state));
   return state;
 }
@@ -301,16 +308,117 @@ async function handleEnrich(req, env) {
   return j({ ok: true, listing });
 }
 
+// ---------- Splitwise: per-trip expense splitting ----------
+// Money is handled in integer cents to avoid float drift. Each expense is
+// split equally among splitAmong; leftover cents go one each to the first
+// participants (in listed order) so shares always sum to the exact total.
+function computeBalances(expenses) {
+  const bal = {};
+  for (const e of expenses || []) {
+    const cents = Math.round(Number(e.amountCents) || 0);
+    const among = (e.splitAmong || []).filter(Boolean);
+    if (!cents || !among.length || !e.paidBy) continue;
+    bal[e.paidBy] = (bal[e.paidBy] || 0) + cents;
+    const base = Math.floor(cents / among.length);
+    let rem = cents - base * among.length;
+    for (const name of among) {
+      const share = base + (rem > 0 ? 1 : 0);
+      if (rem > 0) rem--;
+      bal[name] = (bal[name] || 0) - share;
+    }
+  }
+  return bal;
+}
+
+// Greedy settle-up: biggest debtor pays biggest creditor first, which
+// keeps the number of transfers at or below (people - 1).
+function computeSettlements(balances) {
+  const debtors = Object.entries(balances || {}).filter(([, v]) => v < 0).sort((a, b) => a[1] - b[1]);
+  const creditors = Object.entries(balances || {}).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const out = [];
+  let di = 0, ci = 0;
+  let dLeft = debtors.length ? -debtors[0][1] : 0;
+  let cLeft = creditors.length ? creditors[0][1] : 0;
+  while (di < debtors.length && ci < creditors.length) {
+    const amt = Math.min(dLeft, cLeft);
+    if (amt > 0) out.push({ from: debtors[di][0], to: creditors[ci][0], amountCents: amt });
+    dLeft -= amt; cLeft -= amt;
+    if (dLeft === 0) { di++; if (di < debtors.length) dLeft = -debtors[di][1]; }
+    if (cLeft === 0) { ci++; if (ci < creditors.length) cLeft = creditors[ci][1]; }
+  }
+  return out;
+}
+
+function splitView(state) {
+  const balances = computeBalances(state.expenses);
+  return { members: state.members, expenses: state.expenses, balances, settlements: computeSettlements(balances) };
+}
+const cleanName = v => String(v || '').trim().slice(0, 20);
+function ensureMember(state, name) { if (name && !state.members.includes(name)) state.members.push(name); }
+
+async function handleMemberAdd(req, env) {
+  let body = {};
+  try { body = await req.json(); } catch (e) { /* ignore */ }
+  const name = cleanName(body.name);
+  if (!name) return j({ ok: false, error: '名字是必填的' });
+  const trip = tripOf(body.trip);
+  const state = await getState(env, trip);
+  ensureMember(state, name);
+  await saveState(env, trip, state);
+  return j({ ok: true, ...splitView(state) });
+}
+
+async function handleExpenseAdd(req, env) {
+  let body = {};
+  try { body = await req.json(); } catch (e) { /* ignore */ }
+  const cents = Math.round(Number(body.amountUSD) * 100);
+  if (!isFinite(cents) || cents <= 0) return j({ ok: false, error: '金额要大于 0' });
+  const paidBy = cleanName(body.paidBy);
+  if (!paidBy) return j({ ok: false, error: '请选择付款人' });
+  const splitAmong = [...new Set((Array.isArray(body.splitAmong) ? body.splitAmong : []).map(cleanName).filter(Boolean))];
+  if (!splitAmong.length) return j({ ok: false, error: '至少选一个人分摊' });
+  const trip = tripOf(body.trip);
+  const state = await getState(env, trip);
+  ensureMember(state, paidBy);
+  splitAmong.forEach(n => ensureMember(state, n));
+  const expense = {
+    id: uid(),
+    description: String(body.description || '').trim().slice(0, 120) || '未命名支出',
+    amountCents: cents, paidBy, splitAmong, createdAt: Date.now()
+  };
+  state.expenses.unshift(expense);
+  await saveState(env, trip, state);
+  return j({ ok: true, expense, ...splitView(state) });
+}
+
+async function handleExpenseRemove(req, env) {
+  let body = {};
+  try { body = await req.json(); } catch (e) { /* ignore */ }
+  const trip = tripOf(body.trip);
+  const state = await getState(env, trip);
+  const i = state.expenses.findIndex(e => e.id === body.id);
+  if (i < 0) return j({ ok: false, error: '支出不存在' });
+  state.expenses.splice(i, 1);
+  await saveState(env, trip, state);
+  return j({ ok: true, ...splitView(state) });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const p = url.pathname;
-    if (p === '/api/state' && request.method === 'GET') return j(await getState(env, tripOf(url.searchParams.get('trip'))));
+    if (p === '/api/state' && request.method === 'GET') {
+      const state = await getState(env, tripOf(url.searchParams.get('trip')));
+      return j({ ...state, ...splitView(state) });
+    }
     if (p === '/api/add' && request.method === 'POST') return handleAdd(request, env);
     if (p === '/api/add-manual' && request.method === 'POST') return handleAddManual(request, env);
     if (p === '/api/vote' && request.method === 'POST') return handleVote(request, env);
     if (p === '/api/remove' && request.method === 'POST') return handleRemove(request, env);
     if (p === '/api/enrich' && request.method === 'POST') return handleEnrich(request, env);
+    if (p === '/api/member' && request.method === 'POST') return handleMemberAdd(request, env);
+    if (p === '/api/expense' && request.method === 'POST') return handleExpenseAdd(request, env);
+    if (p === '/api/expense-remove' && request.method === 'POST') return handleExpenseRemove(request, env);
     return env.ASSETS.fetch(request);
   }
 };
