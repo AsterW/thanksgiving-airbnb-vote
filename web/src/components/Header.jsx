@@ -1,5 +1,4 @@
 import { TRIPS, VIEWS } from '../lib/config.js';
-import WeatherStrip from '../features/weather/WeatherStrip.jsx';
 import './header.css';
 
 // 页面标题。按行程分的页面（选房）才显示行程标签页和日期人数；分账、21 点是全员的
@@ -19,7 +18,6 @@ export default function Header({ view, trip, onTrip }) {
             ))}
           </nav>
         )}
-        {V.tripScoped && <WeatherStrip trip={trip} />}
       </div>
     </header>
   );

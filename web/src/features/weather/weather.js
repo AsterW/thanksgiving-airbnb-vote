@@ -13,12 +13,14 @@ export const KINDS = {
   storm: { emoji: '⛈️', label: '雷雨' },
 };
 
-const cache = new Map(); // 这次打开页面里每个行程只查一次
-export function tripWeather(trip) {
-  if (!cache.has(trip)) cache.set(trip, api('/api/weather?trip=' + trip).then(r => {
+const round = x => Math.round(x * 10) / 10; // 和后端一样按 0.1°（约 10 km）取整，附近的地点共用一份
+const cache = new Map(); // 这次打开页面里同一个行程 + 地点只查一次
+export function placeWeather(trip, lat, lng) {
+  const key = trip + '|' + round(lat) + ',' + round(lng);
+  if (!cache.has(key)) cache.set(key, api('/api/weather?trip=' + trip + '&lat=' + round(lat) + '&lng=' + round(lng)).then(r => {
     if (!r.ok) throw new Error('weather');
-    if (r.rows.some(x => x.days.some(d => !d.kind))) cache.delete(trip); // 有几天没查到：下次显示时再问一次
-    return r.rows;
-  }).catch(e => { cache.delete(trip); throw e; }));
-  return cache.get(trip);
+    if (r.days.some(d => !d.kind)) cache.delete(key); // 有几天没查到：下次显示时再问一次
+    return r.days;
+  }).catch(e => { cache.delete(key); throw e; }));
+  return cache.get(key);
 }

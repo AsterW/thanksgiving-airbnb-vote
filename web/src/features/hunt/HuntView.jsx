@@ -13,6 +13,7 @@ import { celebrateVote } from './celebrate.js';
 import { sortListings } from './price.js';
 import { inZone, NO_AREA, zoneTabs } from './zones.js';
 import { useListings } from './useListings.js';
+import WeatherStrip from '../weather/WeatherStrip.jsx';
 import './hunt.css';
 
 const REORDER_DELAY = 700; // 投票后先在原位更新，过一会儿再按新票数重排
@@ -102,12 +103,22 @@ export default function HuntView({ trip, active }) {
     el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
   }
 
+  // 选了某个区域时，在地图上方显示那里的天气（地点 = 这个区域房源位置的平均值）；「全部」「未分区」不显示
+  const region = useMemo(() => {
+    if (filter === 'all' || filter === NO_AREA) return null;
+    const pts = visible.filter(l => l.lat != null && l.lng != null);
+    if (!pts.length) return null;
+    const avg = f => pts.reduce((t, l) => t + l[f], 0) / pts.length;
+    return { name: filter, lat: Math.round(avg('lat') * 10) / 10, lng: Math.round(avg('lng') * 10) / 10 };
+  }, [filter, visible]);
+
   const fitKey = trip + '|' + filter + '|' + visible.map(l => l.id + (l.lat != null ? '@' : '')).sort().join(',');
   return (
     <>
       <AddListingForm trip={trip} T={T} zones={zoneNames} onAdded={refresh} />
       <Toolbar tabs={tabs} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}
         showMap={showMap} onToggleMap={() => { save('showMap', showMap ? '0' : '1'); setShowMap(!showMap); }} />
+      {region && <WeatherStrip trip={trip} name={region.name} lat={region.lat} lng={region.lng} />}
       {showMap && <ListingMap items={visible} T={T} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} />}
       <div ref={gridBox}>
         <ListingGrid items={items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
