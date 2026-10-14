@@ -80,8 +80,11 @@ try {
     // when present so this runner works before and after that lands.
     const emailPath = new URL('email.mjs', import.meta.url).pathname;
     const email = existsSync(emailPath) ? await runSuite('email.mjs') : true;
+    // Same for the user-management suite (PM-only deletion).
+    const usersPath = new URL('users.mjs', import.meta.url).pathname;
+    const users = existsSync(usersPath) ? await runSuite('users.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && storms;
+    ok = fuzz && email && users && storms;
   }
 } finally {
   stopServer();
