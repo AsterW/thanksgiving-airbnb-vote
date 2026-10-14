@@ -2,9 +2,9 @@
 // Static frontend is served from ./public via [assets]; API routes handled here.
 // KV binding: VOTES_KV
 
-const KV_KEY = 'state:v1';
-
 // ---- Seed listings (verified 2026-09-30, 10 adults, Nov 25–29, totals incl. fees) ----
+// priceUSD here is a 4-night total; the frontend labels listings without
+// priceNights as 4 nights for that reason.
 // image fields filled from og:image scrape where available; the rest lazy-enrich
 // at runtime via /api/enrich.
 const SEED = [
@@ -39,6 +39,15 @@ const SEED = [
     title: 'Beautiful Retreat ~ Multi Family w/ Creek Access', area: '大沙丘区域', priceUSD: 1310, sleeps: 13, bedrooms: 5, beds: 10, bathrooms: 2,
     rating: 5.0, reviews: 10, image: 'https://a0.muscache.com/im/pictures/5f090ddb-2bc0-4b1a-bf9f-29b815cc1f34.jpg', note: '小溪+大火坑，Sangre de Cristo 山景' },
 ];
+
+// ---- Trips: each leg has its own shortlist under its own KV key ----
+// nov26 keeps the original 'state:v1' key so the existing list carries over.
+const TRIPS = {
+  nov25: { kvKey: 'state:nov25:v1', seed: [] },      // Nov 25–26, 9 people
+  nov26: { kvKey: 'state:v1', seed: SEED },          // Nov 26–29, 14 people
+};
+const DEFAULT_TRIP = 'nov26'; // requests without a trip (old cached pages) hit the original list
+const tripOf = t => TRIPS[t] || TRIPS[DEFAULT_TRIP];
 
 // ---------- helpers ----------
 const j = (obj, status) => new Response(JSON.stringify(obj), { status: status || 200, headers: { 'Content-Type': 'application/json' } });
@@ -144,16 +153,16 @@ function roomIdFrom(url) {
   return m ? m[1] : null;
 }
 
-async function getState(env) {
-  const raw = await env.VOTES_KV.get(KV_KEY);
+async function getState(env, trip) {
+  const raw = await env.VOTES_KV.get(trip.kvKey);
   if (raw) return JSON.parse(raw);
-  const state = { listings: SEED.map(s => ({ id: uid(), ...s, addedBy: 'Ken', createdAt: Date.now(), votes: [] })), updatedAt: Date.now() };
-  await env.VOTES_KV.put(KV_KEY, JSON.stringify(state));
+  const state = { listings: trip.seed.map(s => ({ id: uid(), ...s, addedBy: 'Ken', createdAt: Date.now(), votes: [] })), updatedAt: Date.now() };
+  await env.VOTES_KV.put(trip.kvKey, JSON.stringify(state));
   return state;
 }
-async function saveState(env, state) {
+async function saveState(env, trip, state) {
   state.updatedAt = Date.now();
-  await env.VOTES_KV.put(KV_KEY, JSON.stringify(state));
+  await env.VOTES_KV.put(trip.kvKey, JSON.stringify(state));
 }
 
 // ---------- route handlers ----------
@@ -163,7 +172,8 @@ async function handleAdd(req, env) {
   const url = String(body.url || '').trim();
   const roomId = roomIdFrom(url);
   if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源链接（需要形如 airbnb.com/rooms/123… 的链接）' });
-  const state = await getState(env);
+  const trip = tripOf(body.trip);
+  const state = await getState(env, trip);
   const existing = state.listings.find(l => l.roomId === roomId);
   if (existing) return j({ ok: true, listing: existing, deduped: true });
   const info = await fetchListingInfo(url);
@@ -175,7 +185,7 @@ async function handleAdd(req, env) {
     rating: info.rating || null, reviews: info.reviews || null, note: '', addedBy: '', createdAt: Date.now(), votes: []
   };
   state.listings.unshift(listing);
-  await saveState(env, state);
+  await saveState(env, trip, state);
   return j({ ok: true, listing, fetched: info.ok });
 }
 
@@ -186,17 +196,18 @@ async function handleAddManual(req, env) {
   const title = String(body.title || '').trim().slice(0, 120);
   const roomId = roomIdFrom(url);
   if (!roomId || !title) return j({ ok: false, error: '链接和标题是必填的' });
-  const state = await getState(env);
+  const trip = tripOf(body.trip);
+  const state = await getState(env, trip);
   if (state.listings.find(l => l.roomId === roomId)) return j({ ok: false, error: '这间已经在清单里了' });
   const num = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
   const listing = { id: uid(), roomId, url, title,
     image: String(body.image || '').trim().slice(0, 500), area: String(body.area || '').slice(0, 40),
-    priceUSD: num(body.priceUSD), sleeps: num(body.sleeps), bedrooms: num(body.bedrooms),
+    priceUSD: num(body.priceUSD), priceNights: num(body.priceNights), sleeps: num(body.sleeps), bedrooms: num(body.bedrooms),
     beds: num(body.beds), bathrooms: num(body.bathrooms),
     rating: null, reviews: null, note: String(body.note || '').slice(0, 200),
     addedBy: '', createdAt: Date.now(), votes: [] };
   state.listings.unshift(listing);
-  await saveState(env, state);
+  await saveState(env, trip, state);
   return j({ ok: true, listing });
 }
 
@@ -205,7 +216,8 @@ async function handleVote(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const { id, token, name } = body;
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
-  const state = await getState(env);
+  const trip = tripOf(body.trip);
+  const state = await getState(env, trip);
   const listing = state.listings.find(l => l.id === id);
   if (!listing) return j({ ok: false, error: '房源不存在' });
   listing.votes = (listing.votes || []).filter(v => v.token !== token);
@@ -214,25 +226,27 @@ async function handleVote(req, env) {
     listing.votes.push({ token: String(token).slice(0, 80), name: String(name).slice(0, 20), at: Date.now() });
     voted = true;
   }
-  await saveState(env, state);
+  await saveState(env, trip, state);
   return j({ ok: true, votes: listing.votes, voted });
 }
 
 async function handleRemove(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
-  const state = await getState(env);
+  const trip = tripOf(body.trip);
+  const state = await getState(env, trip);
   const i = state.listings.findIndex(l => l.id === body.id);
   if (i < 0) return j({ ok: false, error: '房源不存在' });
   state.listings.splice(i, 1);
-  await saveState(env, state);
+  await saveState(env, trip, state);
   return j({ ok: true });
 }
 
 async function handleEnrich(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
-  const state = await getState(env);
+  const trip = tripOf(body.trip);
+  const state = await getState(env, trip);
   const listing = state.listings.find(l => l.id === body.id);
   if (!listing) return j({ ok: false });
   const info = await fetchListingInfo(listing.url);
@@ -245,7 +259,7 @@ async function handleEnrich(req, env) {
   if (listing.sleeps == null && info.guests != null) listing.sleeps = info.guests;
   if (listing.rating == null && info.rating != null) listing.rating = info.rating;
   if (listing.reviews == null && info.reviews != null) listing.reviews = info.reviews;
-  await saveState(env, state);
+  await saveState(env, trip, state);
   return j({ ok: true, listing });
 }
 
@@ -253,7 +267,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const p = url.pathname;
-    if (p === '/api/state' && request.method === 'GET') return j(await getState(env));
+    if (p === '/api/state' && request.method === 'GET') return j(await getState(env, tripOf(url.searchParams.get('trip'))));
     if (p === '/api/add' && request.method === 'POST') return handleAdd(request, env);
     if (p === '/api/add-manual' && request.method === 'POST') return handleAddManual(request, env);
     if (p === '/api/vote' && request.method === 'POST') return handleVote(request, env);
