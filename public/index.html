@@ -37,6 +37,7 @@
   .pin::after { content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); border:5px solid transparent; border-bottom:0; border-top-color:inherit; }
   .pin { border-top-color:#fff; }
   .pin .pin-votes { color:#e11d48; font-weight:700; margin-left:4px; }
+  .pin.booked { background:#e2e8f0; color:#64748b; border-top-color:#e2e8f0; text-decoration: line-through; font-weight:600; }
   .pin.mine { background:#e11d48; color:#fff; border-top-color:#e11d48; }
   .pin.mine .pin-votes { color:#ffe4e6; }
   .pin.hot, .pin:hover { background:#1e1b4b; color:#fff; border-top-color:#1e1b4b; transform:translate(-50%, -6px) scale(1.12); z-index:1000; }
@@ -265,13 +266,43 @@ function airbnbLink(l){
   return 'https://www.airbnb.com/rooms/' + l.roomId + '?adults=' + T.people + '&check_in=' + T.checkIn + '&check_out=' + T.checkOut;
 }
 
+// ---------- 价格：优先用 Airbnb 实时报价（按当前行程的日期和人数） ----------
+function liveOf(l){ return l.live && l.live.checkIn === T.checkIn && l.live.checkOut === T.checkOut ? l.live : null; }
+function isBooked(l){ const v = liveOf(l); return !!(v && !v.available); }
+// 用来排序/地图/分账的价格：有实时价用实时价，否则退回手动填的估价
+function effPrice(l){
+  const v = liveOf(l);
+  if (v) return v.available ? v.total : null;
+  return l.priceUSD || null;
+}
+function ago(ts){
+  const m = Math.round((Date.now() - ts) / 60000);
+  return m < 1 ? '刚刚' : m < 60 ? m + ' 分钟前' : m < 1440 ? Math.round(m / 60) + ' 小时前' : Math.round(m / 1440) + ' 天前';
+}
+const UNAVAILABLE = { DATE: '这几天已经被订了', GUEST: '住不下这么多人，Airbnb 不给报价', MIN_NIGHTS: '不满足最少入住晚数', MAX_NIGHTS: '超过最多入住晚数' };
+function priceBlock(l){
+  const v = liveOf(l);
+  if (v && !v.available) {
+    return '<div class="inline-flex items-center gap-1 text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2 py-1">❌ ' + esc(UNAVAILABLE[v.reason] || '这几天订不了') + '</div>'
+      + '<div class="text-xs text-slate-400 mt-1">Airbnb 实时查询 · ' + ago(v.at) + '</div>';
+  }
+  if (v && v.total) {
+    return '<div class="text-lg font-bold text-slate-800">$' + v.total.toLocaleString()
+      + (v.original && v.original > v.total ? ' <s class="text-sm font-normal text-slate-400">$' + v.original.toLocaleString() + '</s>' : '')
+      + ' <span class="text-xs font-normal text-slate-500">/ ' + v.nights + '晚总价</span></div>'
+      + '<div class="text-xs text-emerald-700 mt-0.5">✓ Airbnb 实时价' + (v.guests < T.people ? ' · 按 ' + v.guests + ' 人计' : '') + ' · ' + ago(v.at) + '</div>';
+  }
+  // 还没查到实时价：早期预置房源的手动估价是 11/25–29 的 4 晚总价
+  if (l.priceUSD) return '<div class="text-lg font-bold text-slate-500">约 $' + Number(l.priceUSD).toLocaleString() + ' <span class="text-xs font-normal">/ ' + (l.priceNights || 4) + '晚</span></div>'
+    + '<div class="text-xs text-slate-400 mt-0.5">手动估价 · 实时价查询中…</div>';
+  return '<div class="text-sm text-slate-500">实时价查询中…</div>';
+}
+
 function card(l){
   const voted = (l.votes || []).some(v => v.token === myToken);
   const n = (l.votes || []).length;
   const voters = (l.votes || []).map(v => '<span class="chip">' + esc(v.name || '匿名') + '</span>').join('');
-  // 早期预置房源没有 priceNights，它们的价格是 11/25–29 的 4 晚总价
-  const price = l.priceUSD ? '<div class="text-lg font-bold text-slate-800">约 $' + Number(l.priceUSD).toLocaleString() + ' <span class="text-xs font-normal text-slate-500">/ ' + (l.priceNights || 4) + '晚含税费</span></div>'
-    : '<div class="text-sm text-slate-500">价格以 Airbnb 页面为准</div>';
+  const price = priceBlock(l);
   const tooSmall = l.sleeps && l.sleeps < T.people ? '<p class="text-sm text-amber-600 mb-2">⚠️ 最多住 ' + l.sleeps + ' 人，不够 ' + T.people + ' 人</p>' : '';
   const rating = l.rating ? '<span class="text-sm">⭐ ' + l.rating + (l.reviews ? '（' + l.reviews + '条评价）' : '') + '</span>' : '';
   const area = l.area ? '<span class="absolute top-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded-full">' + esc(l.area) + '</span>' : '';
@@ -285,7 +316,7 @@ function card(l){
       + '<button class="car-arrow left-2" onclick="carStep(this,-1)" aria-label="上一张" disabled>‹</button>'
       + '<button class="car-arrow right-2" onclick="carStep(this,1)" aria-label="下一张">›</button>'
       + '<div class="car-dots">' + pics.map((_, i) => '<button onclick="carGo(this,' + i + ')" aria-label="第' + (i + 1) + '张"' + (i ? '' : ' class="on"') + '></button>').join('') + '</div>';
-  return '<article data-id="' + esc(l.id) + '" class="bg-white rounded-2xl shadow overflow-hidden flex flex-col">'
+  return '<article data-id="' + esc(l.id) + '" class="bg-white rounded-2xl shadow overflow-hidden flex flex-col' + (isBooked(l) ? ' opacity-60 grayscale-[40%] hover:opacity-100 hover:grayscale-0 transition' : '') + '">'
     + '<div class="relative car-wrap">' + img + area + del + '</div>'
     + '<div class="p-4 flex flex-col flex-1">'
     + '<h3 class="font-bold leading-snug mb-1">' + esc(l.title || '未命名房源') + '</h3>'
@@ -348,8 +379,9 @@ function ensureMap(){
 function pinHtml(l){
   const n = (l.votes || []).length;
   const mine = (l.votes || []).some(v => v.token === myToken);
-  const label = l.priceUSD ? '$' + Number(l.priceUSD).toLocaleString() : '🏠';
-  return '<div class="pin' + (mine ? ' mine' : '') + '" data-id="' + esc(l.id) + '">' + label + (n ? '<span class="pin-votes">♥' + n + '</span>' : '') + '</div>';
+  const booked = isBooked(l), p = effPrice(l);
+  const label = booked ? '已订满' : p ? '$' + p.toLocaleString() : '🏠';
+  return '<div class="pin' + (mine ? ' mine' : '') + (booked ? ' booked' : '') + '" data-id="' + esc(l.id) + '">' + label + (n ? '<span class="pin-votes">♥' + n + '</span>' : '') + '</div>';
 }
 function popupHtml(l){
   const pic = (l.images && l.images[0]) || l.image;
@@ -417,8 +449,8 @@ function render(anchorId){
   grid.querySelectorAll('article[data-id]').forEach(el => { before[el.dataset.id] = el.getBoundingClientRect(); });
   let list = STATE.listings.slice();
   if (filter !== 'all') list = list.filter(l => l.area === filter);
-  if (sortBy === 'votes') list.sort((a,b) => (b.votes||[]).length - (a.votes||[]).length || (a.priceUSD||1e9) - (b.priceUSD||1e9));
-  else list.sort((a,b) => (a.priceUSD||1e9) - (b.priceUSD||1e9));
+  if (sortBy === 'votes') list.sort((a,b) => (b.votes||[]).length - (a.votes||[]).length || (effPrice(a)||1e9) - (effPrice(b)||1e9));
+  else list.sort((a,b) => (effPrice(a)||1e9) - (effPrice(b)||1e9)); // 订满的没有价格，自然排到最后
   grid.innerHTML = list.length ? list.map(card).join('') : '<p class="text-slate-400 col-span-full text-center py-10">' + (filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 链接进来吧 👆</p>';
   $('#countLbl').textContent = '共 ' + STATE.listings.length + ' 间候选';
   restoreSlides(grid);
@@ -539,7 +571,16 @@ async function refresh(){
   const t = trip;
   const s = await api('/api/state?trip=' + t);
   if (t !== trip) return; // 等待期间切了标签页，丢掉旧结果
-  STATE = s; render(); renderSplit(); enrichMissing();
+  STATE = s; render(); renderSplit(); enrichMissing(); refreshPrices();
+}
+// 让后端去 Airbnb 查过期（>6 小时）的实时价，查回来再画一遍
+async function refreshPrices(){
+  const t = trip;
+  let r;
+  try { r = await api('/api/prices', 'POST', { trip: t }); } catch(e) { return; }
+  if (t !== trip || !r.ok || !r.updated) return;
+  STATE.listings.forEach(l => { if (r.live[l.id]) l.live = r.live[l.id]; });
+  render();
 }
 
 async function enrichMissing(){
@@ -748,7 +789,7 @@ function splitListing(id){
   const l = STATE.listings.find(x => x.id === id);
   if (!l) return;
   $('#eDesc').value = l.title || '房费';
-  if (l.priceUSD) $('#eAmount').value = l.priceUSD;
+  if (effPrice(l)) $('#eAmount').value = effPrice(l);
   switchView('split');
   $('#eAmount').focus({ preventScroll: true });
 }
