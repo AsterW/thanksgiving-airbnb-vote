@@ -14,6 +14,16 @@
   #nameModal { display:none; }
   #nameModal.open { display:flex; }
   .vote-btn.voted { background:#e11d48 !important; color:#fff !important; border-color:#e11d48 !important; }
+  .carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; }
+  .carousel::-webkit-scrollbar { display:none; }
+  .carousel > img { flex:0 0 100%; width:100%; scroll-snap-align:start; }
+  .car-dots { position:absolute; left:0; right:0; bottom:10px; display:flex; justify-content:center; gap:6px; pointer-events:none; }
+  .car-dots button { width:7px; height:7px; border-radius:9999px; background:rgba(255,255,255,.55); box-shadow:0 0 2px rgba(0,0,0,.4); pointer-events:auto; transition:transform .2s, background .2s; }
+  .car-dots button.on { background:#fff; transform:scale(1.3); }
+  .car-arrow { position:absolute; top:50%; transform:translateY(-50%); width:30px; height:30px; border-radius:9999px; background:rgba(255,255,255,.9); color:#334155; font-size:18px; line-height:30px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.25); opacity:0; transition:opacity .2s; }
+  .car-wrap:hover .car-arrow:not([disabled]) { opacity:1; }
+  .car-arrow[disabled] { visibility:hidden; }
+  @media (hover:none) { .car-arrow { display:none; } }
   .just-voted { box-shadow: 0 0 0 3px #fb7185, 0 10px 25px -5px rgba(225,29,72,.35); transition: box-shadow .6s ease; }
   .trip-tab { background:rgba(255,255,255,.15); color:#fff; }
   .trip-tab:hover { background:rgba(255,255,255,.28); }
@@ -131,11 +141,17 @@ function card(l){
   const rating = l.rating ? '<span class="text-sm">⭐ ' + l.rating + (l.reviews ? '（' + l.reviews + '条评价）' : '') + '</span>' : '';
   const area = l.area ? '<span class="absolute top-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded-full">' + esc(l.area) + '</span>' : '';
   const del = '<button onclick="removeListing(\'' + l.id + '\')" title="删除这个房源" class="absolute top-3 right-3 bg-black/60 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>';
-  const img = l.image
-    ? '<img src="' + esc(l.image) + '" class="card-img w-full rounded-t-2xl" loading="lazy" alt="">'
-    : '<div class="card-img w-full rounded-t-2xl bg-slate-200 flex items-center justify-center text-slate-400 text-4xl">🏠</div>';
+  const pics = (l.images && l.images.length) ? l.images : (l.image ? [l.image] : []);
+  let img;
+  if (!pics.length) img = '<div class="card-img w-full rounded-t-2xl bg-slate-200 flex items-center justify-center text-slate-400 text-4xl">🏠</div>';
+  else if (pics.length === 1) img = '<img src="' + esc(pics[0]) + '" class="card-img w-full rounded-t-2xl" loading="lazy" alt="">';
+  else img = '<div class="carousel rounded-t-2xl" onscroll="carSync(this)">'
+      + pics.map(u => '<img src="' + esc(u) + '" class="card-img" loading="lazy" alt="">').join('') + '</div>'
+      + '<button class="car-arrow left-2" onclick="carStep(this,-1)" aria-label="上一张" disabled>‹</button>'
+      + '<button class="car-arrow right-2" onclick="carStep(this,1)" aria-label="下一张">›</button>'
+      + '<div class="car-dots">' + pics.map((_, i) => '<button onclick="carGo(this,' + i + ')" aria-label="第' + (i + 1) + '张"' + (i ? '' : ' class="on"') + '></button>').join('') + '</div>';
   return '<article data-id="' + esc(l.id) + '" class="bg-white rounded-2xl shadow overflow-hidden flex flex-col">'
-    + '<div class="relative">' + img + area + del + '</div>'
+    + '<div class="relative car-wrap">' + img + area + del + '</div>'
     + '<div class="p-4 flex flex-col flex-1">'
     + '<h3 class="font-bold leading-snug mb-1">' + esc(l.title || '未命名房源') + '</h3>'
     + '<p class="text-sm text-slate-500 mb-2">' + esc(statsLine(l)) + '</p>'
@@ -148,6 +164,26 @@ function card(l){
     + '<button onclick="doVote(\'' + l.id + '\')" class="vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2 ' + (voted ? 'voted' : '') + '">' + (voted ? '❤️ 已投 · ' : '🤍 投票 · ') + n + '</button>'
     + '<a href="' + esc(airbnbLink(l)) + '" target="_blank" rel="noopener" title="按 ' + T.date + ' · ' + T.people + '人查看实时价格" class="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>'
     + '</div></div></article>';
+}
+
+// ---- photo carousel ----
+const slideIdx = {}; // listing id -> current photo, so re-renders keep your place
+function carOf(el){ return el.closest('.car-wrap').querySelector('.carousel'); }
+function carSync(c){
+  const i = Math.round(c.scrollLeft / c.clientWidth);
+  const wrap = c.closest('.car-wrap');
+  wrap.querySelectorAll('.car-dots button').forEach((d, k) => d.classList.toggle('on', k === i));
+  const [prev, next] = wrap.querySelectorAll('.car-arrow');
+  prev.disabled = i <= 0; next.disabled = i >= c.children.length - 1;
+  const art = c.closest('article'); if (art) slideIdx[art.dataset.id] = i;
+}
+function carGo(el, i){ const c = carOf(el); c.scrollTo({ left: i * c.clientWidth, behavior: reduceMotion ? 'auto' : 'smooth' }); }
+function carStep(el, d){ const c = carOf(el); carGo(el, Math.round(c.scrollLeft / c.clientWidth) + d); }
+function restoreSlides(root){
+  root.querySelectorAll('article[data-id] .carousel').forEach(c => {
+    const i = slideIdx[c.closest('article').dataset.id];
+    if (i) { c.scrollLeft = i * c.clientWidth; carSync(c); }
+  });
 }
 
 const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -166,6 +202,7 @@ function render(anchorId){
   else list.sort((a,b) => (a.priceUSD||1e9) - (b.priceUSD||1e9));
   grid.innerHTML = list.length ? list.map(card).join('') : '<p class="text-slate-400 col-span-full text-center py-10">' + (filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 链接进来吧 👆</p>';
   $('#countLbl').textContent = '共 ' + STATE.listings.length + ' 间候选';
+  restoreSlides(grid);
 
   const anchorEl = anchorId && grid.querySelector('article[data-id="' + CSS.escape(anchorId) + '"]');
   if (anchorEl && before[anchorId]) window.scrollBy(0, anchorEl.getBoundingClientRect().top - before[anchorId].top);
@@ -190,6 +227,7 @@ function afterVote(id, votes){
   const old = $('#grid').querySelector('article[data-id="' + CSS.escape(id) + '"]');
   if (!old || sortBy !== 'votes') { render(id); return; }
   old.outerHTML = card(STATE.listings[i]);
+  restoreSlides($('#grid'));
   if (reorderTimer) clearTimeout(reorderTimer);
   reorderTimer = setTimeout(() => {
     render(id);
@@ -234,6 +272,8 @@ async function refresh(){
 async function enrichMissing(){
   const t = trip;
   for (const l of STATE.listings) {
+    if (!l.image || l.rating == null || !l.images || l.images.length < 2) {
+      try { const r = await api('/api/enrich', 'POST', { id: l.id }); if (r.ok && r.listing && (r.listing.image || (r.listing.images && r.listing.images.length))) { const i = STATE.listings.findIndex(x => x.id === l.id); if (i >= 0) STATE.listings[i] = r.listing; render(); } } catch(e){}
     if (t !== trip) return;
     if (!l.image || l.rating == null) {
       try { const r = await api('/api/enrich', 'POST', { trip: t, id: l.id }); if (t === trip && r.ok && r.listing && r.listing.image) { const i = STATE.listings.findIndex(x => x.id === l.id); if (i >= 0) STATE.listings[i] = r.listing; render(); } } catch(e){}
