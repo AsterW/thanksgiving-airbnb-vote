@@ -4,6 +4,7 @@ import { reduceMotion } from '../../lib/motion.js';
 import { useDdz } from './useDdz.js';
 import DdzCard from './DdzCard.jsx';
 import SeatBox, { Said } from './SeatBox.jsx';
+import Hand from './Hand.jsx';
 import DdzBoard from './DdzBoard.jsx';
 import './ddz.css';
 
@@ -20,7 +21,7 @@ function useCountdown(st, running) {
   return Math.max(0, Math.ceil((t.deadline - t.now - (Date.now() - st.at)) / 1000)) + 's';
 }
 
-const PHASE = { waiting: '等人开始', bidding: '叫地主中', playing: '对局中', result: '结算中' };
+const PHASE = { waiting: '等人开始', bidding: '叫地主中', playing: '对局中', result: '这局结束' };
 
 export default function DdzView({ active }) {
   const { st, live, msg, hint, setHint, room, watch, send, sit, standUp } = useDdz(active);
@@ -42,7 +43,9 @@ export default function DdzView({ active }) {
     if (won && !reduceMotion) confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 }, colors: CONFETTI_COLORS });
   }, [won, round]);
 
-  const toggle = c => setSel(s => { const n = new Set(s); if (n.has(c)) n.delete(c); else n.add(c); return n; });
+  // 点一张或者划过一串：每张都翻一下
+  const flip = list => setSel(s => { const n = new Set(s); for (const c of list) { if (n.has(c)) n.delete(c); else n.add(c); } return n; });
+  const deal = label => <button onClick={() => send({ type: 'start' })} className="dz-btn bg-amber-400 text-slate-900">{label}</button>;
   const bottom = me >= 0 ? me : 0, right = (bottom + 1) % 3, left = (bottom + 2) % 3;
   const myTurn = me >= 0 && t.turn === me;
   const leading = myTurn && t.phase === 'playing' && (t.trickBy === -1 || t.trickBy === me);
@@ -54,7 +57,10 @@ export default function DdzView({ active }) {
   function controls() {
     if (!live || !t) return null;
     if (seatedElsewhere) return <button onClick={() => watch(st.seatedAt)} className="dz-btn bg-amber-400 text-slate-900">回到我坐的桌 {st.seatedAt}</button>;
-    if (t.waiting) return <><span className="text-sm text-emerald-100">已经排上了，这局打完就坐下</span><button onClick={standUp} className="dz-btn bg-white/15 text-white ml-auto">不等了</button></>;
+    if (t.waiting) return <>
+      {t.phase === 'waiting' ? deal('开始游戏') : <span className="text-sm text-emerald-100">{t.phase === 'result' ? '点「再来一局」就坐下' : '已经排上了，这局打完就坐下'}</span>}
+      <button onClick={standUp} className="dz-btn bg-white/15 text-white ml-auto">不等了</button>
+    </>;
     if (me < 0) {
       const full = (here?.people.length || 0) >= 3;
       return <button onClick={sit} disabled={full} className="dz-btn bg-amber-400 text-slate-900">{full ? '这桌满了' : '🪑 坐下'}</button>;
@@ -63,8 +69,8 @@ export default function DdzView({ active }) {
     const auto = mySeat.auto
       ? <button onClick={() => send({ type: 'auto', on: false })} className="dz-btn bg-fuchsia-500 text-white">取消托管</button>
       : t.phase === 'playing' || t.phase === 'bidding' ? <button onClick={() => send({ type: 'auto', on: true })} className="dz-btn bg-white/15 text-white">托管</button> : null;
-    if (t.phase === 'waiting') return <><button onClick={() => send({ type: 'start' })} className="dz-btn bg-amber-400 text-slate-900">开始游戏</button><span className="text-sm text-emerald-100">空位由机器人补上</span>{stand}</>;
-    if (t.phase === 'result') return <><span className="text-sm text-emerald-100">{timer ? timer + ' 后下一局' : '马上下一局'}</span>{stand}</>;
+    if (t.phase === 'waiting') return <>{deal('开始游戏')}<span className="text-sm text-emerald-100">空位由机器人补上</span>{stand}</>;
+    if (t.phase === 'result') return stand; // 再来一局 is in the result banner
     if (!myTurn || mySeat.auto) return <><span className="text-sm text-emerald-100">{t.phase === 'bidding' ? '等别人叫地主…' : '等别人出牌…'}</span>{auto}{stand}</>;
     if (t.phase === 'bidding') {
       const call = t.bidStage === 'call';
@@ -120,15 +126,13 @@ export default function DdzView({ active }) {
                       <div className="dz-said dz-left">{t.seats[k].cards.map(c => <DdzCard key={c} card={c} size="sm" />)}</div>
                     </div>
                   ))}
+                  {live && (me >= 0 || t.waiting) && !seatedElsewhere && <div className="mt-3">{deal('🔁 再来一局')}</div>}
                 </div>
               )}
               <div className="mt-2 dz-mine"><Said said={t.said[bottom]} /></div>
               <div className="mt-2"><SeatBox s={t.seats[bottom]} idx={bottom} t={t} timer={timer} /></div>
-              <div className="dz-hand">
-                {(t.seats[bottom]?.cards || Array.from({ length: t.seats[bottom]?.count || 0 }, () => null)).map((c, i) => (
-                  <DdzCard key={c || 'b' + i} card={c} selected={c && sel.has(c)} onClick={me >= 0 && c && t.phase === 'playing' ? () => toggle(c) : undefined} />
-                ))}
-              </div>
+              <Hand cards={t.seats[bottom]?.cards || Array.from({ length: t.seats[bottom]?.count || 0 }, () => null)}
+                sel={sel} onToggle={flip} pickable={me >= 0 && t.phase === 'playing'} />
             </>
           )}
           <div className="flex flex-wrap items-center gap-2 mt-4">{controls()}</div>

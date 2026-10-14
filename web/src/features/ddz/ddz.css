@@ -34,16 +34,21 @@
 .dz-mine .dz-said { justify-content:center; }
 .dz-said.dz-left { flex-wrap:nowrap; min-width:0; overflow-x:auto; min-height:0; }
 
-.dz-hand { display:flex; justify-content:safe center; padding:1.2rem .25rem .25rem; overflow-x:auto; }
-.dz-hand .dz-card { margin-left:-1.55rem; transition:transform .12s; }
+/* The hand fan: --w is the card width, --ov the usual overlap, --n (set inline) the card count.
+   When the hand would not fit (20 cards on a narrow phone) the cards overlap more instead of scrolling. */
+.dz-hand { --w:2.9rem; --ov:-1.55rem; display:flex; justify-content:safe center; padding:1.2rem .25rem .25rem; overflow-x:auto; }
+.dz-hand.pickable { touch-action:pan-y; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+.dz-hand .dz-card { margin-left:min(var(--ov), calc((100% - var(--w)) / (var(--n) - 1) - var(--w))); transition:transform .12s; }
 .dz-hand .dz-card:first-child { margin-left:0; }
 .dz-hand .dz-card.pick { cursor:pointer; }
-.dz-hand .dz-card.pick:hover { transform:translateY(-4px); }
+@media (hover:hover) { .dz-hand .dz-card.pick:not(.sel):hover { transform:translateY(-4px); } }
 .dz-hand .dz-card.sel { transform:translateY(-14px); box-shadow:0 0 0 2px #facc15, 0 4px 10px rgba(0,0,0,.4); }
+/* cards being swiped over, before the finger lifts */
+.dz-hand .dz-card.sweep::after { content:''; position:absolute; inset:0; border-radius:inherit; background:rgba(56,189,248,.38); pointer-events:none; }
 @media (max-width:640px) {
   .dz-card { width:2.4rem; height:3.4rem; padding:.15rem .2rem; }
   .dz-card .r, .dz-card .s { font-size:.9rem; }
-  .dz-hand .dz-card { margin-left:-1.45rem; }
+  .dz-hand { --w:2.4rem; --ov:-1.45rem; }
   .dz-seat { min-width:0; }
 }
 @media (prefers-reduced-motion: reduce) { .dz-hand .dz-card { transition:none; } }

@@ -4,7 +4,7 @@
 import { deck, isBombish, legalPlay, shuffle, sortHand, takeFrom } from './cards.js';
 import { choosePlay, wantsCall, wantsGrab } from './bot.js';
 
-export const DDZ = { base: 10, startPoints: 1000, bidMs: 15000, turnMs: 30000, botMs: 900, resultMs: 7000, idleMs: 10 * 60 * 1000 };
+export const DDZ = { base: 10, startPoints: 1000, bidMs: 15000, turnMs: 30000, botMs: 900, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑'];
 const next = i => (i + 1) % 3;
 
@@ -13,7 +13,7 @@ export class DdzGame {
     this.h = hooks;
     this.seats = [null, null, null];
     this.waitlist = []; // people who sat down mid-hand; they replace bots at the next deal
-    this.phase = 'waiting'; // waiting -> bidding -> playing -> result -> (next hand) bidding …
+    this.phase = 'waiting'; // waiting -> bidding -> playing -> result -> (再来一局) bidding …
     this.first = 0; // who bids first; rotates every hand
     this.round = 0;
     this.turn = -1; this.deadline = 0; this.timer = null;
@@ -49,11 +49,14 @@ export class DdzGame {
   }
   bot(i) { return { key: 'bot' + i, name: BOT_NAMES[i], bot: true, connected: true, cards: [], played: 0 }; }
 
-  // Anyone seated can start the first hand; after that hands follow on their own.
+  // Anyone at the table (or queued for it) deals: the first hand, and the next
+  // one after each result. Nothing deals on its own.
   start(key) {
-    if (this.seatOf(key) < 0) return '先坐下';
-    if (this.phase !== 'waiting') return null;
-    this.deal();
+    if (!this.has(key)) return '先坐下';
+    const i = this.seatOf(key);
+    if (i >= 0) this.touch(i);
+    if (this.phase === 'waiting') this.deal();
+    else if (this.phase === 'result') this.nextHand();
     return null;
   }
 
@@ -208,18 +211,20 @@ export class DdzGame {
     this.result = { winner, landlordWin, deltas, spring, factor, multiplier: this.multiplier, bombs: this.bombs, names: this.seats.map(s => s.name) };
     this.phase = 'result';
     this.turn = -1;
-    this.setTimer(DDZ.resultMs, () => this.nextHand());
+    this.release();
   }
-  // Let go of people who stood up or dropped, refill anyone broke, deal again
-  // if anyone is still here.
-  nextHand() {
-    this.clearTimer();
+  // Let go of people who stood up or dropped during the hand. The result stays
+  // up until someone presses 再来一局; with nobody left, the table clears.
+  release() {
     this.seats.forEach((s, k) => { if (s && !s.bot && (s.leaving || !s.connected)) { this.h.save(s); this.seats[k] = null; } });
+    if (!this.humans().length && !this.waitlist.length) this.clear();
+  }
+  clear() { this.clearTimer(); this.reset(); this.seats = [null, null, null]; this.phase = 'waiting'; this.turn = -1; }
+  // 再来一局: refill anyone broke and deal again.
+  nextHand() {
+    this.release();
+    if (this.phase !== 'result') return;
     for (const s of this.humans()) if (s.points <= 0) { s.points = DDZ.startPoints; s.refills++; }
-    this.reset();
-    this.turn = -1;
-    this.phase = 'waiting';
-    if (!this.humans().length && !this.waitlist.length) { this.seats = [null, null, null]; return; }
     this.first = next(this.first);
     this.deal();
   }
@@ -238,16 +243,16 @@ export class DdzGame {
     }
     this.h.save(s);
     this.seats[i] = null;
-    if (!this.humans().length) { this.clearTimer(); this.reset(); this.seats = [null, null, null]; this.phase = 'waiting'; this.turn = -1; }
+    if (!this.humans().length && !this.waitlist.length) this.clear();
   }
   disconnect(key) {
     const i = this.seatOf(key);
     if (i >= 0) this.seats[i].connected = false;
     this.leave(key);
-    // No one left watching: play the hand out now so everyone's points get saved.
+    // No one left watching: play the hand out now so everyone's points get
+    // saved (the end of the hand lets them go).
     if (this.inHand() && !this.humans().some(s => s.connected)) {
       for (let guard = 0; this.inHand() && guard < 1000; guard++) this.botMove(this.turn);
-      this.nextHand();
     }
   }
   // Stand up people who haven't done anything for a while; returns their keys.
