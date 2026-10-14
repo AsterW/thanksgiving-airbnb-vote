@@ -379,7 +379,7 @@ function renderTrip(){
   // 分账是全员一本账，不分行程：不显示行程标签页和日期人数
   const forTrip = view !== 'split';
   $('#tripSub').textContent = (forTrip ? T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · ' : '') + VIEWS[view].sub;
-  $('#tabs').hidden = !forTrip;
+  $('#tabs').classList.toggle('hidden', !forTrip); // 用 class：hidden 属性会被 .flex 盖掉
   $('#tabs').innerHTML = Object.keys(TRIPS).map(k => {
     const t = TRIPS[k];
     return '<button data-trip="' + k + '" class="trip-tab rounded-full px-5 py-2 font-bold' + (k === trip ? ' active' : '') + '">'
