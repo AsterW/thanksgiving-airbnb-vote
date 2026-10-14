@@ -13,6 +13,22 @@ function initialToken() {
   return t;
 }
 
+// 这台设备记住每个"验过的人"的 token（localStorage vtu：{ 名字小写: token }）。
+// vt 只存当前身份，切去别人再切回来时，绑邮箱账号的 token 就丢了、又被要
+// 验证码——和"这台设备验过就不用了"的承诺对不上。登录时优先出示记住的
+// token，服务器认得就直接放行；token 已在别处轮换失效时，自然落回验证码
+// 流程，验过后 adopt 会把新 token 记下来。
+function recallUserToken(n) {
+  try { return JSON.parse(load('vtu', '{}'))[String(n).toLowerCase()] || ''; } catch (e) { return ''; }
+}
+function rememberUserToken(n, t) {
+  if (!n || !t) return;
+  let m = {};
+  try { m = JSON.parse(load('vtu', '{}')) || {}; } catch (e) {}
+  m[String(n).toLowerCase()] = t;
+  save('vtu', JSON.stringify(m));
+}
+
 export function SessionProvider({ children }) {
   const [name, setName] = useState(() => load('vn', ''));
   const [token, setToken] = useState(initialToken);
@@ -46,6 +62,7 @@ export function SessionProvider({ children }) {
   const adopt = useCallback(r => {
     setName(r.user.name); setToken(r.user.token); if (r.users) setUsers(r.users);
     save('vn', r.user.name); save('vt', r.user.token);
+    rememberUserToken(r.user.name, r.user.token);
     setChallenge(null);
     setLoginOpen(false);
     const f = pending.current; pending.current = null;
@@ -57,8 +74,10 @@ export function SessionProvider({ children }) {
   const login = useCallback(async input => {
     const n = String(input || '').trim();
     if (!n) return null;
+    // 这台设备验过这个人就出示记住的 token，切回来不用再收验证码
+    const presented = recallUserToken(n) || token;
     let r;
-    try { r = await api('/api/login', 'POST', { name: n, token }); } catch (e) { r = { ok: false, error: '网络有点问题，稍后再试' }; }
+    try { r = await api('/api/login', 'POST', { name: n, token: presented }); } catch (e) { r = { ok: false, error: '网络有点问题，稍后再试' }; }
     if (!r.ok) return r.error || '登录失败';
     if (r.needCode) {
       if (r.users) setUsers(r.users);
@@ -104,6 +123,7 @@ export function SessionProvider({ children }) {
     if (!r.ok) return r.error || '登录失败';
     setName(r.user.name); setToken(r.user.token); setUsers(r.users);
     save('vn', r.user.name); save('vt', r.user.token);
+    rememberUserToken(r.user.name, r.user.token);
     const sent = await sendAuthCode({ name: r.user.name, token: r.user.token, email, purpose: 'bind' });
     if (typeof sent === 'string') return sent; // 账号已建好，只是验证码没发出去
     setChallenge({ kind: 'bind', name: r.user.name, email, emailHint: sent.emailHint, sent: true, devCode: sent.devCode });
