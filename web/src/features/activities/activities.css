@@ -19,3 +19,7 @@
 .loc-map { height:320px; }
 .loc-pin-wrap { background:none; border:none; }
 .loc-pin { font-size:30px; line-height:1; text-align:center; filter:drop-shadow(0 2px 3px rgba(0,0,0,.4)); cursor:grab; }
+
+/* Vote celebration: the button pop, same as the Airbnb list (hunt.css). */
+@keyframes vote-pop { 0% { transform:scale(1); } 35% { transform:scale(1.12); } 100% { transform:scale(1); } }
+.vote-pop { animation: vote-pop .45s ease; }
