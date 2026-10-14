@@ -28,6 +28,8 @@ works for any group picking a place together.
   Google Maps or get directions
 - Blackjack: one live table (up to 6 seats) everyone joins from their own
   phone, play chips only
+- Calendar: each person's agenda by day: the top-voted stay for each trip,
+  their flights, airport pickups (given or received) and the group car return
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
   claim, and suggested times to be at the airport for departures

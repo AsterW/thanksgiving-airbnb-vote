@@ -13,6 +13,7 @@ import FoodView from './features/food/FoodView.jsx';
 import AngelView from './features/angel/AngelView.jsx';
 import FlightsView from './features/flights/FlightsView.jsx';
 import ActivitiesView from './features/activities/ActivitiesView.jsx';
+import CalendarView from './features/calendar/CalendarView.jsx';
 import { useHashRoute } from './lib/useHashRoute.js';
 
 // 每个页面一直挂着（切走只是藏起来），回来时房源、地图、牌桌都还在；切回来时淡入一下
@@ -50,6 +51,7 @@ function Shell() {
       <div className="flex-1 min-w-0 pb-20 md:pb-0">
         <Header view={view} trip={trip} onTrip={t => setRoute({ trip: t })} />
         <main className="max-w-6xl mx-auto px-4 py-6">
+          <Pane active={view === 'calendar'}><CalendarView active={view === 'calendar'} /></Pane>
           <Pane active={view === 'hunt'}><HuntView trip={trip} active={view === 'hunt'} /></Pane>
           <Pane active={view === 'food'}><FoodView trip={trip} active={view === 'food'} /></Pane>
           <Pane active={view === 'split'}><SplitView active={view === 'split'} /></Pane>
