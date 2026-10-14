@@ -9,8 +9,9 @@ import People from './People.jsx';
 import RevealCard from './RevealCard.jsx';
 import './angel.css';
 
-// Secret Angel：每人选想要/不要的礼物类型；大家都选好后管理员（Aster）抽签，
-// 每个人只看得到自己要送给谁。
+// Secret Angel：每人选想要/不要的礼物类型；管理员（Aster）抽签后，
+// 每个人只看得到自己要送给谁。不用等人齐：谁选好了谁进池，没选的人
+// 这轮不参加；重抽按当前已填的人重新分配，不清任何人的愿望。
 export default function AngelView({ active }) {
   const { name, token, users, openLogin } = useSession();
   const toast = useToast();
@@ -46,7 +47,7 @@ export default function AngelView({ active }) {
     if (await post('/api/angel/prefs', { picks, note })) { setDirty(false); toast(mine ? '愿望更新好了 ✨' : '愿望交上去了，等抽签吧 😇'); }
   }
   async function draw() {
-    if (data.drawn && !confirm('已经抽过了。重新抽的话大家的结果都会变，确定吗？')) return;
+    if (data.drawn && !confirm('已经抽过了。重新抽的话大家的结果都会变（愿望不会清掉，只是按现在已填的人重新分配），确定吗？')) return;
     if (await post('/api/angel/draw', {})) toast('🎲 抽好了！大家去拆信封吧');
   }
 
@@ -61,6 +62,7 @@ export default function AngelView({ active }) {
 
   const people = data.people.filter(p => !p.excluded);
   const waiting = people.filter(p => !p.submitted);
+  const filled = people.filter(p => p.submitted);
   const loves = Object.values(picks).filter(v => v === 'love').length;
   return (
     <div className="space-y-5">
@@ -100,12 +102,13 @@ export default function AngelView({ active }) {
         <section className="rounded-2xl shadow p-5 text-white bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600">
           <h2 className="font-bold text-lg mb-1">🔐 管理员：抽签</h2>
           <p className="text-sm text-indigo-100 mb-4">
-            {waiting.length ? '还在等：' + waiting.map(p => p.name).join('、') + '（不参加的人可以在上面点 ✕ 排除）'
-              : people.length < 2 ? '至少要两个人' : data.drawn ? '已经抽过了，' + new Date(data.drawnAt).toLocaleString('zh-CN') + '。结果连你也看不到别人的。'
+            {filled.length < 2 ? '现在只有 ' + filled.length + ' 人选好了愿望，至少要 2 个人才能抽。'
+              : data.drawn ? '已经抽过了，' + new Date(data.drawnAt).toLocaleString('zh-CN') + '。重新抽签按现在已填的人重新分配，谁的愿望都不会清掉' + (waiting.length ? '；还没选的：' + waiting.map(p => p.name).join('、') + '，选好后再重抽就能进来' : '') + '。结果连你也看不到别人的。'
+              : waiting.length ? '已选好 ' + filled.length + '/' + people.length + ' 人，可以先抽！还没选的（' + waiting.map(p => p.name).join('、') + '）这轮不参加，选好后重抽就能进来；不参加的人也可以在上面点 ✕ 排除。'
               : '大家都选好了，可以抽了！每个人会被分到一个要偷偷送礼物的人，不会抽到自己，也不会两个人互送。'}
           </p>
-          <button onClick={draw} disabled={waiting.length > 0 || people.length < 2}
-            className="bg-white text-indigo-700 font-black rounded-xl px-6 py-2 shadow-lg disabled:opacity-40">{data.drawn ? '🎲 重新抽签' : '🎲 开始抽签'}</button>
+          <button onClick={draw} disabled={filled.length < 2}
+            className="bg-white text-indigo-700 font-black rounded-xl px-6 py-2 shadow-lg disabled:opacity-40">{data.drawn ? '🎲 重新抽签（保留愿望）' : '🎲 开始抽签'}</button>
         </section>
       )}
     </div>
