@@ -34,7 +34,9 @@ works for any group picking a place together.
   `trip` in POST bodies: `nov25` or `nov26`); calls without one go to `nov26`.
 - **Storage**: Cloudflare KV — one key per trip tab (`state:nov25:v1` for the
   9-person leg, the original `state:v1` for the 14-person leg), each holding
-  that tab's listings array as JSON.
+  that tab's listings array as JSON. Two keys are shared by the whole group
+  rather than per tab: `users:v1` (the name list people log in with, which is
+  also the Split-that-bill member list) and `split:v1` (one expense ledger).
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader

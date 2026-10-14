@@ -315,7 +315,7 @@ async function handleEnrich(req, env) {
   return j({ ok: true, listing });
 }
 
-// ---------- Splitwise: per-trip expense splitting ----------
+// ---------- Splitwise: one expense ledger for the whole group ----------
 // Money is handled in integer cents to avoid float drift. Each expense is
 // split equally among splitAmong; leftover cents go one each to the first
 // participants (in listed order) so shares always sum to the exact total.
@@ -356,12 +356,39 @@ function computeSettlements(balances) {
   return out;
 }
 
-function splitView(state) {
-  const balances = computeBalances(state.expenses);
-  return { members: state.members, expenses: state.expenses, balances, settlements: computeSettlements(balances) };
+function splitView(split) {
+  const balances = computeBalances(split.expenses);
+  return { expenses: split.expenses, balances, settlements: computeSettlements(balances) };
 }
 const cleanName = v => String(v || '').trim().slice(0, 20);
-function ensureMember(state, name) { if (name && !state.members.includes(name)) state.members.push(name); }
+
+// One ledger for the whole group (not per trip); members are the global user list.
+const SPLIT_KEY = 'split:v1';
+async function getSplit(env) {
+  const raw = await env.VOTES_KV.get(SPLIT_KEY);
+  if (raw) return JSON.parse(raw);
+  // First run: expenses and members used to be kept per trip. Merge the
+  // expenses into one ledger and the member names into the user list.
+  const expenses = [], names = [];
+  for (const key of Object.keys(TRIPS)) {
+    const state = await getState(env, TRIPS[key]);
+    expenses.push(...state.expenses);
+    names.push(...state.members);
+  }
+  expenses.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const users = await addUsers(env, names.concat(...expenses.map(e => [e.paidBy, ...e.splitAmong])));
+  for (const e of expenses) {
+    e.paidBy = canonName(users, e.paidBy);
+    e.splitAmong = [...new Set(e.splitAmong.map(n => canonName(users, n)))];
+  }
+  const split = { expenses, updatedAt: Date.now() };
+  await env.VOTES_KV.put(SPLIT_KEY, JSON.stringify(split));
+  return split;
+}
+async function saveSplit(env, split) {
+  split.updatedAt = Date.now();
+  await env.VOTES_KV.put(SPLIT_KEY, JSON.stringify(split));
+}
 
 // ---------- users ----------
 // One global user list shared by both trips, so people pick their name
@@ -391,6 +418,23 @@ async function getUsers(env) {
 }
 const publicUsers = users => users.map(u => ({ name: u.name, token: u.token }))
   .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+// The user list's spelling of a name ("ken" -> "Ken"), or the name as given.
+const canonName = (users, name) => (users.find(u => sameName(u.name, name)) || { name }).name;
+
+// Add any names that aren't in the user list yet; returns the list.
+async function addUsers(env, names) {
+  const users = await getUsers(env);
+  let changed = false;
+  for (const raw of names) {
+    const name = cleanName(raw);
+    if (name && !users.some(u => sameName(u.name, name))) {
+      users.push({ name, token: uid(), createdAt: Date.now() });
+      changed = true;
+    }
+  }
+  if (changed) await env.VOTES_KV.put(USERS_KEY, JSON.stringify(users));
+  return users;
+}
 
 // Log in as an existing name, or create it. Names are unique (case-insensitive).
 async function handleLogin(req, env) {
@@ -434,11 +478,8 @@ async function handleMemberAdd(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const name = cleanName(body.name);
   if (!name) return j({ ok: false, error: '名字是必填的' });
-  const trip = tripOf(body.trip);
-  const state = await getState(env, trip);
-  ensureMember(state, name);
-  await saveState(env, trip, state);
-  return j({ ok: true, ...splitView(state) });
+  const users = await addUsers(env, [name]);
+  return j({ ok: true, users: publicUsers(users) });
 }
 
 async function handleExpenseAdd(req, env) {
@@ -446,34 +487,34 @@ async function handleExpenseAdd(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const cents = Math.round(Number(body.amountUSD) * 100);
   if (!isFinite(cents) || cents <= 0) return j({ ok: false, error: '金额要大于 0' });
-  const paidBy = cleanName(body.paidBy);
+  let paidBy = cleanName(body.paidBy);
   if (!paidBy) return j({ ok: false, error: '请选择付款人' });
-  const splitAmong = [...new Set((Array.isArray(body.splitAmong) ? body.splitAmong : []).map(cleanName).filter(Boolean))];
+  let splitAmong = (Array.isArray(body.splitAmong) ? body.splitAmong : []).map(cleanName).filter(Boolean);
   if (!splitAmong.length) return j({ ok: false, error: '至少选一个人分摊' });
-  const trip = tripOf(body.trip);
-  const state = await getState(env, trip);
-  ensureMember(state, paidBy);
-  splitAmong.forEach(n => ensureMember(state, n));
+  // New names join the user list; known names use its spelling so "ken" and "Ken" share one balance.
+  const users = await addUsers(env, [paidBy, ...splitAmong]);
+  paidBy = canonName(users, paidBy);
+  splitAmong = [...new Set(splitAmong.map(n => canonName(users, n)))];
+  const split = await getSplit(env);
   const expense = {
     id: uid(),
     description: String(body.description || '').trim().slice(0, 120) || '未命名支出',
     amountCents: cents, paidBy, splitAmong, createdAt: Date.now()
   };
-  state.expenses.unshift(expense);
-  await saveState(env, trip, state);
-  return j({ ok: true, expense, ...splitView(state) });
+  split.expenses.unshift(expense);
+  await saveSplit(env, split);
+  return j({ ok: true, expense, users: publicUsers(users), ...splitView(split) });
 }
 
 async function handleExpenseRemove(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
-  const trip = tripOf(body.trip);
-  const state = await getState(env, trip);
-  const i = state.expenses.findIndex(e => e.id === body.id);
+  const split = await getSplit(env);
+  const i = split.expenses.findIndex(e => e.id === body.id);
   if (i < 0) return j({ ok: false, error: '支出不存在' });
-  state.expenses.splice(i, 1);
-  await saveState(env, trip, state);
-  return j({ ok: true, ...splitView(state) });
+  split.expenses.splice(i, 1);
+  await saveSplit(env, split);
+  return j({ ok: true, ...splitView(split) });
 }
 
 export default {
@@ -481,9 +522,12 @@ export default {
     const url = new URL(request.url);
     const p = url.pathname;
     if (p === '/api/state' && request.method === 'GET') {
-      const state = await getState(env, tripOf(url.searchParams.get('trip')));
-      return j({ ...state, ...splitView(state) });
+      // The trip's listings plus the whole group's ledger. members/expenses
+      // inside trip state are pre-merge leftovers, kept in KV but not served.
+      const { members, expenses, ...state } = await getState(env, tripOf(url.searchParams.get('trip')));
+      return j({ ...state, ...splitView(await getSplit(env)) });
     }
+    if (p === '/api/split' && request.method === 'GET') return j({ ok: true, ...splitView(await getSplit(env)) });
     if (p === '/api/users' && request.method === 'GET') return j({ ok: true, users: publicUsers(await getUsers(env)) });
     if (p === '/api/login' && request.method === 'POST') return handleLogin(request, env);
     if (p === '/api/add' && request.method === 'POST') return handleAdd(request, env);
