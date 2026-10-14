@@ -173,11 +173,23 @@ async function handleAdd(req, env) {
   const url = String(body.url || '').trim();
   const roomId = roomIdFrom(url);
   if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源链接（需要形如 airbnb.com/rooms/123… 的链接）' });
+
   const trip = tripOf(body.trip);
   const state = await getState(env, trip);
+  // Fast-path dedupe check only — do NOT hold this snapshot across the scrape.
+  const preState = await getState(env);
+  const preExisting = preState.listings.find(l => l.roomId === roomId);
+  if (preExisting) return j({ ok: true, listing: preExisting, deduped: true });
+  // Scrape first, read state after. Scraping can take up to ~35s
+  // (10s direct + 10s .co.uk + 15s reader); holding a pre-scrape snapshot
+  // and saving it afterwards would clobber any votes / adds / removes
+  // that happened in that window (lost-update bug).
+  const info = await fetchListingInfo(url);
+  // Re-read fresh state now that the slow work is done, and re-check
+  // dedupe: another request may have added this same room meanwhile.
+  const state = await getState(env);
   const existing = state.listings.find(l => l.roomId === roomId);
   if (existing) return j({ ok: true, listing: existing, deduped: true });
-  const info = await fetchListingInfo(url);
   const listing = {
     id: uid(), roomId, url,
     title: (info.title || '').slice(0, 120) || '未命名房源',
@@ -248,10 +260,19 @@ async function handleEnrich(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   const state = await getState(env, trip);
+  // Peek only to get the URL to scrape — do NOT hold this snapshot
+  // across the scrape (see handleAdd: it can take up to ~35s, and
+  // saving a stale snapshot would clobber concurrent changes).
+  const peekState = await getState(env);
+  const peek = peekState.listings.find(l => l.id === body.id);
+  if (!peek) return j({ ok: false });
+  const info = await fetchListingInfo(peek.url);
+  if (!info.ok) return j({ ok: false });
+  // Re-read fresh state after scraping and merge onto the live listing.
+  // If it was removed while we were scraping, don't resurrect it.
+  const state = await getState(env);
   const listing = state.listings.find(l => l.id === body.id);
   if (!listing) return j({ ok: false });
-  const info = await fetchListingInfo(listing.url);
-  if (!info.ok) return j({ ok: false });
   if ((!listing.title || listing.title === '未命名房源') && info.title) listing.title = info.title.slice(0, 120);
   if (!listing.image && info.image) listing.image = info.image;
   if (listing.bedrooms == null && info.bedrooms != null) listing.bedrooms = info.bedrooms;
