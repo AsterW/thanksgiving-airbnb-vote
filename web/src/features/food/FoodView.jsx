@@ -3,6 +3,8 @@ import { api } from '../../lib/api.js';
 import { load, save } from '../../lib/storage.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useSession } from '../../session/SessionContext.jsx';
+import { useToast } from '../../components/Toast.jsx';
+import { celebrateVote } from '../../lib/celebrate.js';
 import AddPlaceForm from './AddPlaceForm.jsx';
 import PlaceCard from './PlaceCard.jsx';
 import FoodMap from './FoodMap.jsx';
@@ -13,10 +15,13 @@ import './food.css';
 // 每家都能一键在 Google 地图打开、导航过去。
 export default function FoodView({ trip, active }) {
   const { token, ensureName } = useSession();
+  const toast = useToast();
   const { places, setPlaces, patch, tripRef } = useFood(trip, active);
   const [sortBy, setSortBy] = useState('votes');
   const [showMap, setShowMap] = useState(() => load('showFoodMap') !== '0');
   const [hotId, setHotId] = useState(null);
+  const [popId, setPopId] = useState(null);
+  const popTimer = useRef(null);
   const grid = useRef(null);
 
   const list = useMemo(() => {
@@ -25,14 +30,25 @@ export default function FoodView({ trip, active }) {
     return sortBy === 'votes' ? ps.sort((a, b) => (b.votes || []).length - (a.votes || []).length || newest(a, b)) : ps.sort(newest);
   }, [places, sortBy]);
 
-  async function vote(p) {
+  // 和 Airbnb 房源投票完全一致：成功投出 → 🎉 toast + 按钮弹跳 + 彩带庆祝；
+  // 取消投票安安静静，不庆祝。
+  async function vote(p, btn) {
     const t = trip;
     const mine = (p.votes || []).some(v => v.token === token);
     const send = async me => {
       let r;
       try { r = await api('/api/food/vote', 'POST', { trip: t, id: p.id, token: me.token, name: mine ? null : me.name }); } catch (e) { return; }
       if (t !== tripRef.current) return; // 等待期间切了行程
-      if (r.ok) patch(p.id, x => ({ ...x, votes: r.votes })); else alert(r.error || '没投上，稍后再试');
+      if (!r.ok) { alert(r.error || '没投上，稍后再试'); return; }
+      patch(p.id, x => ({ ...x, votes: r.votes }));
+      if (mine) return;
+      toast('🎉 投票成功！给「' + p.name + '」+1');
+      if (!reduceMotion) {
+        setPopId(p.id);
+        clearTimeout(popTimer.current);
+        popTimer.current = setTimeout(() => setPopId(null), 450);
+      }
+      celebrateVote(btn);
     };
     if (mine) send({ token }); else ensureName(send);
   }
@@ -72,7 +88,7 @@ export default function FoodView({ trip, active }) {
         {places === null
           ? <p className="text-slate-400 col-span-full text-center py-10">加载中…</p>
           : list.length
-            ? list.map(p => <PlaceCard key={p.id} p={p} token={token} onVote={vote} onRemove={remove} />)
+            ? list.map(p => <PlaceCard key={p.id} p={p} token={token} pop={popId === p.id} onVote={vote} onRemove={remove} />)
             : <p className="text-slate-400 col-span-full text-center py-10">还没有餐厅，贴个 Google 地图链接进来吧 👆</p>}
       </div>
     </>

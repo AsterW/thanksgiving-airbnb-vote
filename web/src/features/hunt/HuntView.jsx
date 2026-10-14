@@ -9,7 +9,7 @@ import AddListingForm from './AddListingForm.jsx';
 import Toolbar from './Toolbar.jsx';
 import ListingMap from './ListingMap.jsx';
 import ListingGrid from './ListingGrid.jsx';
-import { celebrateVote } from './celebrate.js';
+import { celebrateVote } from '../../lib/celebrate.js';
 import { sortListings } from './price.js';
 import { inZone, NO_AREA, zoneTabs } from './zones.js';
 import { useListings } from './useListings.js';

@@ -26,10 +26,10 @@ works for any group picking a place together.
   place, you get "not found"); each card shows up to 10 photos from the place
   page, like the Airbnb cards. Vote for the ones you want to try, open each in
   Google Maps or get directions
-- Blackjack: one live table (up to 6 seats) everyone joins from their own
-  phone, play chips only
-- Calendar: each person's agenda by day: the top-voted stay for each trip,
-  their flights, airport pickups (given or received) and the group car return
+- Gameroom: live Blackjack (one table, up to 6 seats) and 斗地主 (three
+  tables of 3, bots fill empty seats, 叫地主 / 抢地主 bidding), joined from
+  everyone's own phone. Each game has its own leaderboard (chips / 豆子), play
+  points only
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
   claim, and suggested times to be at the airport for departures
@@ -41,7 +41,7 @@ works for any group picking a place together.
 ## How it works
 
 - **Frontend** (`web/`): React + Vite + Tailwind, one folder per feature
-  (`web/src/features/hunt`, `food`, `split`, `blackjack`). People log in by picking
+  (`web/src/features/hunt`, `food`, `split`, `games`, `blackjack`, `ddz`). People log in by picking
   their name from the group's user list; votes are tied to that user's token.
 - **Backend** (`worker/`): a Cloudflare Worker, one folder per feature, each
   exporting its own route table that `worker/index.js` merges. A small JSON API:
@@ -60,6 +60,11 @@ works for any group picking a place together.
   after each change. Chips are saved in the object's own storage only when a
   player stands up or disconnects, not per hand, so play doesn't use the KV
   write budget.
+- **斗地主** (`GET /api/ddz`, a WebSocket): a second Durable Object,
+  `DdzHall`, runs all three tables. Bots take any empty seat and stand in for
+  anyone who times out twice or drops (托管). 豆子 are saved the same way as
+  Blackjack chips, in the hall's own storage, so the two leaderboards stay
+  separate.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader
@@ -70,7 +75,7 @@ works for any group picking a place together.
 
 ```bash
 npm install
-npm run dev:api   # terminal 1: the worker on :8787 (KV + Blackjack run locally)
+npm run dev:api   # terminal 1: the worker on :8787 (KV and the Gameroom run locally)
 npm run dev       # terminal 2: the page on :5173 with hot reload, /api proxied to :8787
 npm run check     # lint + build + bundle the worker, same as CI runs on every PR
 ```
@@ -113,9 +118,9 @@ Notes:
 | `web/src/components/` | Shared UI: splash, nav, header, login, toast |
 | `web/src/lib/`, `web/src/session/` | Shared helpers, trip/page config, the logged-in user |
 | `worker/index.js` | Worker entry: merges the route tables, serves `dist/` |
-| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`: storage, logic and routes |
+| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`, `ddz/`: storage, logic and routes |
 | `worker/config/` | Trips and seed listings |
-| `wrangler.toml` | Deploy config (build step, KV, assets, Durable Object) |
+| `wrangler.toml` | Deploy config (build step, KV, assets, Durable Objects) |
 | `CONTRIBUTING.md` | Where new code goes, and how to keep PRs from colliding |
 | `ARCHITECTURE.md` | Detailed technical notes (in Chinese) |
 

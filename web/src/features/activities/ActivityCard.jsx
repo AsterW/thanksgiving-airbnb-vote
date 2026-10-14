@@ -2,7 +2,7 @@
 // voted, a vote toggle and a link out to the venue's own website. When
 // the card has a location pin, the place name links to Google Maps and
 // the ✎ opens the map picker; without one, the card offers to add it.
-export default function ActivityCard({ a, token, banner, onVote, onRemove, onSetPlace }) {
+export default function ActivityCard({ a, token, banner, pop, onVote, onRemove, onSetPlace }) {
   const votes = a.votes || [];
   const voted = votes.some(v => v.token === token);
   const hasPin = a.lat != null && a.lng != null;
@@ -32,7 +32,7 @@ export default function ActivityCard({ a, token, banner, onVote, onRemove, onSet
           ? <div className="mb-3">{votes.map(v => <span key={v.token} className="chip">{v.name || '匿名'}</span>)}</div>
           : <div className="mb-3 text-xs text-slate-400">还没有人投票，来当第一个吧</div>}
         <div className="mt-auto flex gap-2">
-          <button onClick={() => onVote(a)} className={'act-vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2 ' + (voted ? 'voted' : '')}>
+          <button onClick={e => onVote(a, e.currentTarget)} className={'act-vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2 ' + (voted ? 'voted' : '') + (pop ? ' vote-pop' : '')}>
             {(voted ? '❤️ 已投 · ' : '🤍 投票 · ') + votes.length}
           </button>
           <a href={a.url} target="_blank" rel="noopener" title="打开官方网站"

@@ -4,7 +4,7 @@ import { ago } from '../../lib/format.js';
 // 导航到链接里的位置（链接没带位置的店不显示导航，直接用 Google 地图链接）
 const directionsLink = p => 'https://www.google.com/maps/dir/?api=1&destination=' + p.lat + ',' + p.lng;
 
-export default function PlaceCard({ p, token, cardRef, onVote, onRemove }) {
+export default function PlaceCard({ p, token, cardRef, pop, onVote, onRemove }) {
   const votes = p.votes || [];
   const voted = votes.some(v => v.token === token);
   return (
@@ -23,8 +23,8 @@ export default function PlaceCard({ p, token, cardRef, onVote, onRemove }) {
           ? <div className="mt-2">{votes.map(v => <span key={v.token} className="chip">{v.name || '匿名'}</span>)}</div>
           : <div className="mt-2 text-xs text-slate-400">还没人说想去</div>}
         <div className="mt-auto pt-4 flex flex-wrap gap-2">
-          <button onClick={() => onVote(p)}
-            className={'flex-1 min-w-[7rem] border-2 font-bold rounded-xl py-2 ' + (voted ? 'bg-rose-600 border-rose-600 text-white' : 'border-rose-500 text-rose-600 hover:bg-rose-50')}>
+          <button onClick={e => onVote(p, e.currentTarget)}
+            className={'flex-1 min-w-[7rem] border-2 font-bold rounded-xl py-2 ' + (voted ? 'bg-rose-600 border-rose-600 text-white' : 'border-rose-500 text-rose-600 hover:bg-rose-50') + (pop ? ' vote-pop' : '')}>
             {(voted ? '❤️ 想去 · ' : '🤍 想去 · ') + votes.length}
           </button>
           <a href={p.url} target="_blank" rel="noopener"

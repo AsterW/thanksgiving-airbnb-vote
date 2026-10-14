@@ -8,7 +8,7 @@ import AccountButton from './components/AccountButton.jsx';
 import LoginModal from './components/LoginModal.jsx';
 import HuntView from './features/hunt/HuntView.jsx';
 import SplitView from './features/split/SplitView.jsx';
-import BlackjackView from './features/blackjack/BlackjackView.jsx';
+import GamesView from './features/games/GamesView.jsx';
 import FoodView from './features/food/FoodView.jsx';
 import AngelView from './features/angel/AngelView.jsx';
 import FlightsView from './features/flights/FlightsView.jsx';
@@ -55,7 +55,7 @@ function Shell() {
           <Pane active={view === 'hunt'}><HuntView trip={trip} active={view === 'hunt'} /></Pane>
           <Pane active={view === 'food'}><FoodView trip={trip} active={view === 'food'} /></Pane>
           <Pane active={view === 'split'}><SplitView active={view === 'split'} /></Pane>
-          <Pane active={view === 'blackjack'}><BlackjackView active={view === 'blackjack'} /></Pane>
+          <Pane active={view === 'games'}><GamesView active={view === 'games'} /></Pane>
           <Pane active={view === 'angel'}><AngelView active={view === 'angel'} /></Pane>
           <Pane active={view === 'flights'}><FlightsView active={view === 'flights'} /></Pane>
           <Pane active={view === 'activities'}><ActivitiesView active={view === 'activities'} /></Pane>
