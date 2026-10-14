@@ -9,12 +9,14 @@ export function effPrice(l, T) {
 }
 export const UNAVAILABLE = { DATE: '这几天已经被订了', GUEST: '住不下这么多人，Airbnb 不给报价', MIN_NIGHTS: '不满足最少入住晚数', MAX_NIGHTS: '超过最多入住晚数' };
 
-// 排序：票数（同票按价格）、价格（订满的没有价格，自然排到最后）、添加时间（最新在前）
+// 排序：先按所选方式排，订满的（实时报价显示这几天订不了）一律沉到最后，
+// 组内仍保持所选排序。没有实时报价的房源不算订满，照常参与排序。
 export function sortListings(list, sortBy, T) {
   const p = l => effPrice(l, T) || 1e9;
-  const out = list.slice();
-  if (sortBy === 'votes') out.sort((a, b) => (b.votes || []).length - (a.votes || []).length || p(a) - p(b));
-  else if (sortBy === 'added') out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  else out.sort((a, b) => p(a) - p(b));
-  return out;
+  const byMode = (a, b) => sortBy === 'votes'
+    ? (b.votes || []).length - (a.votes || []).length || p(a) - p(b)
+    : sortBy === 'added'
+      ? (b.createdAt || 0) - (a.createdAt || 0)
+      : p(a) - p(b);
+  return list.slice().sort((a, b) => (isBooked(a, T) ? 1 : 0) - (isBooked(b, T) ? 1 : 0) || byMode(a, b));
 }

@@ -1,12 +1,13 @@
 import { statsLine } from '../../lib/format.js';
 import Carousel from './Carousel.jsx';
 import PriceBlock from './PriceBlock.jsx';
+import AreaBadge from './AreaBadge.jsx';
 import { isBooked } from './price.js';
 
 // 按当前行程的日期和人数打开 Airbnb，直接看到实时总价
 const airbnbLink = (l, T) => 'https://www.airbnb.com/rooms/' + l.roomId + '?adults=' + T.people + '&check_in=' + T.checkIn + '&check_out=' + T.checkOut;
 
-export default function ListingCard({ l, T, token, glow, pop, cardRef, onVote, onRemove }) {
+export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, onVote, onRemove, onSetArea }) {
   const votes = l.votes || [];
   const voted = votes.some(v => v.token === token);
   const pics = l.images && l.images.length ? l.images : l.image ? [l.image] : [];
@@ -15,7 +16,7 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, onVote, o
       className={'bg-white rounded-2xl shadow overflow-hidden flex flex-col' + (isBooked(l, T) ? ' opacity-60 grayscale-[40%] hover:opacity-100 hover:grayscale-0 transition' : '') + (glow ? ' just-voted' : '')}>
       <div className="relative car-wrap">
         <Carousel pics={pics} />
-        {l.area && <span className="absolute top-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded-full">{l.area}</span>}
+        <AreaBadge area={l.area} zones={zones} onChange={a => onSetArea(l, a)} />
         <button onClick={() => onRemove(l)} title="删除这个房源" className="absolute top-3 right-3 bg-black/60 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>
       </div>
       <div className="p-4 flex flex-col flex-1">

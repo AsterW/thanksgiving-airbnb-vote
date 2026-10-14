@@ -11,6 +11,7 @@ import ListingMap from './ListingMap.jsx';
 import ListingGrid from './ListingGrid.jsx';
 import { celebrateVote } from './celebrate.js';
 import { sortListings } from './price.js';
+import { inZone, NO_AREA, zoneTabs } from './zones.js';
 import { useListings } from './useListings.js';
 import './hunt.css';
 
@@ -40,8 +41,7 @@ export default function HuntView({ trip, active }) {
   useEffect(() => { if (anchorId) setAnchorId(null); }, [anchorId]);
 
   const visible = useMemo(() => {
-    const list = filter === 'all' ? listings : listings.filter(l => l.area === filter);
-    return sortListings(list, sortBy, T);
+    return sortListings(listings.filter(l => inZone(l, filter)), sortBy, T);
   }, [listings, filter, sortBy, T]);
 
   // 冻结期间按冻结时的顺序显示（新出现的房源排在后面），数据照常更新
@@ -51,6 +51,16 @@ export default function HuntView({ trip, active }) {
     const kept = frozen.filter(id => byId.has(id)).map(id => byId.get(id));
     return kept.concat(visible.filter(l => !frozen.includes(l.id)));
   }, [visible, frozen]);
+
+  const tabs = useMemo(() => zoneTabs(T, listings), [T, listings]);
+  const zoneNames = tabs.map(t => t.name).filter(n => n !== NO_AREA);
+  // 选中的区域标签没了（比如最后一间被改到别的区域）：回到「全部」
+  useEffect(() => { if (filter !== 'all' && listings.length && !tabs.some(t => t.name === filter)) setFilter('all'); }, [tabs, filter, listings.length]);
+
+  async function setArea(l, area) {
+    const r = await api('/api/area', 'POST', { trip, id: l.id, area });
+    if (r.ok) patch(l.id, () => r.listing); else alert('改区域失败：' + (r.error || ''));
+  }
 
   function afterVote(id, votes) {
     if (sortBy === 'votes') setFrozen(f => f || items.map(l => l.id));
@@ -95,14 +105,14 @@ export default function HuntView({ trip, active }) {
   const fitKey = trip + '|' + filter + '|' + visible.map(l => l.id + (l.lat != null ? '@' : '')).sort().join(',');
   return (
     <>
-      <AddListingForm trip={trip} T={T} onAdded={refresh} />
-      <Toolbar T={T} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}
+      <AddListingForm trip={trip} T={T} zones={zoneNames} onAdded={refresh} />
+      <Toolbar tabs={tabs} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}
         showMap={showMap} onToggleMap={() => { save('showMap', showMap ? '0' : '1'); setShowMap(!showMap); }} />
       {showMap && <ListingMap items={visible} T={T} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} />}
       <div ref={gridBox}>
         <ListingGrid items={items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
           emptyText={(filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 链接进来吧 👆'}
-          onVote={vote} onRemove={remove} onHover={setHotId} />
+          zones={zoneNames} onVote={vote} onRemove={remove} onSetArea={setArea} onHover={setHotId} />
       </div>
     </>
   );

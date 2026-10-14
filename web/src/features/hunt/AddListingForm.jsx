@@ -5,7 +5,7 @@ const EMPTY = { url: '', title: '', image: '', price: '', bedrooms: '', beds: ''
 const num = v => (v ? Number(v) : null);
 
 // 加房源：贴链接自动抓取；抓不到就展开手动表单（链接已预填）
-export default function AddListingForm({ trip, T, onAdded }) {
+export default function AddListingForm({ trip, T, zones, onAdded }) {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState({ text: '', tone: 'text-slate-500' });
@@ -70,10 +70,9 @@ export default function AddListingForm({ trip, T, onAdded }) {
           <input className={input} type="number" placeholder="床位数" {...field('beds')} />
           <input className={input} placeholder="浴室数（可填 2.5）" {...field('baths')} />
           <input className={input} type="number" placeholder="可住人数" {...field('sleeps')} />
-          <select className={input} {...field('area')}>
-            <option value="">区域（可选）</option>
-            {T.areas.concat('其他').map(a => <option key={a}>{a}</option>)}
-          </select>
+          {/* 可以选已有区域，也可以直接打一个新的；不填的话按位置自动分 */}
+          <input className={input} list="zoneOptions" placeholder="区域（可选，不填按位置自动分）" maxLength={30} {...field('area')} />
+          <datalist id="zoneOptions">{zones.map(a => <option key={a} value={a} />)}</datalist>
           <input className={input} placeholder="一句话亮点（可选）" {...field('note')} />
         </div>
         <button onClick={addManual} className="mt-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl px-5 py-2">手动加入</button>
