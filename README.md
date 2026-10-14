@@ -21,6 +21,8 @@ works for any group picking a place together.
 - Sort by votes or price, filter by area
 - Anyone with the link can remove a listing (with a confirm dialog)
 - Manual-add fallback when auto-scrape fails
+- Blackjack: one live table (up to 6 seats) everyone joins from their own
+  phone, play chips only
 - No login, no build step, no database server
 
 ## How it works
@@ -37,6 +39,12 @@ works for any group picking a place together.
   that tab's listings array as JSON. Two keys are shared by the whole group
   rather than per tab: `users:v1` (the name list people log in with, which is
   also the Split-that-bill member list) and `split:v1` (one expense ledger).
+- **Blackjack** (`GET /api/bj`, a WebSocket): the table lives in one Durable
+  Object, `BlackjackTable` (SQLite-backed, which the free plan requires). The
+  game runs there and every seated or watching client gets the whole table
+  after each change. Chips are saved in the object's own storage only when a
+  player stands up or disconnects, not per hand, so play doesn't use the KV
+  write budget.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader
@@ -68,7 +76,9 @@ Notes:
   throws Error 1101.
 - `worker-single.js` (regenerate with `node build-single.js`) is a single-file
   bundle you can paste into the Cloudflare dashboard's Worker Quick Edit if
-  you'd rather not use wrangler.
+  you'd rather not use wrangler. Quick Edit doesn't create the Blackjack
+  Durable Object; `wrangler deploy` does, from the `[[durable_objects.bindings]]`
+  and `[[migrations]]` entries in `wrangler.toml`.
 
 ## Project layout
 

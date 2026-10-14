@@ -117,6 +117,28 @@
     #splash.leave { transform:none; opacity:0; }
     #splash .sp-leaf { display:none; }
   }
+
+  /* ---------- 21 点 ---------- */
+  .bj-felt { background: radial-gradient(120% 80% at 50% 0%, #059669 0%, #065f46 55%, #064e3b 100%); }
+  .bj-hand { display:flex; flex-wrap:wrap; gap:.35rem; min-height:4.4rem; }
+  .bj-card { width:3rem; height:4.25rem; border-radius:.5rem; background:#fff; color:#0f172a; box-shadow:0 3px 8px rgba(0,0,0,.35);
+    display:flex; flex-direction:column; justify-content:space-between; padding:.25rem .35rem; font-weight:800; font-size:1rem; line-height:1; }
+  .bj-card.red { color:#e11d48; }
+  .bj-card .s { align-self:flex-end; font-size:1.25rem; }
+  .bj-card.back { background: repeating-linear-gradient(45deg, #6366f1 0 6px, #a855f7 6px 12px); border:3px solid #fff; }
+  .bj-card.deal { animation: bj-deal .35s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes bj-deal { from { opacity:0; transform: translate(0,-28px) rotate(-10deg) scale(.9); } to { opacity:1; transform:none; } }
+  .bj-seat { background:rgba(0,0,0,.2); border:2px solid transparent; border-radius:1rem; padding:.6rem .7rem; transition: border-color .2s, box-shadow .2s; }
+  .bj-seat.me { background:rgba(255,255,255,.12); }
+  .bj-seat.turn { border-color:#facc15; box-shadow:0 0 0 4px rgba(250,204,21,.25); }
+  .bj-seat.away { opacity:.55; }
+  .bj-chip { width:3.1rem; height:3.1rem; border-radius:9999px; font-weight:800; font-size:.8rem; color:#fff; border:3px dashed rgba(255,255,255,.75);
+    box-shadow:0 3px 6px rgba(0,0,0,.35), inset 0 0 0 3px rgba(0,0,0,.15); transition: transform .15s; }
+  .bj-chip:hover { transform: translateY(-3px); }
+  .bj-chip:disabled { opacity:.35; transform:none; }
+  .bj-btn { border-radius:.8rem; padding:.55rem 1.1rem; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.25); }
+  .bj-btn:disabled { opacity:.4; }
+  @media (prefers-reduced-motion: reduce) { .bj-card.deal { animation:none; } .bj-chip:hover { transform:none; } }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen md:flex">
@@ -180,6 +202,7 @@ const splashDone = new Promise(resolve => {
   <nav class="flex flex-col gap-2" aria-label="主导航">
     <button data-view="hunt" class="nav-item"><span class="nav-ico">🏠</span><span class="font-bold">AirBnb hunting<span class="nav-sub">一起选房 · 投票</span></span></button>
     <button data-view="split" class="nav-item"><span class="nav-ico">💰</span><span class="font-bold">Split that bill<span class="nav-sub">分账 · 谁该给谁</span></span></button>
+    <button data-view="blackjack" class="nav-item"><span class="nav-ico">🃏</span><span class="font-bold">Blackjack<span class="nav-sub">21 点 · 大家同一桌</span></span></button>
   </nav>
   <p class="mt-auto px-2 text-xs text-indigo-200/80 leading-relaxed">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
 </aside>
@@ -188,6 +211,7 @@ const splashDone = new Promise(resolve => {
 <nav id="bottomNav" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 flex" aria-label="主导航">
   <button data-view="hunt" class="bnav-item"><span class="nav-ico">🏠</span>AirBnb hunting</button>
   <button data-view="split" class="bnav-item"><span class="nav-ico">💰</span>Split that bill</button>
+  <button data-view="blackjack" class="bnav-item"><span class="nav-ico">🃏</span>Blackjack</button>
 </nav>
 
 <div class="flex-1 min-w-0 pb-20 md:pb-0">
@@ -279,6 +303,31 @@ const splashDone = new Promise(resolve => {
   </section>
   </div>
 
+  <!-- 21 点：一张桌子，大家实时同桌 -->
+  <div id="view-blackjack" hidden>
+  <div class="grid lg:grid-cols-3 gap-5">
+    <section class="lg:col-span-2 bj-felt rounded-2xl shadow-xl p-4 md:p-6 text-white">
+      <div class="flex items-center justify-between gap-3 mb-4 text-sm">
+        <span id="bjStatus" class="font-medium text-emerald-100">连接中…</span>
+        <span id="bjTimer" class="font-bold tabular-nums text-amber-200"></span>
+      </div>
+      <div class="text-center mb-6">
+        <div class="text-xs tracking-widest text-emerald-200 mb-2">庄家 DEALER <span id="bjDealerTotal" class="font-bold text-white"></span></div>
+        <div id="bjDealer" class="bj-hand justify-center"></div>
+      </div>
+      <div id="bjSeats" class="grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+      <div id="bjControls" class="mt-5"></div>
+      <p id="bjMsg" class="text-sm mt-3 min-h-[1.25rem] text-amber-200"></p>
+    </section>
+    <aside class="bg-white rounded-2xl shadow p-5 self-start">
+      <h2 class="font-bold text-lg mb-1">🏆 筹码榜</h2>
+      <p class="text-xs text-slate-500 mb-3">站起来时才保存筹码 · 初始 1000，输光了自动补给</p>
+      <div id="bjBoard"></div>
+      <p class="text-xs text-slate-400 mt-4 leading-relaxed">规则：6 副牌，庄家软 17 停牌，Blackjack 赔 3:2，头两张可以加倍，不能分牌和买保险。每注 10–500。筹码只是好玩，和分账无关。</p>
+    </aside>
+  </div>
+  </div>
+
   <p class="md:hidden text-center text-slate-400 text-sm mt-10 mb-6">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
 </main>
 </div>
@@ -320,10 +369,11 @@ const TRIPS = {
 };
 const [hashTrip, hashView] = location.hash.slice(1).split('/');
 let trip = TRIPS[hashTrip] ? hashTrip : 'nov25';
-// 左侧导航的两个页面
+// 左侧导航的几个页面
 const VIEWS = {
   hunt:  { title: '🏠 AirBnb hunting · 一起选房', sub: '看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它' },
   split: { title: '💰 Split that bill · 分账', sub: '全员一本账 · 共同支出记在这里，自动算清谁该给谁多少钱' },
+  blackjack: { title: '🃏 Blackjack · 21 点', sub: '大家同一桌，轮流跟庄家玩 · 筹码只是好玩，不跟分账挂钩' },
 };
 let view = VIEWS[hashView] ? hashView : 'hunt';
 function syncHash(){ history.replaceState(null, '', '#' + trip + (view === 'hunt' ? '' : '/' + view)); }
@@ -608,8 +658,8 @@ function celebrate(id){
 
 // 切换行程时重画标题、标签页、区域筛选和手动表单
 function renderTrip(){
-  // 分账是全员一本账，不分行程：不显示行程标签页和日期人数
-  const forTrip = view !== 'split';
+  // 分账、21 点都是全员的，不分行程：不显示行程标签页和日期人数
+  const forTrip = view === 'hunt';
   $('#tripSub').textContent = (forTrip ? T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · ' : '') + VIEWS[view].sub;
   $('#tabs').classList.toggle('hidden', !forTrip); // 用 class：hidden 属性会被 .flex 盖掉
   $('#tabs').innerHTML = Object.keys(TRIPS).map(k => {
@@ -635,11 +685,14 @@ function renderNav(){
 }
 function switchView(v){
   if (v === view || !VIEWS[v]) return;
+  const prev = view;
   view = v;
   syncHash();
   renderNav();
   renderTrip();
   if (v === 'split') loadSplit(); // 拿最新的账，别人可能刚记了
+  if (v === 'blackjack') { bjConnect(); renderBj(); }
+  if (prev === 'blackjack') bjDisconnectIfIdle(); // 坐着的人离开页面也留在桌上
   const el = $('#view-' + v);
   el.classList.remove('view-enter'); void el.offsetWidth; el.classList.add('view-enter');
   window.scrollTo({ top: 0 });
@@ -717,6 +770,7 @@ async function login(name){
   let r;
   try { r = await api('/api/login', 'POST', { name, token: myToken }); } catch(e) { r = { ok: false, error: '网络有点问题，稍后再试' }; }
   if (!r.ok) { $('#loginMsg').textContent = r.error || '登录失败'; return; }
+  if (bjState && bjState.you && bjState.you !== r.user.name.toLowerCase()) bjStandUp(); // 换了人：先把原来的人从 21 点桌上站起来
   myName = r.user.name; myToken = r.user.token; USERS = r.users;
   localStorage.setItem('vn', myName); localStorage.setItem('vt', myToken);
   $('#nameModal').classList.remove('open');
@@ -946,9 +1000,152 @@ $('#sortSel').onchange = e => { sortBy = e.target.value; render(); };
 
 document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => switchView(b.dataset.view));
 
+// ---------- 21 点：牌局都在服务器（Durable Object）里，这里只负责连线和画桌子 ----------
+let bjWs = null, bjState = null, bjRetry = 0, bjWantSeat = false, bjSatConfirmed = false;
+let bjBet = 0, bjSeen = new Set(), bjSeenRound = -1, bjCelebrated = -1, bjClock = null, bjMsgTimer = null;
+const BJ_CHIPS = [[10, '#64748b'], [25, '#dc2626'], [100, '#0f172a'], [500, '#7c3aed']];
+const BJ_RESULT = { win: '赢了', lose: '输了', push: '平局', bust: '爆了 💥', blackjack: 'Blackjack! 🎉', refill: '破产了，补给 1000' };
+
+function bjSend(m){ if (bjWs && bjWs.readyState === 1) bjWs.send(JSON.stringify(m)); }
+function bjMe(){ return bjState && bjState.you ? bjState.table.seats.find(s => s.key === bjState.you) : null; }
+// 不在 21 点页面、也没坐下就不连：没人连着时 Durable Object 能休息，省免费额度
+function bjWanted(){ return (view === 'blackjack' && document.visibilityState === 'visible') || bjWantSeat; }
+function bjConnect(){
+  if (bjWs || !bjWanted()) return;
+  const ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/bj');
+  bjWs = ws; bjSatConfirmed = false;
+  ws.onopen = () => { bjRetry = 0; if (bjWantSeat) bjSitNow(); renderBj(); };
+  ws.onmessage = e => {
+    let m;
+    try { m = JSON.parse(e.data); } catch (err) { return; }
+    if (m.type !== 'state') return;
+    bjState = { ...m, at: Date.now() };
+    if (m.you) bjSatConfirmed = true;
+    else if (bjWantSeat && (bjSatConfirmed || m.error)) { bjWantSeat = false; bjSatConfirmed = false; } // 被站起来了，或者坐不下
+    if (m.error === '先登录再坐下') openLogin(bjSitClick);
+    else if (m.error || m.notice) bjMsg(m.error || m.notice);
+    renderBj();
+  };
+  ws.onclose = () => {
+    if (bjWs === ws) bjWs = null;
+    renderBj();
+    if (bjWanted()) setTimeout(bjConnect, Math.min(10000, 800 * 2 ** bjRetry++));
+  };
+}
+function bjDisconnectIfIdle(){ if (bjWs && !bjWanted()) bjWs.close(); }
+function bjSitNow(){ bjSend({ type: 'sit', name: myName, token: myToken }); }
+function bjSitClick(){ ensureNameThen(() => { bjWantSeat = true; if (bjWs && bjWs.readyState === 1) bjSitNow(); else bjConnect(); }); }
+// 站起来：服务器这时才保存筹码（这局打到一半的话，打完再存）
+function bjStandUp(){ bjSend({ type: 'leave' }); bjWantSeat = false; bjSatConfirmed = false; setTimeout(bjDisconnectIfIdle, 500); }
+function bjAddChip(v){ bjBet += v; renderBj(); }
+function bjMsg(text){ $('#bjMsg').textContent = text; clearTimeout(bjMsgTimer); bjMsgTimer = setTimeout(() => { $('#bjMsg').textContent = ''; }, 4000); }
+
+function bjCardHtml(card, id, fresh){
+  const isNew = !bjSeen.has(id);
+  if (isNew) { bjSeen.add(id); fresh.n++; }
+  const anim = isNew ? ' deal" style="animation-delay:' + (fresh.n - 1) * 90 + 'ms' : '';
+  if (!card) return '<div class="bj-card back' + anim + '"></div>';
+  const rank = card.slice(0, -1), suit = card.slice(-1);
+  return '<div class="bj-card' + ('♥♦'.includes(suit) ? ' red' : '') + anim + '"><span>' + rank + '</span><span class="s">' + suit + '</span></div>';
+}
+function bjSeatHtml(s, t, fresh){
+  const mine = s.key === bjState.you, turn = t.turn === s.key;
+  const net = s.net ? ' ' + (s.net > 0 ? '+' : '−') + Math.abs(s.net) : '';
+  const label = s.status === 'out' ? (s.result ? BJ_RESULT[s.result] + (s.result === 'refill' ? '' : net) : (t.phase === 'waiting' || t.phase === 'betting' ? '还没下注' : '这局没玩'))
+    : s.status === 'bet' ? '已下注' : s.status === 'playing' ? (turn ? '思考中…' : '等待中')
+    : s.status === 'stood' ? '停牌' : s.status === 'bust' ? '爆了 💥' : s.status === 'blackjack' ? 'Blackjack!' : (BJ_RESULT[s.result] || '') + net;
+  const tone = /^(win|blackjack)$/.test(s.result) ? 'text-amber-300' : /^(lose|bust)$/.test(s.result) ? 'text-rose-200' : 'text-emerald-100';
+  return '<div class="bj-seat' + (mine ? ' me' : '') + (turn ? ' turn' : '') + (s.connected ? '' : ' away') + '">'
+    + '<div class="flex items-center justify-between gap-2 text-sm mb-1"><span class="font-bold truncate">' + esc(s.name) + (mine ? '（你）' : '') + '</span>'
+    + '<span class="font-bold text-amber-200 tabular-nums">🪙 ' + s.chips.toLocaleString() + '</span></div>'
+    + '<div class="bj-hand">' + s.cards.map((c, i) => bjCardHtml(c, t.round + ':' + s.key + ':' + i, fresh)).join('') + '</div>'
+    + '<div class="flex items-center justify-between text-xs mt-1 text-emerald-100"><span>' + (s.total != null ? s.total + ' 点' : '') + '</span>'
+    + '<span>' + (s.bet ? '注 ' + s.bet + (s.doubled ? '（加倍）' : '') : '') + '</span></div>'
+    + '<div class="text-sm font-bold mt-1 ' + tone + '">' + label + (s.leaving ? ' · 这局后离开' : '') + '</div></div>';
+}
+function bjControls(t, me){
+  const el = $('#bjControls');
+  if (!bjWs || bjWs.readyState !== 1) { el.innerHTML = ''; return; }
+  if (!me) {
+    const full = t.seats.length >= t.rules.seats;
+    el.innerHTML = '<button onclick="bjSitClick()" class="bj-btn bg-amber-400 text-slate-900"' + (full ? ' disabled' : '') + '>🪑 '
+      + (full ? '桌子满了' : myName ? '坐下（' + esc(myName) + '）' : '登录后坐下') + '</button>';
+    return;
+  }
+  const stand = '<button onclick="bjStandUp()" class="bj-btn bg-white/15 text-white ml-auto">站起来</button>';
+  if (t.phase === 'waiting' || t.phase === 'betting') {
+    const cap = Math.min(t.rules.maxBet, me.chips);
+    if (bjBet > cap) bjBet = 0;
+    el.innerHTML = '<div class="flex flex-wrap items-center gap-2 mb-3">'
+      + BJ_CHIPS.map(([v, c]) => '<button class="bj-chip" style="background:' + c + '" onclick="bjAddChip(' + v + ')"' + (bjBet + v > cap ? ' disabled' : '') + '>' + v + '</button>').join('')
+      + '<button onclick="bjBet = 0; renderBj()" class="text-sm text-emerald-100 underline ml-1">清零</button></div>'
+      + '<div class="flex flex-wrap items-center gap-2">'
+      + '<button onclick="bjSend({ type: \'bet\', amount: bjBet })" class="bj-btn bg-amber-400 text-slate-900"' + (bjBet < t.rules.minBet ? ' disabled' : '') + '>'
+      + (me.status === 'bet' ? '改成 ' : '下注 ') + bjBet + '</button>'
+      + '<span class="text-sm text-emerald-100">' + (me.status === 'bet' ? '已下注 ' + me.bet + '，等其他人…' : '点筹码凑注，' + t.rules.minBet + '–' + t.rules.maxBet) + '</span>'
+      + stand + '</div>';
+    return;
+  }
+  if (t.phase === 'playing' && t.turn === me.key) {
+    const canDouble = me.cards.length === 2 && me.chips >= me.bet * 2;
+    el.innerHTML = '<div class="flex flex-wrap items-center gap-2">'
+      + '<button onclick="bjSend({ type: \'hit\' })" class="bj-btn bg-amber-400 text-slate-900">要牌 Hit</button>'
+      + '<button onclick="bjSend({ type: \'stand\' })" class="bj-btn bg-white text-emerald-800">停牌 Stand</button>'
+      + '<button onclick="bjSend({ type: \'double\' })" class="bj-btn bg-fuchsia-500 text-white"' + (canDouble ? '' : ' disabled') + '>加倍 Double</button>'
+      + stand + '</div>';
+    return;
+  }
+  el.innerHTML = '<div class="flex flex-wrap items-center gap-2"><span class="text-sm text-emerald-100">'
+    + (t.phase === 'result' ? '这局结束，马上开下一局' : me.status === 'out' ? '这局你没下注，等下一局' : '等别人…') + '</span>' + stand + '</div>';
+}
+function bjBoard(){
+  const rows = (bjState && bjState.board) || [];
+  $('#bjBoard').innerHTML = rows.length ? rows.map((r, i) => '<div class="flex items-center justify-between gap-2 border-b py-1.5 text-sm"><span class="truncate">'
+      + (i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.') + ' ' + esc(r.name) + (r.seated ? ' <span class="text-xs text-emerald-600">在桌上</span>' : '') + '</span>'
+      + '<span class="font-bold tabular-nums whitespace-nowrap">' + r.chips.toLocaleString() + (r.refills ? ' <span class="text-xs font-normal text-slate-400">补给×' + r.refills + '</span>' : '') + '</span></div>').join('')
+    : '<p class="text-sm text-slate-400">还没人玩过</p>';
+}
+// 倒计时用服务器给的时间算，本地每 250ms 刷一下
+function bjTick(){
+  clearInterval(bjClock); bjClock = null;
+  const t = bjState && bjState.table;
+  const label = () => {
+    if (!t) return '';
+    const left = t.deadline ? Math.max(0, Math.ceil((t.deadline - t.now - (Date.now() - bjState.at)) / 1000)) : 0;
+    if (t.phase === 'waiting') return t.seats.length ? '等人下注' : '';
+    if (t.phase === 'betting') return '下注中 · ' + left + 's';
+    if (t.phase === 'playing') { const s = t.seats.find(x => x.key === t.turn); return (s ? (s.key === bjState.you ? '轮到你' : '轮到 ' + s.name) + ' · ' : '') + left + 's'; }
+    return t.phase === 'result' ? left + 's 后下一局' : '';
+  };
+  $('#bjTimer').textContent = label();
+  if (t && t.deadline) bjClock = setInterval(() => { $('#bjTimer').textContent = label(); }, 250);
+}
+function renderBj(){
+  const t = bjState && bjState.table, me = bjMe();
+  const live = bjWs && bjWs.readyState === 1;
+  $('#bjStatus').textContent = !t ? '连接中…' : !live ? '断线了，重连中…' : t.seats.length + '/' + t.rules.seats + ' 人在桌上' + (me ? '' : ' · 你在旁观');
+  if (!t) return;
+  if (t.round !== bjSeenRound) { bjSeen.clear(); bjSeenRound = t.round; }
+  const fresh = { n: 0 };
+  $('#bjDealer').innerHTML = t.dealer.map((c, i) => bjCardHtml(c, t.round + ':dealer:' + i + ':' + c, fresh)).join('');
+  $('#bjDealerTotal').textContent = t.dealerTotal != null ? '· ' + t.dealerTotal + ' 点' : '';
+  $('#bjSeats').innerHTML = t.seats.length ? t.seats.map(s => bjSeatHtml(s, t, fresh)).join('')
+    : '<p class="col-span-full text-center text-emerald-100/80 text-sm py-6">桌上还没人，坐下开一局吧</p>';
+  bjControls(t, me);
+  bjBoard();
+  bjTick();
+  // 自己赢了撒点彩带
+  if (t.phase === 'result' && me && bjCelebrated !== t.round && /^(win|blackjack)$/.test(me.result)) {
+    bjCelebrated = t.round;
+    if (window.confetti && !reduceMotion) confetti({ particleCount: me.result === 'blackjack' ? 160 : 60, spread: 80, origin: { y: 0.6 }, colors: CONFETTI_COLORS });
+  }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') bjConnect(); else bjDisconnectIfIdle(); });
+
 renderNav();
 renderTrip();
 refresh();
+if (view === 'blackjack') bjConnect();
 </script>
 </body>
 </html>
