@@ -1,0 +1,28 @@
+/* Card tables (斗地主, 掼蛋, 川麻): felt, buttons, seats, speech bubbles, results */
+.gt-felt { position:relative; color:#fff; background: radial-gradient(120% 80% at 50% 0%, #0f766e 0%, #115e59 55%, #134e4a 100%); }
+.gt-btn { border-radius:.8rem; padding:.55rem 1.1rem; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.25); }
+.gt-btn:disabled { opacity:.4; }
+.gt-seat { background:rgba(0,0,0,.22); border:2px solid transparent; border-radius:.9rem; padding:.45rem .6rem; min-width:8.5rem; transition:border-color .2s, box-shadow .2s; }
+.gt-seat.compact { max-width:11rem; width:100%; }
+.gt-seat.turn { border-color:#facc15; box-shadow:0 0 0 4px rgba(250,204,21,.25); }
+.gt-seat.away { opacity:.55; }
+.gt-seat.empty { color:rgba(255,255,255,.5); font-size:.8rem; text-align:center; }
+.gt-role { font-size:.7rem; font-weight:800; padding:1px 7px; border-radius:9999px; background:rgba(255,255,255,.18); white-space:nowrap; }
+.gt-role.gold { background:#f59e0b; color:#1e1b4b; }
+.gt-said { display:flex; flex-wrap:wrap; align-items:center; min-height:2.9rem; }
+.gt-bubble { background:#fff; color:#0f172a; font-weight:800; font-size:.8rem; padding:.25rem .6rem; border-radius:9999px; box-shadow:0 2px 6px rgba(0,0,0,.25); }
+.gt-result { margin:.6rem auto 0; text-align:center; background:rgba(0,0,0,.28); border-radius:1rem; padding:.6rem .8rem; }
+@media (max-width:640px) { .gt-seat { min-width:0; } }
+
+/* A phone held sideways, seated: the table takes the whole screen. Nothing scrolls,
+   the hand sits above the controls, clear of the bottom edge. */
+.gt-full { position:fixed; inset:0; z-index:60; overflow:hidden; display:flex; flex-direction:column;
+  padding:.35rem .9rem calc(env(safe-area-inset-bottom, 0px) + .5rem); overscroll-behavior:contain; }
+.gt-full .gt-mid { flex:1; min-height:0; overflow-y:auto; }
+.gt-full .gt-bar { padding-right:2.4rem; margin-bottom:.4rem; }
+.gt-full .gt-seat { padding:.25rem .5rem; min-width:0; }
+.gt-full .gt-said { min-height:2.1rem; }
+.gt-full .gt-result { margin-top:.3rem; padding:.35rem .6rem; }
+.gt-full .gt-btn { padding:.4rem .9rem; }
+.gt-exit { position:absolute; top:.3rem; right:.5rem; width:2rem; height:2rem; border-radius:9999px; background:rgba(0,0,0,.3); color:#fff; font-weight:800; z-index:2; }
+html.gt-lock, html.gt-lock body { overflow:hidden; overscroll-behavior:none; }

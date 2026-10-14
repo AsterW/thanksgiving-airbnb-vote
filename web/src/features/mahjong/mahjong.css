@@ -1,0 +1,58 @@
+/* 川麻: tiles, the hand, and the table layout. Felt, seats and buttons come from features/games/table.css. */
+.mj-tile { position:relative; flex:0 0 auto; width:2.6rem; height:3.5rem; border-radius:.4rem; padding:.15rem;
+  background:linear-gradient(#fffdf5, #f4efe1); color:#0f172a; box-shadow:0 2px 0 #d6cfb8, 0 3px 6px rgba(0,0,0,.35);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1; user-select:none; -webkit-user-select:none; }
+.mj-tile.back { background:linear-gradient(#22c55e, #15803d); box-shadow:0 2px 0 #166534, 0 3px 6px rgba(0,0,0,.35); }
+.mj-svg { width:100%; height:100%; }
+.mj-cn { font-size:1.15rem; font-weight:900; color:#1e3a8a; }
+.mj-wan { font-size:1.05rem; font-weight:900; color:#dc2626; margin-top:.1rem; }
+.mj-tile.sm { width:1.55rem; height:2.1rem; padding:.08rem; border-radius:.28rem; box-shadow:0 1px 0 #d6cfb8, 0 2px 3px rgba(0,0,0,.3); }
+.mj-tile.sm .mj-cn { font-size:.72rem; } .mj-tile.sm .mj-wan { font-size:.62rem; margin-top:.05rem; }
+.mj-tile.xs { width:1.25rem; height:1.7rem; padding:.05rem; border-radius:.22rem; box-shadow:0 1px 0 #d6cfb8, 0 1px 2px rgba(0,0,0,.3); }
+.mj-tile.xs .mj-cn { font-size:.6rem; } .mj-tile.xs .mj-wan { font-size:.5rem; margin-top:0; }
+.mj-tile.lg { width:3.2rem; height:4.3rem; }
+.mj-tile.lg .mj-cn { font-size:1.45rem; } .mj-tile.lg .mj-wan { font-size:1.3rem; }
+.mj-tile.lit { box-shadow:0 0 0 2px #facc15, 0 2px 0 #d6cfb8, 0 3px 6px rgba(0,0,0,.35); }
+.mj-tile.lackt::after { content:''; position:absolute; left:15%; right:15%; bottom:2px; height:3px; border-radius:2px; background:#ef4444; }
+button.mj-tile { cursor:pointer; touch-action:manipulation; transition:transform .12s; }
+.mj-tile.sel { transform:translateY(-12px); box-shadow:0 0 0 2px #facc15, 0 4px 10px rgba(0,0,0,.4); }
+
+/* the hand: one row on a wide screen, rows of 7 on a phone held upright; the tile just drawn stands apart */
+.mj-hand { display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-end; gap:.2rem; padding-top:1rem; }
+.mj-hand .drawn { margin-left:.6rem; }
+@media (max-width:640px) {
+  .mj-hand { gap:.18rem .18rem; row-gap:.5rem; }
+  .mj-hand .mj-tile:not(.sm) { width:2.65rem; height:3.6rem; }
+}
+/* melds and discards */
+.mj-melds { display:flex; flex-wrap:wrap; gap:.3rem; }
+.mj-meld { display:flex; gap:1px; }
+.mj-river { display:flex; flex-wrap:wrap; gap:2px; min-height:1.7rem; }
+
+.mj-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-top:.5rem; }
+.mj-opp { display:flex; flex-direction:column; gap:.3rem; min-width:0; }
+.mj-top { max-width:24rem; margin:0 auto; }
+.mj-head { display:flex; flex-wrap:wrap; align-items:center; gap:.3rem; }
+.mj-lack { font-size:.7rem; font-weight:900; padding:0 6px; border-radius:9999px; background:#fde68a; color:#78350f; }
+.mj-won { font-size:.7rem; font-weight:800; padding:1px 7px; border-radius:9999px; background:#f59e0b; color:#1e1b4b; }
+.mj-center { display:flex; flex-direction:column; align-items:center; gap:.4rem; margin-top:.6rem; text-align:center; }
+.mj-note { font-size:.8rem; color:#fef3c7; background:rgba(0,0,0,.22); border-radius:.8rem; padding:.3rem .7rem; }
+
+/* full screen, phone on its side: the three others in one row with small tiles, the last
+   discard up in the top bar, a one-row hand */
+.gt-full .mj-grid { grid-template-columns:1fr 1fr 1fr; margin-top:0; gap:.5rem; }
+.gt-full .mj-opp { gap:.2rem; }
+.gt-full .mj-opp .mj-extra { display:none; }
+.gt-full .mj-opp .gt-seat { padding:.2rem .45rem; }
+.gt-full .mj-melds .mj-tile.sm { width:1.2rem; height:1.6rem; }
+.gt-full .mj-melds .mj-tile.sm .mj-cn { font-size:.55rem; } .gt-full .mj-melds .mj-tile.sm .mj-wan { font-size:.48rem; }
+.gt-full .mj-river .mj-tile.xs { width:1.05rem; height:1.42rem; }
+.gt-full .mj-river .mj-tile.xs .mj-cn { font-size:.5rem; } .gt-full .mj-river .mj-tile.xs .mj-wan { font-size:.42rem; }
+.gt-full .mj-center { margin-top:.25rem; gap:.2rem; }
+.gt-full .mj-hand { flex-wrap:nowrap; padding-top:.8rem; gap:.12rem; }
+.gt-full .mj-hand .mj-tile:not(.sm) { width:2.35rem; height:3.15rem; }
+.gt-full .mj-river { min-height:0; }
+.gt-full .mj-tile.lg { width:2.4rem; height:3.2rem; }
+.gt-full .mj-controls { margin-top:.35rem; }
+.gt-full .mj-msg { margin-top:.15rem; min-height:1rem; font-size:.75rem; }
+@media (prefers-reduced-motion: reduce) { button.mj-tile { transition:none; } }

@@ -14,6 +14,8 @@ import { routes as activityRoutes } from './activities/routes.js';
 // The Durable Object class must be exported from the entry module.
 export { BlackjackTable } from './blackjack/table.js';
 export { DdzHall } from './ddz/hall.js';
+export { GuandanHall } from './guandan/hall.js';
+export { MahjongHall } from './mahjong/hall.js';
 
 const ROUTES = { ...listingRoutes, ...userRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes };
 
@@ -22,8 +24,10 @@ export default {
     const url = new URL(request.url);
     // Blackjack is one WebSocket endpoint handled by the table itself.
     if (url.pathname === '/api/bj') return env.BJ_TABLE.get(env.BJ_TABLE.idFromName('main')).fetch(request);
-    // 斗地主: one WebSocket endpoint for all its tables, handled by the hall.
+    // 斗地主 / 掼蛋 / 川麻: one WebSocket endpoint per game for all its tables, handled by its hall.
     if (url.pathname === '/api/ddz') return env.DDZ_HALL.get(env.DDZ_HALL.idFromName('hall')).fetch(request);
+    if (url.pathname === '/api/guandan') return env.GD_HALL.get(env.GD_HALL.idFromName('hall')).fetch(request);
+    if (url.pathname === '/api/mahjong') return env.MJ_HALL.get(env.MJ_HALL.idFromName('hall')).fetch(request);
     const handler = ROUTES[request.method + ' ' + url.pathname];
     if (handler) return handler(request, env, url);
     return env.ASSETS.fetch(request);

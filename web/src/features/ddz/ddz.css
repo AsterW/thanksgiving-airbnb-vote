@@ -1,54 +1,18 @@
-/* 斗地主: felt, seats, cards and the hand fan */
-.dz-felt { background: radial-gradient(120% 80% at 50% 0%, #0f766e 0%, #115e59 55%, #134e4a 100%); }
-.dz-btn { border-radius:.8rem; padding:.55rem 1.1rem; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.25); }
-.dz-btn:disabled { opacity:.4; }
+/* 斗地主 table layout: the two other seats on top with 底牌 between them, your play in the middle.
+   Felt, seats, buttons and cards come from features/games (table.css, cards.css). */
 .dz-top { display:grid; grid-template-columns: 1fr auto 1fr; gap:.6rem; align-items:start; }
 .dz-side { display:flex; flex-direction:column; gap:.4rem; min-width:0; }
 .dz-side.right { align-items:flex-end; text-align:right; }
+.dz-side.right .gt-said { justify-content:flex-end; }
 .dz-center { text-align:center; padding-top:.25rem; }
-.dz-seat { background:rgba(0,0,0,.22); border:2px solid transparent; border-radius:.9rem; padding:.45rem .6rem; min-width:8.5rem; transition:border-color .2s, box-shadow .2s; }
-.dz-seat.compact { max-width:11rem; width:100%; }
-.dz-seat.turn { border-color:#facc15; box-shadow:0 0 0 4px rgba(250,204,21,.25); }
-.dz-seat.away { opacity:.55; }
-.dz-seat.empty { color:rgba(255,255,255,.5); font-size:.8rem; text-align:center; }
-.dz-role { font-size:.7rem; font-weight:800; padding:1px 7px; border-radius:9999px; background:rgba(255,255,255,.18); white-space:nowrap; }
-.dz-role.lord { background:#f59e0b; color:#1e1b4b; }
-.dz-said { display:flex; flex-wrap:wrap; align-items:center; min-height:2.9rem; }
-.dz-side.right .dz-said { justify-content:flex-end; }
-.dz-bubble { background:#fff; color:#0f172a; font-weight:800; font-size:.8rem; padding:.25rem .6rem; border-radius:9999px; box-shadow:0 2px 6px rgba(0,0,0,.25); }
-.dz-result { margin:.6rem auto 0; text-align:center; background:rgba(0,0,0,.28); border-radius:1rem; padding:.6rem .8rem; }
+.dz-mine .gt-said { justify-content:center; }
+.dz-left { min-width:0; overflow-x:auto; }
+.dz-left .gt-said { flex-wrap:nowrap; min-height:0; }
 
-.dz-card { position:relative; flex:0 0 auto; width:2.9rem; height:4rem; border-radius:.45rem; background:#fff; color:#0f172a; box-shadow:0 2px 5px rgba(0,0,0,.35);
-  display:flex; flex-direction:column; align-items:flex-start; padding:.2rem .3rem; font-weight:800; line-height:1.05; user-select:none; }
-.dz-card .r, .dz-card .s { font-size:1rem; }
-/* "10" is squeezed so it still reads under the next card in the fan */
-.dz-card .r.ten { display:inline-block; transform:scaleX(.72); transform-origin:left; letter-spacing:-.04em; }
-.dz-card.red { color:#dc2626; }
-.dz-card.joker .jk { writing-mode:vertical-rl; font-size:.85rem; letter-spacing:.1em; }
-.dz-card.back { background: repeating-linear-gradient(45deg, #6366f1 0 6px, #a855f7 6px 12px); border:2px solid #fff; }
-.dz-card.sm { width:2rem; height:2.8rem; padding:.12rem .2rem; }
-.dz-card.sm .r, .dz-card.sm .s { font-size:.78rem; }
-.dz-card.sm.joker .jk { font-size:.62rem; }
-.dz-said .dz-card.sm { margin-left:-.9rem; }
-.dz-said .dz-card.sm:first-child { margin-left:0; }
-.dz-mine .dz-said { justify-content:center; }
-.dz-said.dz-left { flex-wrap:nowrap; min-width:0; overflow-x:auto; min-height:0; }
-
-/* The hand fan: --w is the card width, --ov the usual overlap, --n (set inline) the card count.
-   When the hand would not fit (20 cards on a narrow phone) the cards overlap more instead of scrolling. */
-.dz-hand { --w:2.9rem; --ov:-1.55rem; display:flex; justify-content:safe center; padding:1.2rem .25rem .25rem; overflow-x:auto; }
-.dz-hand.pickable { touch-action:pan-y; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
-.dz-hand .dz-card { margin-left:min(var(--ov), calc((100% - var(--w)) / (var(--n) - 1) - var(--w))); transition:transform .12s; }
-.dz-hand .dz-card:first-child { margin-left:0; }
-.dz-hand .dz-card.pick { cursor:pointer; }
-@media (hover:hover) { .dz-hand .dz-card.pick:not(.sel):hover { transform:translateY(-4px); } }
-.dz-hand .dz-card.sel { transform:translateY(-14px); box-shadow:0 0 0 2px #facc15, 0 4px 10px rgba(0,0,0,.4); }
-/* cards being swiped over, before the finger lifts */
-.dz-hand .dz-card.sweep::after { content:''; position:absolute; inset:0; border-radius:inherit; background:rgba(56,189,248,.38); pointer-events:none; }
-@media (max-width:640px) {
-  .dz-card { width:2.4rem; height:3.4rem; padding:.15rem .2rem; }
-  .dz-card .r, .dz-card .s { font-size:.9rem; }
-  .dz-hand { --w:2.4rem; --ov:-1.45rem; }
-  .dz-seat { min-width:0; }
-}
-@media (prefers-reduced-motion: reduce) { .dz-hand .dz-card { transition:none; } }
+/* full screen, phone on its side: seats sit beside what they played, so the table is short enough */
+.gt-full .dz-side { flex-direction:row; align-items:center; gap:.5rem; }
+.gt-full .dz-side.right { flex-direction:row-reverse; }
+.gt-full .dz-side .gt-seat.compact { width:auto; max-width:9.5rem; }
+.gt-full .dz-center .pc.sm { width:1.7rem; height:2.4rem; }
+.gt-full .dz-controls { margin-top:.35rem; }
+.gt-full .dz-msg { margin-top:.15rem; min-height:1rem; font-size:.75rem; }

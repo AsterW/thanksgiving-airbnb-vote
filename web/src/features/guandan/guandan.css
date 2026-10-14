@@ -1,0 +1,22 @@
+/* 掼蛋 table layout: partner across the top, the two opponents left and right, you at the bottom.
+   Felt, seats, buttons and cards come from features/games (table.css, cards.css). */
+.gd-top { display:flex; flex-direction:column; align-items:center; gap:.35rem; }
+.gd-top .gt-seat.compact { max-width:11rem; }
+.gd-row { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-top:.4rem; }
+.gd-side { display:flex; flex-direction:column; gap:.4rem; min-width:0; }
+.gd-side.right { align-items:flex-end; text-align:right; }
+.gd-side.right .gt-said { justify-content:flex-end; }
+.gd-said { gap:.4rem; }
+.gd-tag { font-size:.7rem; font-weight:800; padding:1px 7px; border-radius:9999px; background:#fde68a; color:#78350f; white-space:nowrap; }
+.gd-mine .gt-said { justify-content:center; }
+.gd-note { margin:.4rem auto 0; text-align:center; font-size:.8rem; color:#fef3c7; background:rgba(0,0,0,.22); border-radius:.8rem; padding:.3rem .7rem; }
+.gd-left { min-width:0; overflow-x:auto; }
+
+/* full screen, phone on its side: seats sit beside what they played */
+.gt-full .gd-top { flex-direction:row; justify-content:center; gap:.5rem; }
+.gt-full .gd-row { margin-top:.15rem; }
+.gt-full .gd-side { flex-direction:row; align-items:center; gap:.5rem; }
+.gt-full .gd-side.right { flex-direction:row-reverse; }
+.gt-full .gd-side .gt-seat.compact, .gt-full .gd-top .gt-seat.compact { width:auto; max-width:9.5rem; }
+.gt-full .gd-controls { margin-top:.35rem; }
+.gt-full .gd-msg { margin-top:.15rem; min-height:1rem; font-size:.75rem; }

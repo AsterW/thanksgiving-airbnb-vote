@@ -1,0 +1,43 @@
+/* Playing cards (斗地主, 掼蛋) and the hand they sit in */
+.pc { position:relative; flex:0 0 auto; width:2.9rem; height:4rem; border-radius:.45rem; background:#fff; color:#0f172a; box-shadow:0 2px 5px rgba(0,0,0,.35);
+  display:flex; flex-direction:column; align-items:flex-start; padding:.2rem .3rem; font-weight:800; line-height:1.05; user-select:none; -webkit-user-select:none; }
+.pc .r, .pc .s { font-size:1rem; }
+/* "10" is squeezed so it still reads under the next card in the fan */
+.pc .r.ten { display:inline-block; transform:scaleX(.72); transform-origin:left; letter-spacing:-.04em; }
+.pc.red { color:#dc2626; }
+.pc.joker .jk { writing-mode:vertical-rl; font-size:.85rem; letter-spacing:.1em; }
+.pc.back { background: repeating-linear-gradient(45deg, #6366f1 0 6px, #a855f7 6px 12px); border:2px solid #fff; }
+.pc .w { margin-top:.15rem; font-size:.6rem; line-height:1; padding:.1rem .18rem; border-radius:.25rem; background:#f59e0b; color:#1e1b4b; }
+.pc.sm { width:2rem; height:2.8rem; padding:.12rem .2rem; }
+.pc.sm .r, .pc.sm .s { font-size:.78rem; }
+.pc.sm.joker .jk { font-size:.62rem; }
+.pc.sm .w { font-size:.5rem; padding:.05rem .12rem; }
+/* a hand someone played: small cards overlapping */
+.pc-run { display:flex; align-items:center; }
+.pc-run .pc { margin-left:-.9rem; }
+.pc-run .pc:first-child { margin-left:0; }
+
+/* The hand. --w / --h card size, --ov the usual overlap, --n (inline, per row) the cards in that row.
+   A row overlaps more when it would not fit. On a narrow phone CardHand wraps the hand into rows,
+   each row tucked under the one above so the corners (rank + suit) still show. */
+.pc-hand { --w:2.9rem; --h:4rem; --ov:-1.55rem; padding:1.2rem .25rem .25rem; }
+.pc-row { display:flex; justify-content:safe center; }
+.pc-row + .pc-row { margin-top:calc(var(--h) * -.42); }
+.pc-hand .pc { width:var(--w); height:var(--h); margin-left:min(var(--ov), calc((100% - var(--w)) / (var(--n) - 1) - var(--w))); transition:transform .12s; }
+.pc-hand .pc:first-child { margin-left:0; }
+.pc-hand.pickable { touch-action:pan-y; -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+.pc-hand .pc.pick { cursor:pointer; }
+@media (hover:hover) { .pc-hand .pc.pick:not(.sel):hover { transform:translateY(-4px); } }
+.pc-hand .pc.sel { transform:translateY(-14px); box-shadow:0 0 0 2px #facc15, 0 4px 10px rgba(0,0,0,.4); }
+/* cards being swiped over, before the finger lifts */
+.pc-hand .pc.sweep::after { content:''; position:absolute; inset:0; border-radius:inherit; background:rgba(56,189,248,.38); pointer-events:none; }
+/* phones: bigger cards so they're easy to hit; the hand wraps into rows instead of squeezing */
+@media (max-width:640px) {
+  .pc-hand { --w:3.1rem; --h:4.3rem; --ov:-1.2rem; }
+  .pc-hand .pc .r, .pc-hand .pc .s { font-size:1.15rem; }
+}
+/* the full-screen table on a phone held sideways: one row, sized for a short screen */
+.gt-full .pc-hand { --w:2.7rem; --h:3.7rem; --ov:-1.25rem; padding-top:.95rem; }
+.gt-full .pc-hand .pc .r, .gt-full .pc-hand .pc .s { font-size:1.05rem; }
+.gt-full .pc-hand.pickable { touch-action:none; }
+@media (prefers-reduced-motion: reduce) { .pc-hand .pc { transition:none; } }

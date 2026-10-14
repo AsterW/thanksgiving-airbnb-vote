@@ -14,6 +14,9 @@
 - **Secret Angel**：`angel:v1`（全员一份）。`prefs` 按名字（小写）存每人的礼物偏好（分类 id → `love` / `nope`，加一句备注）；`excluded` 是管理员排除的人；`draw` 是抽签结果（天使 → 要送礼的人）。管理员是名字为 Aster 的用户（`worker/angel/routes.js` 的 `ADMIN`）。抽签把所有参加的人随机排成一个圈，每人送给下一个（`worker/angel/draw.js`），所以不会抽到自己、也不会两人互送。接口只返回调用者自己的那一对。和投票一样，身份靠用户列表里的名字 + token，不是真正的密码登录
 - **21 点**：不走 KV，是一个 Durable Object（`BlackjackTable`，SQLite 存储，免费计划只能用这种）。整张桌子的状态在它的内存里，玩家用 WebSocket（`/api/bj`）连上来，每次有变化就把整桌推给所有人。规则和流程在 `BlackjackGame` 里（6 副牌、庄家软 17 停、Blackjack 3:2、头两张可加倍、不分牌不保险；15 秒下注、30 秒一手）。筹码只在玩家站起来或断线时存进它自己的存储（`p:<名字>`），不按局存。坐下要用登录名单里的名字和 token。不在 21 点页面又没坐下的人会断开连接，10 分钟没下注会被站起来，免得白占免费的运行时长
 - **斗地主**：和 21 点一样是 Durable Object（`DdzHall`，WebSocket `/api/ddz`），一个对象管 3 张桌（`ROOMS`），每桌 3 个座位，一个人同时只能坐一张桌。规则在 `worker/ddz/cards.js`（牌型识别、比大小：单、对、三带、顺子、连对、飞机带翅膀、四带二、炸弹、王炸），机器人在 `bot.js`（按牌力叫/抢地主，出牌先出小的、不拆王炸、不压队友、对手快走完了才炸），一桌的流程在 `game.js`（`DdzGame`：叫地主 → 抢地主（每抢一次 ×2，叫的人最后还能抢回来；三家都不叫就重发）→ 地主拿 3 张底牌 → 出牌 → 结算。结果一直留在桌上，桌上的人点「再来一局」才发下一局，不会自己开）。空位开局时由机器人补上；叫地主 15 秒、出牌 30 秒，超时由机器人代打一手，连续超时两次或掉线就托管，局中站起来也是托管打完这局再走；局中来的人排队，下一局坐下。底分 10 豆，倍数 = 叫抢倍数 × 2^炸弹数（春天 / 反春再 ×2），地主一人对两家。豆子和 21 点筹码分开，存在 `DdzHall` 自己的存储里（`p:<名字>`，豆子、局数、胜局、补豆次数），同样只在站起来或断线时写；输光了下一局自动补到 1000。每个人只收到自己的牌，结算时才亮所有人的牌。没人连着时这局直接让机器人打完、记分，桌子空出来
+- **三个牌桌游戏共用的大厅**：`worker/games/hall.js` 的 `TableHall` 管连线、选桌、用登录名单坐下（一个人在同一个游戏里只能坐一张桌）、豆子存取（`p:<名字>`）、大厅列表和豆子榜；`DdzHall` / `GuandanHall` / `MahjongHall` 只是继承它，写明用哪个游戏类、玩家能发哪些消息（`actions`：消息类型 → 调用桌子的方法，返回错误文字或 `{ reply }`）。三个游戏都有同样的托管、排队、站起来、再来一局、10 分钟不动自动站起
+- **掼蛋**：Durable Object `GuandanHall`（WebSocket `/api/guandan`），3 张桌，每桌 4 人，对面是队友（座位 0+2 对 1+3）。规则在 `worker/guandan/cards.js`：两副牌 108 张，牌的 id 带第几副（`'10♥1'`、`'sj2'`）；级牌在单张/对子/三张/三带二/炸弹里比 A 大，在顺子/三连对/钢板/同花顺里按原位；红心级牌是「配」，能当任何非王的牌。牌型：单、对、三张、三带二、顺子（正好 5 张，A 可以当 1）、三连对、钢板、炸弹 4–10 张、同花顺（比 5 炸大、比 6 炸小）、天王炸。带配的牌可能有几种读法（`readPlays`），出牌时取最强的那种。机器人在 `bot.js`（拆牌：炸弹、钢板、三连对、顺子、三带二、对、单；先出小的组，跟牌用最便宜不拆炸的，队友的牌不压，对手快走完才炸；也给人「提示」）。一桌在 `game.js`（`GuandanGame`）：两队各自的级数从 2 打到 A，头游一方升级（队友二游 +3、三游 +2、末游 +1），在自己的 A 上赢且队友不是末游就整场赢、级数重来；从第二局起进贡（末游给头游最大的非配牌；双下两人都给，大的给头游）、还贡（10 以下）、两个大王抗贡；进贡的人先出。出完牌的人没人管，由队友接风。豆子每局 ±10×升的级数，整场赢 ±60
+- **川麻**：Durable Object `MahjongHall`（WebSocket `/api/mahjong`），3 张桌，每桌 4 人，血战到底。牌在 `worker/mahjong/tiles.js`（108 张，`'m1'`..`'p9'`，同一种牌不分彼此）；`hand.js` 算能不能胡（四组一对或七对，手里不能有缺的那门）、番（平胡 0、对对胡 1、清一色 2、七对 2、带幺九 2、将对 +2、金钩钓 +1、每个根 +1、杠上花/杠上炮/抢杠/海底 +1、天胡 3、地胡 2，不封顶，取最大的拆法）、向听数（每门花色单独算、记住结果，再合起来，给机器人用）和听哪些牌（查叫用）。`bot.js`：换三张挑最没用的一门、定缺挑最少的一门、打牌先打缺的那门再挑向听最小、有效进张最多的，碰/杠只在不让牌变差时。一桌在 `game.js`（`MahjongGame`）：发牌（庄 14 张）→ 换三张（随机方向，大家一样）→ 定缺 → 打牌：缺的那门要先打完；别人打的牌可以胡（一炮多响）、杠、碰，没人要就下家摸；放过能胡的牌，到自己下次摸牌前都不能胡别人打的（过水不胡）；暗杠、补杠（别人可以抢杠）；胡了的人退出，剩下的接着打，三家胡完或摸完牌结束，摸完时查花猪（赔 16 底）、查大叫（没听牌的赔听牌的人最大番）。底分 5 豆 × 2^番，自摸每家多给一底；杠当场记账：直杠 2 底、暗杠每家 2 底、补杠每家 1 底。一炮多响时胡的那张只算一张（`won.shared`）。第一个胡的人下局坐庄（一炮多响就是点炮的人）
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 
 ## 前端（`web/`，React + Vite + Tailwind）
@@ -26,9 +29,11 @@
 | `web/src/features/hunt/` | 选房：`HuntView`（数据和投票）、`ListingGrid`（卡片换位动画 FLIP + 投票后锚定位置）、`ListingCard`、`Carousel`（照片轮播）、`ListingMap`（Leaflet 地图）、`AddListingForm`、`price.js`（实时价/排序） |
 | `web/src/features/food/` | 找餐厅：贴 Google 地图链接加店（`AddPlaceForm`）、店铺卡片（想去 / 在 Google 地图打开 / 导航）、`FoodMap`（Leaflet 钉子） |
 | `web/src/features/split/` | 分账：成员、记一笔、余额和结清方案、支出记录（行内修改） |
-| `web/src/features/games/` | Gameroom 页：`GamesView` 在 Blackjack 和斗地主之间切（记在 `localStorage` 的 `game`）；两个游戏都一直挂着，只有看着的那个连服务器。旧链接 `#…/blackjack` 会跳到 `#…/games` |
+| `web/src/features/games/` | Gameroom 页：`GamesView` 在 Blackjack、斗地主、掼蛋、川麻之间切（记在 `localStorage` 的 `game`）；几个游戏都一直挂着，只有看着的那个连服务器。旧链接 `#…/blackjack` 会跳到 `#…/games`。牌桌游戏共用的东西也在这：`useTable`（WebSocket、选桌、坐下/站起、提示）和 `useCountdown`；`PlayingCard`（扑克牌，掼蛋的配标「配」）；`CardHand`（手牌：点一张或按住划一串，pointer 事件，电脑和手机一样；手机竖着时牌更大，一行放不下就分几行叠着放，可以跨行划）；`TableFrame`（牌桌外框：手机横过来、坐在桌上时铺满整个屏幕，直接挂到 body 上，手牌和按钮不用滚动就在屏幕上，也离开屏幕底边的系统手势区）、`RoomPicker`、`PointsBoard`；`table.css`、`cards.css` |
 | `web/src/features/blackjack/` | 21 点：`useBlackjack`（WebSocket 连线、坐下/站起）、牌桌各部分组件 |
-| `web/src/features/ddz/` | 斗地主：`useDdz`（WebSocket、选桌、坐下/站起、提示）、`DdzView`（桌子、叫抢/出牌按钮、再来一局）、`Hand`（手牌：点一张或按住横着划一串，pointer 事件，电脑和手机一样；牌多了自动叠紧放得下）、`SeatBox`、`DdzCard`、`DdzBoard`（豆子榜） |
+| `web/src/features/ddz/` | 斗地主：`DdzView`（桌子、叫抢/出牌按钮、再来一局）、`SeatBox`；牌、手牌、外框用 `features/games` 的 |
+| `web/src/features/guandan/` | 掼蛋：`GuandanView`（四个座位，对面是队友；级数、进贡/还贡、头游到末游、出的牌型标签） |
+| `web/src/features/mahjong/` | 川麻：`MahjongView`（三家的碰杠和弃牌、换三张/定缺/碰杠胡按钮、本局输赢）、`MjTile`（麻将牌，万是汉字，条和筒用 SVG 画）；手牌点一下选中、再点一下打出 |
 | `web/src/session/` | 登录：从用户列表选名字，名字和 token 存在 `localStorage`（`vn` / `vt`） |
 | `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅、照片轮播 `Carousel`（选房和餐厅卡片都用） |
 | `web/src/lib/` | 共用：`api()`、行程和页面配置（`TRIPS`、`VIEWS`）、URL hash 路由（`#nov26/split`） |
@@ -38,7 +43,7 @@
 
 ## 后端（`worker/`，跑在 Worker 里）
 
-入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`food/`（餐厅：读 Google 地图链接）、`users/`（用户列表、登录）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`ddz/`（斗地主：牌型 `cards.js`、机器人 `bot.js`、一桌 `game.js`、Durable Object `hall.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
+入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`food/`（餐厅：读 Google 地图链接）、`users/`（用户列表、登录）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`games/`（三个牌桌游戏共用的 Durable Object 大厅 `hall.js`）、`ddz/`（斗地主：牌型 `cards.js`、机器人 `bot.js`、一桌 `game.js`、Durable Object `hall.js`）、`guandan/`、`mahjong/`（同样的分法；川麻的牌型在 `tiles.js` 和 `hand.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
 
 | 路由 | 作用 |
 |---|---|
@@ -92,7 +97,7 @@ Airbnb 房源页的价格框是浏览器单独请求的（GraphQL 持久化查�
 
 ## 部署（`wrangler.toml`）
 
-声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、21 点和斗地主的两个 Durable Object（`BlackjackTable`、`DdzHall`，各自一条 migration）。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
+声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、四个游戏的 Durable Object（`BlackjackTable`、`DdzHall`、`GuandanHall`、`MahjongHall`；migration v1、v2 各加一个，v3 加掼蛋和川麻两个）。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
 
 **部署踩坑清单（2026-10-10）：**
 

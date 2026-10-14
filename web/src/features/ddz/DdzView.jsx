@@ -1,36 +1,24 @@
 import { useEffect, useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
-import { useDdz } from './useDdz.js';
-import DdzCard from './DdzCard.jsx';
+import { useTable, useCountdown } from '../games/useTable.js';
+import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/TableFrame.jsx';
+import PlayingCard from '../games/PlayingCard.jsx';
+import CardHand from '../games/CardHand.jsx';
 import SeatBox, { Said } from './SeatBox.jsx';
-import Hand from './Hand.jsx';
-import DdzBoard from './DdzBoard.jsx';
 import './ddz.css';
-
-// 倒计时用服务器给的时间算；只在这页开着、连着的时候走
-function useCountdown(st, running) {
-  const [, tick] = useState(0);
-  const t = st?.table;
-  useEffect(() => {
-    if (!running || !t?.deadline) return;
-    const id = setInterval(() => tick(n => n + 1), 250);
-    return () => clearInterval(id);
-  }, [running, t?.deadline]);
-  if (!t?.deadline) return '';
-  return Math.max(0, Math.ceil((t.deadline - t.now - (Date.now() - st.at)) / 1000)) + 's';
-}
 
 const PHASE = { waiting: '等人开始', bidding: '叫地主中', playing: '对局中', result: '这局结束' };
 
 export default function DdzView({ active }) {
-  const { st, live, msg, hint, setHint, room, watch, send, sit, standUp } = useDdz(active);
+  const { st, live, msg, hint, setHint, room, watch, send, sit, standUp } = useTable(active, { path: '/api/ddz', roomKey: 'ddzRoom', noHint: '没有管得上的牌，建议不出' });
   const timer = useCountdown(st, active && live);
   const t = st?.table;
   const me = t ? t.you : -1;
   const mySeat = me >= 0 ? t.seats[me] : null;
   const myCards = mySeat?.cards || [];
   const [sel, setSel] = useState(() => new Set());
+  const { full, exit, enter, canEnter } = useFullTable(active && me >= 0);
 
   // 出了牌 / 新的一局：清掉选中的牌；提示回来了：选上建议的牌
   const handKey = (t?.round || 0) + ':' + myCards.length;
@@ -45,7 +33,7 @@ export default function DdzView({ active }) {
 
   // 点一张或者划过一串：每张都翻一下
   const flip = list => setSel(s => { const n = new Set(s); for (const c of list) { if (n.has(c)) n.delete(c); else n.add(c); } return n; });
-  const deal = label => <button onClick={() => send({ type: 'start' })} className="dz-btn bg-amber-400 text-slate-900">{label}</button>;
+  const deal = label => <button onClick={() => send({ type: 'start' })} className="gt-btn bg-amber-400 text-slate-900">{label}</button>;
   const bottom = me >= 0 ? me : 0, right = (bottom + 1) % 3, left = (bottom + 2) % 3;
   const myTurn = me >= 0 && t.turn === me;
   const leading = myTurn && t.phase === 'playing' && (t.trickBy === -1 || t.trickBy === me);
@@ -56,89 +44,91 @@ export default function DdzView({ active }) {
 
   function controls() {
     if (!live || !t) return null;
-    if (seatedElsewhere) return <button onClick={() => watch(st.seatedAt)} className="dz-btn bg-amber-400 text-slate-900">回到我坐的桌 {st.seatedAt}</button>;
+    if (seatedElsewhere) return <button onClick={() => watch(st.seatedAt)} className="gt-btn bg-amber-400 text-slate-900">回到我坐的桌 {st.seatedAt}</button>;
     if (t.waiting) return <>
       {t.phase === 'waiting' ? deal('开始游戏') : <span className="text-sm text-emerald-100">{t.phase === 'result' ? '点「再来一局」就坐下' : '已经排上了，这局打完就坐下'}</span>}
-      <button onClick={standUp} className="dz-btn bg-white/15 text-white ml-auto">不等了</button>
+      <button onClick={standUp} className="gt-btn bg-white/15 text-white ml-auto">不等了</button>
     </>;
     if (me < 0) {
-      const full = (here?.people.length || 0) >= 3;
-      return <button onClick={sit} disabled={full} className="dz-btn bg-amber-400 text-slate-900">{full ? '这桌满了' : '🪑 坐下'}</button>;
+      const taken = (here?.people.length || 0) >= 3;
+      return <button onClick={sit} disabled={taken} className="gt-btn bg-amber-400 text-slate-900">{taken ? '这桌满了' : '🪑 坐下'}</button>;
     }
-    const stand = <button onClick={standUp} className="dz-btn bg-white/15 text-white ml-auto">站起来</button>;
+    const stand = <button onClick={standUp} className="gt-btn bg-white/15 text-white ml-auto">站起来</button>;
     const auto = mySeat.auto
-      ? <button onClick={() => send({ type: 'auto', on: false })} className="dz-btn bg-fuchsia-500 text-white">取消托管</button>
-      : t.phase === 'playing' || t.phase === 'bidding' ? <button onClick={() => send({ type: 'auto', on: true })} className="dz-btn bg-white/15 text-white">托管</button> : null;
+      ? <button onClick={() => send({ type: 'auto', on: false })} className="gt-btn bg-fuchsia-500 text-white">取消托管</button>
+      : t.phase === 'playing' || t.phase === 'bidding' ? <button onClick={() => send({ type: 'auto', on: true })} className="gt-btn bg-white/15 text-white">托管</button> : null;
     if (t.phase === 'waiting') return <>{deal('开始游戏')}<span className="text-sm text-emerald-100">空位由机器人补上</span>{stand}</>;
-    if (t.phase === 'result') return stand; // 再来一局 is in the result banner
+    // 再来一局 is in the result banner; full screen also puts it here, where it's always on screen
+    if (t.phase === 'result') return full ? <>{deal('🔁 再来一局')}{stand}</> : stand;
     if (!myTurn || mySeat.auto) return <><span className="text-sm text-emerald-100">{t.phase === 'bidding' ? '等别人叫地主…' : '等别人出牌…'}</span>{auto}{stand}</>;
     if (t.phase === 'bidding') {
       const call = t.bidStage === 'call';
       return <>
-        <button onClick={() => send({ type: 'bid', yes: true })} className="dz-btn bg-amber-400 text-slate-900">{call ? '叫地主' : '抢地主'}</button>
-        <button onClick={() => send({ type: 'bid', yes: false })} className="dz-btn bg-white text-emerald-800">{call ? '不叫' : '不抢'}</button>
+        <button onClick={() => send({ type: 'bid', yes: true })} className="gt-btn bg-amber-400 text-slate-900">{call ? '叫地主' : '抢地主'}</button>
+        <button onClick={() => send({ type: 'bid', yes: false })} className="gt-btn bg-white text-emerald-800">{call ? '不叫' : '不抢'}</button>
         <span className="text-sm text-amber-200">{timer}</span>{auto}{stand}
       </>;
     }
     return <>
-      <button onClick={() => send({ type: 'pass' })} disabled={leading} className="dz-btn bg-white text-emerald-800">不出</button>
-      <button onClick={() => send({ type: 'hint' })} className="dz-btn bg-sky-400 text-slate-900">提示</button>
-      <button onClick={() => send({ type: 'play', cards: [...sel] })} disabled={!sel.size} className="dz-btn bg-amber-400 text-slate-900">出牌</button>
+      <button onClick={() => send({ type: 'pass' })} disabled={leading} className="gt-btn bg-white text-emerald-800">不出</button>
+      <button onClick={() => send({ type: 'hint' })} className="gt-btn bg-sky-400 text-slate-900">提示</button>
+      <button onClick={() => send({ type: 'play', cards: [...sel] })} disabled={!sel.size} className="gt-btn bg-amber-400 text-slate-900">出牌</button>
       <span className="text-sm text-amber-200">{timer}</span>{auto}{stand}
     </>;
   }
 
   const result = t?.phase === 'result' && t.result;
+  // 全屏时自己的座位框收起来，地主/豆子挪到顶上那行
+  const meLine = full && mySeat && <span className="text-xs text-emerald-50/90">{t.landlord === me ? '👑 地主 · ' : t.landlord >= 0 ? '农民 · ' : ''}🫘 {mySeat.points?.toLocaleString()}</span>;
   return (
     <div>
-      <div className="flex flex-wrap gap-2 mb-4">
-        {(st?.lobby || [1, 2, 3].map(r => ({ room: r, people: [], bots: 0, phase: 'waiting' }))).map(l => (
-          <button key={l.room} onClick={() => watch(l.room)}
-            className={'rounded-2xl px-4 py-2 text-left border-2 ' + (l.room === room ? 'bg-white border-indigo-500 shadow' : 'bg-white/70 border-transparent hover:border-indigo-200')}>
-            <div className="font-bold text-sm">桌 {l.room}{st?.seatedAt === l.room ? ' · 你在这' : ''}</div>
-            <div className="text-xs text-slate-500">{l.people.length ? l.people.join('、') : '空着'}{l.bots ? ' + ' + l.bots + ' 🤖' : ''} · {PHASE[l.phase]}</div>
-          </button>
-        ))}
-      </div>
+      <RoomPicker st={st} room={room} watch={watch} phases={PHASE} />
       <div className="grid lg:grid-cols-3 gap-5">
-        <section className="lg:col-span-2 dz-felt rounded-2xl shadow-xl p-3 md:p-5 text-white">
-          <div className="flex items-center justify-between gap-3 mb-3 text-sm">
+        <TableFrame full={full} onExit={exit} className="lg:col-span-2">
+          <div className="gt-bar flex items-center justify-between gap-3 mb-3 text-sm">
             <span className="font-medium text-emerald-100">{status}</span>
+            {meLine}
             {t && t.landlord >= 0 && <span className="font-bold text-amber-200">倍数 ×{odds}{t.bombs ? '（炸弹 ' + t.bombs + '）' : ''}</span>}
+            {canEnter && <button onClick={enter} className="text-xs rounded-full bg-white/15 px-2 py-1">⛶ 全屏</button>}
           </div>
           {t && (
             <>
-              <div className="dz-top">
-                <div className="dz-side"><SeatBox s={t.seats[left]} idx={left} t={t} timer={timer} compact /><Said said={t.said[left]} /></div>
-                <div className="dz-center">
-                  <div className="text-[11px] tracking-widest text-emerald-200 mb-1">底牌</div>
-                  <div className="flex justify-center gap-1">{(t.bottom.length ? t.bottom : [null, null, null]).map((c, i) => <DdzCard key={i + ':' + c} card={c} size="sm" />)}</div>
+              <div className="gt-mid">
+                <div className="dz-top">
+                  <div className="dz-side"><SeatBox s={t.seats[left]} idx={left} t={t} timer={timer} compact /><Said said={t.said[left]} /></div>
+                  <div className="dz-center">
+                    <div className="text-[11px] tracking-widest text-emerald-200 mb-1">底牌</div>
+                    <div className="flex justify-center gap-1">{(t.bottom.length ? t.bottom : [null, null, null]).map((c, i) => <PlayingCard key={i + ':' + c} card={c} size="sm" />)}</div>
+                  </div>
+                  <div className="dz-side right"><SeatBox s={t.seats[right]} idx={right} t={t} timer={timer} compact /><Said said={t.said[right]} /></div>
                 </div>
-                <div className="dz-side right"><SeatBox s={t.seats[right]} idx={right} t={t} timer={timer} compact /><Said said={t.said[right]} /></div>
+                {result && (
+                  <div className="gt-result">
+                    <div className="text-lg font-extrabold">{result.landlordWin ? '👑 地主赢了！' : '🌾 农民赢了！'}{result.spring ? (result.landlordWin ? ' · 春天 ×2' : ' · 反春 ×2') : ''}</div>
+                    <div className="text-sm mt-1">倍数 ×{result.factor} · {result.names.map((n, k) => n + ' ' + (result.deltas[k] > 0 ? '+' : '') + result.deltas[k]).join(' · ')}</div>
+                    {[left, right].filter(k => t.seats[k]?.cards?.length).map(k => (
+                      <div key={k} className="flex items-center justify-center gap-2 mt-2 text-xs">
+                        <span className="shrink-0 text-emerald-100">{result.names[k]} 剩</span>
+                        <div className="dz-left"><Said said={{ cards: t.seats[k].cards }} /></div>
+                      </div>
+                    ))}
+                    {live && (me >= 0 || t.waiting) && !seatedElsewhere && <div className="mt-3">{deal('🔁 再来一局')}</div>}
+                  </div>
+                )}
+                <div className="mt-2 dz-mine"><Said said={t.said[bottom]} /></div>
               </div>
-              {result && (
-                <div className="dz-result">
-                  <div className="text-lg font-extrabold">{result.landlordWin ? '👑 地主赢了！' : '🌾 农民赢了！'}{result.spring ? (result.landlordWin ? ' · 春天 ×2' : ' · 反春 ×2') : ''}</div>
-                  <div className="text-sm mt-1">倍数 ×{result.factor} · {result.names.map((n, k) => n + ' ' + (result.deltas[k] > 0 ? '+' : '') + result.deltas[k]).join(' · ')}</div>
-                  {[left, right].filter(k => t.seats[k]?.cards?.length).map(k => (
-                    <div key={k} className="flex items-center justify-center gap-2 mt-2 text-xs">
-                      <span className="shrink-0 text-emerald-100">{result.names[k]} 剩</span>
-                      <div className="dz-said dz-left">{t.seats[k].cards.map(c => <DdzCard key={c} card={c} size="sm" />)}</div>
-                    </div>
-                  ))}
-                  {live && (me >= 0 || t.waiting) && !seatedElsewhere && <div className="mt-3">{deal('🔁 再来一局')}</div>}
-                </div>
-              )}
-              <div className="mt-2 dz-mine"><Said said={t.said[bottom]} /></div>
-              <div className="mt-2"><SeatBox s={t.seats[bottom]} idx={bottom} t={t} timer={timer} /></div>
-              <Hand cards={t.seats[bottom]?.cards || Array.from({ length: t.seats[bottom]?.count || 0 }, () => null)}
+              {!full && <div className="mt-2"><SeatBox s={t.seats[bottom]} idx={bottom} t={t} timer={timer} /></div>}
+              <CardHand cards={t.seats[bottom]?.cards || Array.from({ length: t.seats[bottom]?.count || 0 }, () => null)}
                 sel={sel} onToggle={flip} pickable={me >= 0 && t.phase === 'playing'} />
             </>
           )}
-          <div className="flex flex-wrap items-center gap-2 mt-4">{controls()}</div>
-          <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200">{msg}</p>
-        </section>
-        <DdzBoard rows={st?.board || []} />
+          <div className="flex flex-wrap items-center gap-2 mt-4 dz-controls">{controls()}</div>
+          <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 dz-msg">{msg}</p>
+        </TableFrame>
+        <PointsBoard title="斗地主豆子榜" rows={st?.board || []}>
+          规则：一副牌 54 张，三人各 17 张，留 3 张底牌。叫地主 / 抢地主，每抢一次 ×2；炸弹、王炸各 ×2；春天 / 反春 ×2。底分 10 豆，地主一人对两家，输赢都算两份。
+          空位由机器人补上；掉线或连着两次没出牌会自动托管。豆子只是好玩，和分账无关。
+        </PointsBoard>
       </div>
     </div>
   );

@@ -2,15 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from '../../session/SessionContext.jsx';
 import { load, save } from '../../lib/storage.js';
 
-// 斗地主：牌局都在服务器（DdzHall，一个 Durable Object 里三张桌子），这里只负责连线。
-// 和 21 点一样：不在这页、也没坐下就不连，省免费额度；被站起来了且不在这页就断开。
-export function useDdz(active) {
+// 斗地主 / 掼蛋 / 川麻 共用的连线：牌局都在服务器（每个游戏一个 Durable Object，里面几张桌子），
+// 这里只负责连上、选桌、坐下、站起。和 21 点一样：不在这页、也没坐下就不连，省免费额度；
+// 被站起来了且不在这页就断开。
+// path：WebSocket 地址（/api/ddz）；roomKey：记住看哪张桌的 localStorage key；
+// noHint：点「提示」却没有能出的牌时显示的话。
+export function useTable(active, { path, roomKey, noHint }) {
   const { name, ensureName, openLogin } = useSession();
   const [st, setSt] = useState(null); // 服务器发来的 { room, seatedAt, you, table, lobby, board } + 收到的时间 at
   const [live, setLive] = useState(false);
   const [msg, setMsg] = useState('');
   const [hint, setHint] = useState(null); // 提示：服务器建议出的牌
-  const [room, setRoom] = useState(() => Number(load('ddzRoom')) || 1);
+  const [room, setRoom] = useState(() => Number(load(roomKey)) || 1);
   const ws = useRef(null), retry = useRef(0), msgTimer = useRef(null);
   const wantSeat = useRef(false), satConfirmed = useRef(false);
   const activeRef = useRef(active), roomRef = useRef(room);
@@ -24,7 +27,7 @@ export function useDdz(active) {
 
   actions.current.connect = () => {
     if (ws.current || !wanted()) return;
-    const s = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/ddz?room=' + roomRef.current);
+    const s = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + path + '?room=' + roomRef.current);
     ws.current = s; satConfirmed.current = false;
     s.onopen = () => { retry.current = 0; setLive(true); if (wantSeat.current && actions.current.me) send({ type: 'sit', room: roomRef.current, ...actions.current.me }); };
     s.onmessage = e => {
@@ -32,7 +35,7 @@ export function useDdz(active) {
       try { m = JSON.parse(e.data); } catch (err) { return; }
       if (m.type !== 'state') return;
       setSt({ ...m, at: Date.now() });
-      if (m.hint) { setHint(m.hint); if (!m.hint.length) flash('没有管得上的牌，建议不出'); }
+      if (m.hint) { setHint(m.hint); if (!m.hint.length && noHint) flash(noHint); }
       if (m.you) satConfirmed.current = true;
       else if (wantSeat.current && (satConfirmed.current || m.error)) { // 被站起来了，或者坐不下
         wantSeat.current = false; satConfirmed.current = false;
@@ -62,7 +65,7 @@ export function useDdz(active) {
     setTimeout(disconnectIfIdle, 500);
   }, [send]); // eslint-disable-line react-hooks/exhaustive-deps -- disconnectIfIdle only reads refs
   // 换桌看：只换看哪张桌，坐着的人还坐在原来那桌
-  const watch = useCallback(r => { setRoom(r); save('ddzRoom', String(r)); send({ type: 'watch', room: r }); }, [send]);
+  const watch = useCallback(r => { setRoom(r); save(roomKey, String(r)); send({ type: 'watch', room: r }); }, [send, roomKey]);
 
   useEffect(() => {
     const onVis = () => (document.visibilityState === 'visible' ? actions.current.connect() : disconnectIfIdle());
@@ -77,5 +80,18 @@ export function useDdz(active) {
     if (st?.you && name && st.you !== name.toLowerCase()) standUp();
   }, [name]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { st, live, msg, hint, setHint, room, watch, send, sit, standUp };
+  return { st, live, msg, flash, hint, setHint, room, watch, send, sit, standUp };
+}
+
+// 倒计时用服务器给的时间算；只在这页开着、连着的时候走
+export function useCountdown(st, running) {
+  const [, tick] = useState(0);
+  const t = st?.table;
+  useEffect(() => {
+    if (!running || !t?.deadline) return;
+    const id = setInterval(() => tick(n => n + 1), 250);
+    return () => clearInterval(id);
+  }, [running, t?.deadline]);
+  if (!t?.deadline) return '';
+  return Math.max(0, Math.ceil((t.deadline - t.now - (Date.now() - st.at)) / 1000)) + 's';
 }

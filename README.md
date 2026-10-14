@@ -26,10 +26,12 @@ works for any group picking a place together.
   place, you get "not found"); each card shows up to 10 photos from the place
   page, like the Airbnb cards. Vote for the ones you want to try, open each in
   Google Maps or get directions
-- Gameroom: live Blackjack (one table, up to 6 seats) and 斗地主 (three
-  tables of 3, bots fill empty seats, 叫地主 / 抢地主 bidding), joined from
+- Gameroom: live Blackjack (one table, up to 6 seats), 斗地主 (叫地主 /
+  抢地主), 掼蛋 (full 升级 with 进贡 / 还贡) and 川麻 (血战到底 with 换三张,
+  no 番 cap), each with three tables and bots in empty seats, joined from
   everyone's own phone. Each game has its own leaderboard (chips / 豆子), play
-  points only
+  points only. On a phone held upright the cards / tiles are bigger and the
+  hand wraps into rows; held sideways while seated, the table fills the screen
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
   claim, and suggested times to be at the airport for departures
@@ -41,7 +43,7 @@ works for any group picking a place together.
 ## How it works
 
 - **Frontend** (`web/`): React + Vite + Tailwind, one folder per feature
-  (`web/src/features/hunt`, `food`, `split`, `games`, `blackjack`, `ddz`). People log in by picking
+  (`web/src/features/hunt`, `food`, `split`, `games`, `blackjack`, `ddz`, `guandan`, `mahjong`). People log in by picking
   their name from the group's user list; votes are tied to that user's token.
 - **Backend** (`worker/`): a Cloudflare Worker, one folder per feature, each
   exporting its own route table that `worker/index.js` merges. A small JSON API:
@@ -60,11 +62,15 @@ works for any group picking a place together.
   after each change. Chips are saved in the object's own storage only when a
   player stands up or disconnects, not per hand, so play doesn't use the KV
   write budget.
-- **斗地主** (`GET /api/ddz`, a WebSocket): a second Durable Object,
-  `DdzHall`, runs all three tables. Bots take any empty seat and stand in for
-  anyone who times out twice or drops (托管). 豆子 are saved the same way as
-  Blackjack chips, in the hall's own storage, so the two leaderboards stay
-  separate.
+- **斗地主 / 掼蛋 / 川麻** (`GET /api/ddz`, `/api/guandan`, `/api/mahjong`,
+  WebSockets): one Durable Object per game (`DdzHall`, `GuandanHall`,
+  `MahjongHall`), each running three tables. They share the hall code in
+  `worker/games/hall.js` (rooms, sitting down with your login, saving 豆子,
+  the leaderboard); each game folder has its rules, bots and table. Bots take
+  any empty seat and stand in for anyone who times out twice or drops (托管).
+  豆子 are saved the same way as Blackjack chips, in each hall's own storage,
+  so every game's leaderboard is separate and play never touches the KV
+  write budget.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader
@@ -118,7 +124,7 @@ Notes:
 | `web/src/components/` | Shared UI: splash, nav, header, login, toast |
 | `web/src/lib/`, `web/src/session/` | Shared helpers, trip/page config, the logged-in user |
 | `worker/index.js` | Worker entry: merges the route tables, serves `dist/` |
-| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`, `ddz/`: storage, logic and routes |
+| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`, `games/` (shared game hall), `ddz/`, `guandan/`, `mahjong/`: storage, logic and routes |
 | `worker/config/` | Trips and seed listings |
 | `wrangler.toml` | Deploy config (build step, KV, assets, Durable Objects) |
 | `CONTRIBUTING.md` | Where new code goes, and how to keep PRs from colliding |
