@@ -8,6 +8,16 @@ import { byId } from './categories.js';
 export default function RevealCard({ master, drawnAt, me }) {
   const seenKey = 'angelSeen:' + me + ':' + drawnAt;
   const [open, setOpen] = useState(() => load(seenKey) === '1');
+  // 「拆没拆过」是按每一次抽签分别记的（seenKey 里带着抽签时间）。但
+  // useState 的初始值只在组件挂载时算一次：面板是常驻不卸载的，重新
+  // shuffle 后父组件只是换了新数据重渲染，这个组件还活着，open 就
+  // 带着上一轮的 true，新结果直接摊开显示人名。所以在渲染期对齐：
+  // seenKey 变了就按新一轮的记录重算 open，新信封回到封口状态。
+  const [keyFor, setKeyFor] = useState(seenKey);
+  if (keyFor !== seenKey) {
+    setKeyFor(seenKey);
+    setOpen(load(seenKey) === '1');
+  }
   const prefs = master.prefs;
   const loves = prefs ? Object.entries(prefs.picks).filter(([, v]) => v === 'love').map(([k]) => byId[k]).filter(Boolean) : [];
   const nopes = prefs ? Object.entries(prefs.picks).filter(([, v]) => v === 'nope').map(([k]) => byId[k]).filter(Boolean) : [];
