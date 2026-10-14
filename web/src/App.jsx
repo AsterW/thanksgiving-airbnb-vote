@@ -48,7 +48,7 @@ function Shell() {
       <Splash onDone={() => setSplashDone(true)} />
       <Sidebar view={view} onView={goView} />
       <BottomNav view={view} onView={goView} />
-      <div className="flex-1 min-w-0 pb-20 md:pb-0">
+      <div className="flex-1 min-w-0 pb-24 md:pb-0">
         <Header view={view} trip={trip} onTrip={t => setRoute({ trip: t })} />
         <main className="max-w-6xl mx-auto px-4 py-6">
           <Pane active={view === 'calendar'}><CalendarView active={view === 'calendar'} /></Pane>

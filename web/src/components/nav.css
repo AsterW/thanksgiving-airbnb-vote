@@ -1,23 +1,52 @@
-/* 左侧导航 */
-#sidebar { background: radial-gradient(120% 60% at 0% 0%, rgba(236,72,153,.35), transparent 60%), linear-gradient(180deg, #1e1b4b 0%, #312e81 55%, #4c1d95 100%); }
-.nav-item { position:relative; display:flex; align-items:center; gap:.85rem; width:100%; padding:.8rem 1rem; border-radius:1rem; color:rgba(224,231,255,.75); text-align:left; transition: background .2s, color .2s, transform .2s; }
-.nav-item:hover { background:rgba(255,255,255,.08); color:#fff; }
-.nav-item .nav-ico { display:grid; place-items:center; width:2.4rem; height:2.4rem; border-radius:.8rem; background:rgba(255,255,255,.08); font-size:1.15rem; transition: background .2s, transform .2s; }
+/* 左侧导航：悬浮玻璃栏（Liquid Glass 阶段 1）。不再贴边满高，
+   四周留出间隙浮在极光底色上；玻璃里留一点品牌靛蓝/粉的淡晕做呼应 */
+#sidebar {
+  top:14px; height:calc(100vh - 28px); margin-left:14px; border-radius:26px; color:var(--ink);
+  background:
+    radial-gradient(120% 55% at 0% 0%, rgba(99,102,241,.16), transparent 60%),
+    radial-gradient(110% 50% at 100% 100%, rgba(236,72,153,.12), transparent 60%),
+    var(--glass-bg);
+  -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-border); box-shadow:var(--glass-shadow);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  #sidebar { background:rgba(247,249,255,.94); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  #sidebar { background:rgba(247,249,255,.96); -webkit-backdrop-filter:none; backdrop-filter:none; }
+}
+.nav-item { position:relative; display:flex; align-items:center; gap:.85rem; width:100%; padding:.8rem 1rem; border-radius:1rem; color:#33547c; text-align:left; transition: background .2s, color .2s, transform .2s; }
+.nav-item:hover { background:rgba(255,255,255,.5); color:var(--ink); }
+.nav-item .nav-ico { display:grid; place-items:center; width:2.4rem; height:2.4rem; border-radius:.8rem; background:rgba(255,255,255,.45); box-shadow:inset 0 1px 0 rgba(255,255,255,.8); font-size:1.15rem; transition: background .2s, transform .2s; }
 .nav-item:hover .nav-ico { transform: rotate(-6deg) scale(1.06); }
-.nav-item.active { background:#fff; color:#1e1b4b; box-shadow:0 10px 30px -8px rgba(0,0,0,.45); }
-.nav-item.active .nav-ico { background:linear-gradient(135deg,#6366f1,#ec4899); }
-.nav-item.active::before { content:''; position:absolute; left:-1rem; top:22%; bottom:22%; width:4px; border-radius:0 4px 4px 0; background:linear-gradient(#a5b4fc,#f9a8d4); }
+/* 选中项是一片亮玻璃透镜，图标砖保留品牌渐变，是整条栏上唯一的饱和色 */
+.nav-item.active { background:linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.62)); color:var(--ink); box-shadow:0 8px 20px -6px rgba(30,50,110,.28), inset 0 1px 0 #fff; }
+.nav-item.active .nav-ico { background:linear-gradient(135deg,#6366f1,#ec4899); color:#fff; box-shadow:none; }
 .nav-sub { display:block; font-size:.72rem; font-weight:500; opacity:.65; }
-/* 手机上变成底部标签栏 */
+/* 手机上变成底部标签栏：悬浮玻璃胶囊（Liquid Glass 阶段 1），
+   四周留间隙浮在内容之上，不再贴边满宽 */
 /* 页面多了一行放不下：横着滑，字不换行。滑的是里面那条（.bnav-strip），
-   这样两边淡出只淡标签，不淡底栏的白底；哪边还有标签，哪边就淡出 */
-#bottomNav { padding-bottom: env(safe-area-inset-bottom, 0px); }
+   这样两边淡出只淡标签，不淡胶囊的玻璃底；哪边还有标签，哪边就淡出 */
+#bottomNav {
+  left:10px; right:10px; bottom:calc(10px + env(safe-area-inset-bottom, 0px));
+  border-radius:999px;
+  background:var(--glass-bg);
+  -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+  border:1px solid var(--glass-border); box-shadow:var(--glass-shadow);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  #bottomNav { background:rgba(247,249,255,.94); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  #bottomNav { background:rgba(247,249,255,.96); -webkit-backdrop-filter:none; backdrop-filter:none; }
+}
 .bnav-strip { position:relative; display:flex; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; }
 .bnav-strip::-webkit-scrollbar { display:none; }
 .bnav-strip.more-r { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); }
 .bnav-strip.more-l { -webkit-mask-image:linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); }
 .bnav-strip.more-l.more-r { -webkit-mask-image:linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); }
-.bnav-item { flex:1 0 4.6rem; display:flex; flex-direction:column; align-items:center; gap:2px; padding:.55rem .25rem .5rem; font-size:.72rem; font-weight:600; color:#64748b; white-space:nowrap; }
+.bnav-item { flex:1 0 4.6rem; display:flex; flex-direction:column; align-items:center; gap:2px; margin:5px 3px; border-radius:999px; padding:.55rem .25rem .5rem; font-size:.72rem; font-weight:600; color:#64748b; white-space:nowrap; transition: background .2s, color .2s, box-shadow .2s; }
 .bnav-item .nav-ico { font-size:1.3rem; transition: transform .2s; }
-.bnav-item.active { color:#4f46e5; }
+/* 选中项同样是亮玻璃透镜，和桌面侧栏一个语言 */
+.bnav-item.active { background:linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.62)); color:#4f46e5; box-shadow:0 4px 12px rgba(30,50,110,.2), inset 0 1px 0 #fff; }
 .bnav-item.active .nav-ico { transform: translateY(-2px) scale(1.12); }
