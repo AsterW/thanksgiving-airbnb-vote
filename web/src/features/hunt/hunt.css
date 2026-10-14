@@ -7,7 +7,6 @@
 #map { height:340px; }
 @media (min-width:768px) { #map { height:420px; } }
 .pin-wrap { background:none; border:none; }
-.osm-tiles { filter: saturate(.75) contrast(.95) brightness(1.03); } /* 柔和一点，让价格钉更显眼 */
 .pin { position:absolute; left:0; bottom:0; transform:translate(-50%, -6px); white-space:nowrap; background:#fff; color:#0f172a; font-weight:800; font-size:12px; padding:4px 9px; border-radius:9999px; box-shadow:0 2px 8px rgba(15,23,42,.28); transition: transform .15s, background .15s, color .15s; cursor:pointer; }
 .pin::after { content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); border:5px solid transparent; border-bottom:0; border-top-color:inherit; }
 .pin { border-top-color:#fff; }

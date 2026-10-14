@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
+import { addSatellite } from '../../lib/tiles.js';
 import { esc } from '../../lib/format.js';
 
 // 活动地图：有地点的卡都钉上，钉子是活动的 emoji + 短标题。点钉子可以
@@ -33,9 +34,7 @@ export default function ActivitiesMap({ items, token, visible, onFocus }) {
   useEffect(() => {
     if (!visible || map.current) return;
     const m = L.map(box.current, { scrollWheelZoom: false, zoomSnap: 0.25 });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(m);
+    addSatellite(m);
     m.setView([39.2, -105.3], 7);
     m.on('click', () => m.scrollWheelZoom.enable());
     m.on('mouseout', () => m.scrollWheelZoom.disable());
