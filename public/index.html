@@ -81,6 +81,35 @@
 
   <!-- 列表 -->
   <section id="grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-5"></section>
+
+  <!-- 分账 Splitwise -->
+  <section id="splitSection" class="bg-white rounded-2xl shadow p-5 mt-8">
+    <h2 class="font-bold text-lg mb-1">💰 分账 · Splitwise</h2>
+    <p class="text-sm text-slate-500 mb-4">这一段行程的共同支出记在这里，自动算清谁该给谁多少钱（按当前行程分别记账）</p>
+    <div class="mb-5">
+      <div class="text-sm font-medium mb-2">成员</div>
+      <div id="memberChips" class="mb-2"></div>
+      <div class="flex gap-2">
+        <input id="memberInput" class="border rounded-lg px-3 py-2 flex-1" placeholder="新成员的名字" maxlength="20">
+        <button id="memberBtn" class="bg-slate-800 hover:bg-slate-900 text-white rounded-xl px-4 py-2 text-sm font-bold">加成员</button>
+      </div>
+    </div>
+    <div class="grid md:grid-cols-3 gap-3 mb-3">
+      <input id="eDesc" class="border rounded-lg px-3 py-2" placeholder="支出说明，比如 房费 / 晚餐">
+      <input id="eAmount" type="number" step="0.01" min="0" class="border rounded-lg px-3 py-2" placeholder="金额 USD">
+      <select id="ePaidBy" class="border rounded-lg px-3 py-2"></select>
+    </div>
+    <div class="mb-3">
+      <div class="text-sm font-medium mb-1">分摊给（默认全选）</div>
+      <div id="eSplit"></div>
+    </div>
+    <button id="eAddBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl px-5 py-2">记一笔</button>
+    <p id="eMsg" class="text-sm mt-2 text-slate-500"></p>
+    <div id="balances" class="mt-5"></div>
+    <div id="settlements" class="mt-3"></div>
+    <div id="expenses" class="mt-4"></div>
+  </section>
+
   <p class="text-center text-slate-400 text-sm mt-10 mb-6">有链接的人都能加房源、投票 · 数据实时共享</p>
 </main>
 
@@ -103,7 +132,7 @@ const TRIPS = {
 };
 let trip = TRIPS[location.hash.slice(1)] ? location.hash.slice(1) : 'nov25';
 let T = TRIPS[trip];
-let STATE = { listings: [] };
+let STATE = { listings: [], members: [], expenses: [], balances: {}, settlements: [] };
 let myToken = localStorage.getItem('vt');
 if (!myToken) { myToken = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); localStorage.setItem('vt', myToken); }
 let myName = localStorage.getItem('vn') || '';
@@ -163,7 +192,9 @@ function card(l){
     + '<div class="mt-auto flex gap-2">'
     + '<button onclick="doVote(\'' + l.id + '\')" class="vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2 ' + (voted ? 'voted' : '') + '">' + (voted ? '❤️ 已投 · ' : '🤍 投票 · ') + n + '</button>'
     + '<a href="' + esc(airbnbLink(l)) + '" target="_blank" rel="noopener" title="按 ' + T.date + ' · ' + T.people + '人查看实时价格" class="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>'
-    + '</div></div></article>';
+    + '</div>'
+    + '<button onclick="splitListing(\'' + l.id + '\')" class="mt-2 border-2 border-emerald-100 text-emerald-700 rounded-xl py-1.5 text-sm font-medium hover:border-emerald-400">💰 用这间分账</button>'
+    + '</div></article>';
 }
 
 // ---- photo carousel ----
@@ -256,9 +287,10 @@ function switchTrip(k){
   trip = k; T = TRIPS[k]; filter = 'all';
   if (reorderTimer) { clearTimeout(reorderTimer); reorderTimer = null; } // 别让上一页投票后的重排画到新标签页
   history.replaceState(null, '', '#' + k);
-  STATE = { listings: [] };
-  $('#grid').innerHTML = ''; $('#countLbl').textContent = ''; $('#addMsg').textContent = '';
+  STATE = { listings: [], members: [], expenses: [], balances: {}, settlements: [] };
+  $('#grid').innerHTML = ''; $('#countLbl').textContent = ''; $('#addMsg').textContent = ''; $('#eMsg').textContent = '';
   renderTrip();
+  renderSplit();
   refresh();
 }
 
@@ -266,7 +298,7 @@ async function refresh(){
   const t = trip;
   const s = await api('/api/state?trip=' + t);
   if (t !== trip) return; // 等待期间切了标签页，丢掉旧结果
-  STATE = s; render(); enrichMissing();
+  STATE = s; render(); renderSplit(); enrichMissing();
 }
 
 async function enrichMissing(){
@@ -358,6 +390,92 @@ $('#manualBtn').onclick = async () => {
   if (r.ok) { ['mUrl','mTitle','mImage','mPrice','mBedrooms','mBeds','mBaths','mSleeps','mNote'].forEach(id => $('#'+id).value=''); $('#manualBox').open = false; await refresh(); }
   else alert('添加失败：' + (r.error || ''));
 };
+
+// ---------- 分账 Splitwise ----------
+function fmtMoney(cents){
+  return '$' + (Math.abs(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// 成员名单：手动加的成员 + 投过票的人 + 支出里出现过的人
+function knownNames(){
+  const out = [];
+  const push = n => { n = String(n || '').trim(); if (n && !out.includes(n)) out.push(n); };
+  (STATE.members || []).forEach(push);
+  push(myName);
+  (STATE.listings || []).forEach(l => (l.votes || []).forEach(v => push(v.name)));
+  (STATE.expenses || []).forEach(e => { push(e.paidBy); (e.splitAmong || []).forEach(push); });
+  return out;
+}
+function renderSplit(){
+  const names = knownNames();
+  $('#memberChips').innerHTML = names.length
+    ? names.map(n => '<span class="chip">' + esc(n) + '</span>').join('')
+    : '<span class="text-sm text-slate-400">还没有成员，先加上大家的名字（投过票的人会自动出现）</span>';
+  const sel = $('#ePaidBy'); const prev = sel.value;
+  sel.innerHTML = names.map(n => '<option' + ((prev ? n === prev : n === myName) ? ' selected' : '') + '>' + esc(n) + '</option>').join('');
+  const prevChecked = {};
+  document.querySelectorAll('#eSplit input[type=checkbox]').forEach(c => { prevChecked[c.value] = c.checked; });
+  $('#eSplit').innerHTML = names.length
+    ? names.map(n => '<label class="inline-flex items-center gap-1 mr-3 mb-1 text-sm"><input type="checkbox" value="' + esc(n) + '"' + ((n in prevChecked) ? (prevChecked[n] ? ' checked' : '') : ' checked') + '> ' + esc(n) + '</label>').join('')
+    : '<span class="text-sm text-slate-400">先加成员</span>';
+  const bal = STATE.balances || {};
+  const entries = Object.entries(bal).sort((a, b) => b[1] - a[1]);
+  $('#balances').innerHTML = entries.length
+    ? '<h3 class="font-bold mb-2">余额（+ 应收回 · − 应付出）</h3>' + entries.map(([n, c]) =>
+        '<div class="flex justify-between border-b py-1.5 text-sm"><span>' + esc(n) + '</span><span class="font-medium '
+        + (c > 0 ? 'text-emerald-600' : c < 0 ? 'text-rose-600' : 'text-slate-400') + '">'
+        + (c === 0 ? '已结清' : (c > 0 ? '+' : '−') + fmtMoney(c)) + '</span></div>').join('')
+    : '';
+  const st = STATE.settlements || [];
+  $('#settlements').innerHTML = st.length
+    ? '<h3 class="font-bold mb-2">💸 这样结清最省事</h3>' + st.map(s => '<div class="text-sm py-1">' + esc(s.from) + ' 付给 ' + esc(s.to) + ' <b>' + fmtMoney(s.amountCents) + '</b></div>').join('')
+    : (entries.length ? '<p class="text-sm text-emerald-600">大家已经结清了 🎉</p>' : '');
+  const exps = STATE.expenses || [];
+  $('#expenses').innerHTML = exps.length
+    ? '<h3 class="font-bold mb-2">支出记录</h3>' + exps.map(e =>
+        '<div class="flex items-center gap-2 border-b py-2 text-sm"><div class="flex-1"><div>' + esc(e.description)
+        + '</div><div class="text-slate-500 text-xs">' + esc(e.paidBy) + ' 付的 · 分摊给 ' + (e.splitAmong || []).map(esc).join('、')
+        + '</div></div><div class="font-medium">' + fmtMoney(e.amountCents)
+        + '</div><button onclick="removeExpense(\'' + e.id + '\')" class="text-slate-400 hover:text-red-600 px-1" title="删除这笔">✕</button></div>').join('')
+    : '<p class="text-sm text-slate-400">还没有支出记录</p>';
+}
+function applySplitView(r){
+  if (r.members) STATE.members = r.members;
+  if (r.expenses) STATE.expenses = r.expenses;
+  if (r.balances) STATE.balances = r.balances;
+  if (r.settlements) STATE.settlements = r.settlements;
+}
+async function addMember(){
+  const v = $('#memberInput').value.trim();
+  if (!v) return;
+  const r = await api('/api/member', 'POST', { trip, name: v });
+  if (r.ok) { $('#memberInput').value = ''; applySplitView(r); renderSplit(); }
+  else alert('添加失败：' + (r.error || ''));
+}
+async function addExpense(){
+  const splitAmong = [...document.querySelectorAll('#eSplit input[type=checkbox]:checked')].map(c => c.value);
+  const amountUSD = $('#eAmount').value ? Number($('#eAmount').value) : null;
+  if (!amountUSD) { $('#eMsg').textContent = '先填金额'; return; }
+  if (!$('#ePaidBy').value) { $('#eMsg').textContent = '先加成员并选择付款人'; return; }
+  const r = await api('/api/expense', 'POST', { trip, description: $('#eDesc').value.trim(), amountUSD, paidBy: $('#ePaidBy').value, splitAmong });
+  if (r.ok) { $('#eDesc').value = ''; $('#eAmount').value = ''; $('#eMsg').textContent = '记上了 ✅'; applySplitView(r); renderSplit(); }
+  else $('#eMsg').textContent = r.error || '记账失败';
+}
+async function removeExpense(id){
+  if (!confirm('删除这笔支出？')) return;
+  const r = await api('/api/expense-remove', 'POST', { trip, id });
+  if (r.ok) { applySplitView(r); renderSplit(); } else alert('删除失败，稍后再试');
+}
+// 卡片上的「用这间分账」：把房源标题和总价预填进分账表单
+function splitListing(id){
+  const l = STATE.listings.find(x => x.id === id);
+  if (!l) return;
+  $('#eDesc').value = l.title || '房费';
+  if (l.priceUSD) $('#eAmount').value = l.priceUSD;
+  $('#splitSection').scrollIntoView({ behavior: 'smooth' });
+}
+$('#memberBtn').onclick = addMember;
+$('#memberInput').addEventListener('keydown', e => { if (e.key === 'Enter') addMember(); });
+$('#eAddBtn').onclick = addExpense;
 
 // 筛选按钮和标签页都是动态生成的，用事件委托
 $('#filters').onclick = e => {
