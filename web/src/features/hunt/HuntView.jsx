@@ -136,14 +136,18 @@ export default function HuntView({ trip, active }) {
   const fitKey = trip + '|' + filter + '|' + visible.map(l => l.id + (l.lat != null ? '@' : '')).sort().join(',');
   return (
     <>
-      {voteInfo && voteInfo.open && voteInfo.voteEndsAt && <VoteBanner vote={voteInfo} listings={listings} T={T} />}
-      {closed && <DecisionPanel trip={trip} T={T} vote={voteInfo} listings={listings} onVote={setVote} />}
-      <AddListingForm trip={trip} T={T} zones={zoneNames} closed={closed} onAdded={refresh} />
-      <Toolbar tabs={tabs} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}
-        showMap={showMap} onToggleMap={() => { save('showMap', showMap ? '0' : '1'); setShowMap(!showMap); }} />
-      {region && <WeatherStrip trip={trip} name={region.name} lat={region.lat} lng={region.lng} />}
-      {showMap && <ListingMap items={visible} T={T} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} />}
-      <div ref={gridBox}>
+      {/* 切行程转场的分工（见 styles.css）：顶部小块 .trip-blur 带模糊，
+          地图和房源网格 .trip-fade 只淡入，不参与模糊渲染 */}
+      {voteInfo && voteInfo.open && voteInfo.voteEndsAt && <div className="trip-blur"><VoteBanner vote={voteInfo} listings={listings} T={T} /></div>}
+      {closed && <div className="trip-blur"><DecisionPanel trip={trip} T={T} vote={voteInfo} listings={listings} onVote={setVote} /></div>}
+      <div className="trip-blur"><AddListingForm trip={trip} T={T} zones={zoneNames} closed={closed} onAdded={refresh} /></div>
+      <div className="trip-blur">
+        <Toolbar tabs={tabs} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}
+          showMap={showMap} onToggleMap={() => { save('showMap', showMap ? '0' : '1'); setShowMap(!showMap); }} />
+        {region && <WeatherStrip trip={trip} name={region.name} lat={region.lat} lng={region.lng} />}
+      </div>
+      {showMap && <div className="trip-fade"><ListingMap items={visible} T={T} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} /></div>}
+      <div ref={gridBox} className="trip-fade">
         <ListingGrid items={items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
           emptyText={(filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 链接进来吧 👆'}
           zones={zoneNames} closed={closed} chosenId={voteInfo?.chosenId} onChoose={closed && isAdmin ? choose : null}
