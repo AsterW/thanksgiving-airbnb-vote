@@ -192,9 +192,8 @@ async function handleAdd(req, env) {
   const roomId = roomIdFrom(url);
   if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源链接（需要形如 airbnb.com/rooms/123… 的链接）' });
   const trip = tripOf(body.trip);
-  const state = await getState(env, trip);
   // Fast-path dedupe check only — do NOT hold this snapshot across the scrape.
-  const preState = await getState(env);
+  const preState = await getState(env, trip);
   const preExisting = preState.listings.find(l => l.roomId === roomId);
   if (preExisting) return j({ ok: true, listing: preExisting, deduped: true });
   // Scrape first, read state after. Scraping can take up to ~35s
@@ -204,7 +203,7 @@ async function handleAdd(req, env) {
   const info = await fetchListingInfo(url);
   // Re-read fresh state now that the slow work is done, and re-check
   // dedupe: another request may have added this same room meanwhile.
-  const state = await getState(env);
+  const state = await getState(env, trip);
   const existing = state.listings.find(l => l.roomId === roomId);
   if (existing) return j({ ok: true, listing: existing, deduped: true });
   const listing = {
@@ -276,18 +275,17 @@ async function handleEnrich(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
-  const state = await getState(env, trip);
   // Peek only to get the URL to scrape — do NOT hold this snapshot
   // across the scrape (see handleAdd: it can take up to ~35s, and
   // saving a stale snapshot would clobber concurrent changes).
-  const peekState = await getState(env);
+  const peekState = await getState(env, trip);
   const peek = peekState.listings.find(l => l.id === body.id);
   if (!peek) return j({ ok: false });
   const info = await fetchListingInfo(peek.url);
   if (!info.ok) return j({ ok: false });
   // Re-read fresh state after scraping and merge onto the live listing.
   // If it was removed while we were scraping, don't resurrect it.
-  const state = await getState(env);
+  const state = await getState(env, trip);
   const listing = state.listings.find(l => l.id === body.id);
   if (!listing) return j({ ok: false });
   if ((!listing.title || listing.title === '未命名房源') && info.title) listing.title = info.title.slice(0, 120);

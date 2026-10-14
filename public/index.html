@@ -309,11 +309,9 @@ async function refresh(){
 async function enrichMissing(){
   const t = trip;
   for (const l of STATE.listings) {
-    if (!l.image || l.rating == null || !l.images || l.images.length < 2) {
-      try { const r = await api('/api/enrich', 'POST', { id: l.id }); if (r.ok && r.listing && (r.listing.image || (r.listing.images && r.listing.images.length))) { const i = STATE.listings.findIndex(x => x.id === l.id); if (i >= 0) STATE.listings[i] = r.listing; render(); } } catch(e){}
     if (t !== trip) return;
-    if (!l.image || l.rating == null) {
-      try { const r = await api('/api/enrich', 'POST', { trip: t, id: l.id }); if (t === trip && r.ok && r.listing && r.listing.image) { const i = STATE.listings.findIndex(x => x.id === l.id); if (i >= 0) STATE.listings[i] = r.listing; render(); } } catch(e){}
+    if (!l.image || l.rating == null || !l.images || l.images.length < 2) {
+      try { const r = await api('/api/enrich', 'POST', { trip: t, id: l.id }); if (t === trip && r.ok && r.listing && (r.listing.image || (r.listing.images && r.listing.images.length))) { const i = STATE.listings.findIndex(x => x.id === l.id); if (i >= 0) STATE.listings[i] = r.listing; render(); } } catch(e){}
     }
   }
 }
