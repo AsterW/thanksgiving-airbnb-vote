@@ -356,6 +356,72 @@ function splitView(state) {
 const cleanName = v => String(v || '').trim().slice(0, 20);
 function ensureMember(state, name) { if (name && !state.members.includes(name)) state.members.push(name); }
 
+// ---------- users ----------
+// One global user list shared by both trips, so people pick their name
+// from a dropdown instead of typing it again on every device. Each user
+// owns the vote token their votes are recorded under; picking an existing
+// user on a new device adopts that token, so their votes show as theirs.
+const USERS_KEY = 'users:v1';
+const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+
+async function getUsers(env) {
+  const raw = await env.VOTES_KV.get(USERS_KEY);
+  if (raw) return JSON.parse(raw);
+  // First run: build the list from everyone who already voted or was added
+  // as a splitwise member, reusing the token from their votes.
+  const users = [];
+  const add = (name, token) => {
+    name = cleanName(name);
+    if (name && !users.some(u => sameName(u.name, name))) users.push({ name, token: token || uid(), createdAt: Date.now() });
+  };
+  for (const key of Object.keys(TRIPS)) {
+    const state = await getState(env, TRIPS[key]);
+    state.listings.forEach(l => (l.votes || []).forEach(v => add(v.name, v.token)));
+    state.members.forEach(m => add(m));
+  }
+  await env.VOTES_KV.put(USERS_KEY, JSON.stringify(users));
+  return users;
+}
+const publicUsers = users => users.map(u => ({ name: u.name, token: u.token }))
+  .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+
+// Log in as an existing name, or create it. Names are unique (case-insensitive).
+async function handleLogin(req, env) {
+  let body = {};
+  try { body = await req.json(); } catch (e) { /* ignore */ }
+  const name = cleanName(body.name);
+  if (!name) return j({ ok: false, error: '名字是必填的' });
+  const users = await getUsers(env);
+  let user = users.find(u => sameName(u.name, name));
+  if (!user) {
+    const token = String(body.token || '').slice(0, 80) || uid();
+    user = { name, token: users.some(u => u.token === token) ? uid() : token, createdAt: Date.now() };
+    users.push(user);
+    await env.VOTES_KV.put(USERS_KEY, JSON.stringify(users));
+  }
+  // This device may have voted under its own token before logging in as an
+  // existing user: move those votes (same name only) onto the user's token.
+  const oldToken = String(body.token || '');
+  if (oldToken && oldToken !== user.token) {
+    for (const key of Object.keys(TRIPS)) {
+      const state = await getState(env, TRIPS[key]);
+      let changed = false;
+      for (const l of state.listings) {
+        const votes = l.votes || [];
+        if (!votes.some(v => v.token === oldToken && sameName(v.name || '', user.name))) continue;
+        const hasUserVote = votes.some(v => v.token === user.token);
+        l.votes = votes.flatMap(v => {
+          if (v.token !== oldToken || !sameName(v.name || '', user.name)) return [v];
+          return hasUserVote ? [] : [{ ...v, token: user.token }];
+        });
+        changed = true;
+      }
+      if (changed) await saveState(env, TRIPS[key], state);
+    }
+  }
+  return j({ ok: true, user: { name: user.name, token: user.token }, users: publicUsers(users) });
+}
+
 async function handleMemberAdd(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
@@ -411,6 +477,8 @@ export default {
       const state = await getState(env, tripOf(url.searchParams.get('trip')));
       return j({ ...state, ...splitView(state) });
     }
+    if (p === '/api/users' && request.method === 'GET') return j({ ok: true, users: publicUsers(await getUsers(env)) });
+    if (p === '/api/login' && request.method === 'POST') return handleLogin(request, env);
     if (p === '/api/add' && request.method === 'POST') return handleAdd(request, env);
     if (p === '/api/add-manual' && request.method === 'POST') return handleAddManual(request, env);
     if (p === '/api/vote' && request.method === 'POST') return handleVote(request, env);

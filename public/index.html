@@ -26,6 +26,9 @@
   .car-arrow[disabled] { visibility:hidden; }
   @media (hover:none) { .car-arrow { display:none; } }
   .just-voted { box-shadow: 0 0 0 3px #fb7185, 0 10px 25px -5px rgba(225,29,72,.35); transition: box-shadow .6s ease; }
+  .avatar { display:grid; place-items:center; border-radius:9999px; font-weight:800; color:#fff; background:linear-gradient(135deg,#6366f1,#ec4899); }
+  #accountBtn { position:fixed; z-index:45; top:calc(env(safe-area-inset-top, 0px) + 14px); right:16px; }
+  @media (max-width: 767px) { header h1 { padding-right: 6rem; } }
   .trip-tab { background:rgba(255,255,255,.15); color:#fff; }
   .trip-tab:hover { background:rgba(255,255,255,.28); }
   .trip-tab.active { background:#fff; color:#4f46e5; box-shadow:0 4px 14px rgba(0,0,0,.15); }
@@ -164,15 +167,30 @@
 </div>
 
 <!-- 名字弹窗 -->
+<!-- 当前用户（点开可以切换） -->
+<button id="accountBtn" class="account-btn flex items-center gap-2 rounded-full bg-white/90 backdrop-blur shadow-lg hover:shadow-xl pl-1 pr-3 py-1 text-sm font-medium text-slate-700"></button>
+
 <!-- 投票成功的庆祝横幅 -->
 <div id="toast" role="status" aria-live="polite" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white font-bold rounded-full px-6 py-3 shadow-xl max-w-[90vw] truncate"></div>
 
-<div id="nameModal" class="fixed inset-0 bg-black/50 items-center justify-center z-50">
-  <div class="bg-white rounded-2xl p-6 w-80">
-    <h3 class="font-bold mb-2">怎么称呼你？</h3>
-    <p class="text-sm text-slate-500 mb-3">投票会显示名字，方便大家知道是谁投的（只问一次）</p>
-    <input id="nameInput" class="border rounded-lg px-3 py-2 w-full mb-3" placeholder="比如 Ken" maxlength="20">
-    <button id="nameOk" class="bg-indigo-600 text-white rounded-xl px-5 py-2 w-full font-bold">确定</button>
+<div id="nameModal" class="fixed inset-0 bg-black/50 items-center justify-center z-50 px-4">
+  <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+    <h3 class="font-bold text-lg mb-1">👋 你是谁？</h3>
+    <p class="text-sm text-slate-500 mb-4">选一下你的名字就能登录，投票和记账都会记在你名下</p>
+    <div id="pickBox">
+      <label class="text-sm font-medium" for="userSel">我来过了</label>
+      <div class="flex gap-2 mt-1 mb-4">
+        <select id="userSel" class="flex-1 min-w-0 border rounded-lg px-3 py-2 bg-white"></select>
+        <button id="pickOk" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-4 py-2 font-bold">登录</button>
+      </div>
+      <div class="flex items-center gap-3 text-xs text-slate-400 mb-3"><span class="flex-1 border-t"></span>第一次来？<span class="flex-1 border-t"></span></div>
+    </div>
+    <div class="flex gap-2">
+      <input id="nameInput" class="flex-1 min-w-0 border rounded-lg px-3 py-2" placeholder="输入你的名字，比如 Ken" maxlength="20">
+      <button id="nameOk" class="bg-slate-800 hover:bg-slate-900 text-white rounded-xl px-4 py-2 font-bold">加入</button>
+    </div>
+    <p id="loginMsg" class="text-sm text-rose-600 mt-2"></p>
+    <button id="loginSkip" class="mt-2 text-sm text-slate-400 hover:text-slate-600">先随便看看 →</button>
   </div>
 </div>
 
@@ -420,20 +438,54 @@ async function enrichMissing(){
   }
 }
 
-function ensureNameThen(fn){
-  if (myName) { fn(); return; }
-  pendingVoteId = true; pendingFn = fn;
-  $('#nameModal').classList.add('open');
-  $('#nameInput').focus();
-}
+// ---------- 登录：从后端的用户列表里选名字 ----------
+let USERS = [];
 let pendingFn = null;
-$('#nameOk').onclick = () => {
-  const v = $('#nameInput').value.trim();
-  if (!v) return;
-  myName = v; localStorage.setItem('vn', v);
+async function loadUsers(){
+  try { const r = await api('/api/users'); if (r.ok) USERS = r.users; } catch(e){}
+  renderUserSel(); renderSplit();
+}
+function renderUserSel(){
+  $('#pickBox').hidden = !USERS.length;
+  $('#userSel').innerHTML = '<option value="">选择你的名字…</option>'
+    + USERS.map(u => '<option' + (u.name === myName ? ' selected' : '') + '>' + esc(u.name) + '</option>').join('');
+}
+function renderAccount(){
+  const ini = myName ? esc(Array.from(myName)[0].toUpperCase()) : '?';
+  $('#accountBtn').innerHTML = '<span class="avatar w-7 h-7 text-xs">' + ini + '</span>'
+    + '<span class="max-w-[8rem] truncate">' + (myName ? esc(myName) : '登录') + '</span>';
+  $('#accountBtn').title = myName ? '切换用户' : '登录';
+}
+function openLogin(fn){
+  pendingFn = fn || null;
+  $('#loginMsg').textContent = ''; $('#nameInput').value = '';
+  renderUserSel();
+  $('#nameModal').classList.add('open');
+  (USERS.length ? $('#userSel') : $('#nameInput')).focus();
+  loadUsers(); // 别人可能刚注册，顺手刷新一下列表
+}
+function ensureNameThen(fn){ if (myName) fn(); else openLogin(fn); }
+async function login(name){
+  name = name.trim();
+  if (!name) return;
+  $('#loginMsg').textContent = '';
+  let r;
+  try { r = await api('/api/login', 'POST', { name, token: myToken }); } catch(e) { r = { ok: false, error: '网络有点问题，稍后再试' }; }
+  if (!r.ok) { $('#loginMsg').textContent = r.error || '登录失败'; return; }
+  myName = r.user.name; myToken = r.user.token; USERS = r.users;
+  localStorage.setItem('vn', myName); localStorage.setItem('vt', myToken);
   $('#nameModal').classList.remove('open');
+  renderAccount(); render(); renderSplit(); refresh();
   if (pendingFn) { const f = pendingFn; pendingFn = null; f(); }
-};
+}
+$('#pickOk').onclick = () => login($('#userSel').value);
+$('#userSel').onchange = e => { if (e.target.value) login(e.target.value); };
+$('#nameOk').onclick = () => login($('#nameInput').value);
+$('#nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') login(e.target.value); });
+$('#loginSkip').onclick = () => { pendingFn = null; $('#nameModal').classList.remove('open'); };
+$('#accountBtn').onclick = () => openLogin();
+renderAccount();
+loadUsers().then(() => { if (!myName) openLogin(); });
 
 async function doVote(id){
   const l = STATE.listings.find(x => x.id === id);
@@ -510,6 +562,7 @@ function knownNames(){
   const push = n => { n = String(n || '').trim(); if (n && !out.includes(n)) out.push(n); };
   (STATE.members || []).forEach(push);
   push(myName);
+  USERS.forEach(u => push(u.name));
   (STATE.listings || []).forEach(l => (l.votes || []).forEach(v => push(v.name)));
   (STATE.expenses || []).forEach(e => { push(e.paidBy); (e.splitAmong || []).forEach(push); });
   return out;
