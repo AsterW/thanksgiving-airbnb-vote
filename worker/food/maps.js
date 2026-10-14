@@ -3,7 +3,9 @@
 // (!3d<lat>!4d<lng>, or the map centre @lat,lng); a search link carries the
 // name in ?query= or ?q=. Share links (maps.app.goo.gl/…) are expanded by
 // following their redirects, without fetching the page they point to.
-const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+// Not a browser user agent: for a full browser UA, maps.app.goo.gl answers 200
+// with a page that redirects in JavaScript; anything else gets a plain 302.
+const UA = 'Mozilla/5.0 (compatible; thanksgiving-trip/1.0)';
 const SHORT_HOST = /^(maps\.app\.goo\.gl|goo\.gl)$/i;
 const GOOGLE_HOST = /^((www|maps)\.)?google\.[a-z]{2,3}(\.[a-z]{2})?$/i;
 
