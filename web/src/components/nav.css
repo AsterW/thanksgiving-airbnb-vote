@@ -50,18 +50,3 @@
 /* 选中项同样是亮玻璃透镜，和桌面侧栏一个语言 */
 .bnav-item.active { background:linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.62)); color:#4f46e5; box-shadow:0 4px 12px rgba(30,50,110,.2), inset 0 1px 0 #fff; }
 .bnav-item.active .nav-ico { transform: translateY(-2px) scale(1.12); }
-
-/* 「更多」圆形展开菜单：一圈玻璃泡泡从触发点扇形弹出（--dx/--dy 是每个泡泡的落点） */
-.radial-backdrop { position:fixed; inset:0; z-index:59; background:rgba(18,35,59,.10); }
-.radial-fan { position:fixed; z-index:60; width:0; height:0; }
-.radial-item { position:absolute; left:0; top:0; width:80px; display:flex; flex-direction:column; align-items:center; gap:5px; padding:0; background:none; border:none; cursor:pointer;
-  transform:translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))); animation:fan-in .3s cubic-bezier(.2,1.4,.4,1) both; }
-@keyframes fan-in { from { transform:translate(-50%,-50%) scale(.3); opacity:0; } }
-.radial-bubble { display:grid; place-items:center; width:58px; height:58px; border-radius:9999px; font-size:25px;
-  background:linear-gradient(135deg, rgba(255,255,255,.94), rgba(255,255,255,.7));
-  border:1px solid rgba(255,255,255,.8); box-shadow:0 12px 28px -6px rgba(15,23,64,.35), inset 0 1px 0 #fff;
-  -webkit-backdrop-filter:blur(12px) saturate(160%); backdrop-filter:blur(12px) saturate(160%); transition:transform .15s; }
-.radial-item:hover .radial-bubble, .radial-item:focus-visible .radial-bubble { transform:scale(1.1); }
-.radial-item.on .radial-bubble { background:linear-gradient(135deg,#6366f1,#ec4899); box-shadow:0 12px 28px -6px rgba(99,60,235,.55), inset 0 1px 0 rgba(255,255,255,.5); }
-.radial-label { font-size:11px; font-weight:700; color:#12233b; background:rgba(255,255,255,.88); padding:2px 8px; border-radius:999px; box-shadow:0 2px 8px rgba(15,23,42,.18); white-space:nowrap; }
-@media (prefers-reduced-motion: reduce) { .radial-item { animation:none; } }
