@@ -50,6 +50,12 @@ export default function AngelView({ active }) {
     if (data.drawn && !confirm('已经抽过了。重新抽的话大家的结果都会变（愿望不会清掉，只是按现在已填的人重新分配），确定吗？')) return;
     if (await post('/api/angel/draw', {})) toast('🎲 抽好了！大家去拆信封吧');
   }
+  const [transferTo, setTransferTo] = useState('');
+  async function transferAdmin() {
+    if (!transferTo) return;
+    if (!confirm('把管理员转给 ' + transferTo + '？转完之后就由 TA 来抽签和重新 Shuffle，你将不再是管理员。')) return;
+    if (await post('/api/angel/admin', { target: transferTo })) { setTransferTo(''); toast('👑 管理员已转给 ' + transferTo); }
+  }
 
   if (!name) return (
     <section className="glass-card rounded-2xl p-8 text-center">
@@ -98,6 +104,10 @@ export default function AngelView({ active }) {
 
       <People people={data.people} isAdmin={data.isAdmin} onExclude={(target, excluded) => post('/api/angel/exclude', { target, excluded })} />
 
+      {!data.isAdmin && (
+        <p className="text-sm text-slate-500 px-1">👑 管理员是 <b className="text-slate-700">{data.adminName}</b> — 抽签和重新 Shuffle 由管理员操作，想换分配找 TA 点一下就行。</p>
+      )}
+
       {data.isAdmin && (
         <section className="rounded-2xl shadow p-5 text-white bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-600">
           <h2 className="font-bold text-lg mb-1">🔐 管理员：抽签</h2>
@@ -108,7 +118,17 @@ export default function AngelView({ active }) {
               : '大家都选好了，可以抽了！每个人会被分到一个要偷偷送礼物的人，不会抽到自己，也不会两个人互送。'}
           </p>
           <button onClick={draw} disabled={filled.length < 2}
-            className="bg-white text-indigo-700 font-black rounded-xl px-6 py-2 shadow-lg disabled:opacity-40">{data.drawn ? '🎲 重新抽签（保留愿望）' : '🎲 开始抽签'}</button>
+            className="bg-white text-indigo-700 font-black rounded-xl px-6 py-2 shadow-lg disabled:opacity-40">{data.drawn ? '🎲 重新 Shuffle（保留愿望）' : '🎲 开始抽签'}</button>
+          <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-white/25">
+            <span className="text-sm text-indigo-100">👑 你是管理员。可以把管理员转给：</span>
+            <select value={transferTo} onChange={e => setTransferTo(e.target.value)}
+              className="rounded-lg px-2 py-1.5 text-sm text-slate-700 bg-white/95">
+              <option value="">选择成员…</option>
+              {people.filter(p => p.name !== name).map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+            </select>
+            <button onClick={transferAdmin} disabled={!transferTo}
+              className="bg-white/15 hover:bg-white/25 disabled:opacity-40 border border-white/50 text-white font-bold rounded-lg px-4 py-1.5 text-sm">转让管理员</button>
+          </div>
         </section>
       )}
     </div>
