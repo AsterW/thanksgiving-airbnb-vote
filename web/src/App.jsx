@@ -15,6 +15,7 @@ import FlightsView from './features/flights/FlightsView.jsx';
 import ActivitiesView from './features/activities/ActivitiesView.jsx';
 import CalendarView from './features/calendar/CalendarView.jsx';
 import { useHashRoute } from './lib/useHashRoute.js';
+import { reduceMotion } from './lib/motion.js';
 
 // 每个页面一直挂着（切走只是藏起来），回来时房源、地图、牌桌都还在；切回来时淡入一下。
 // animKey 变了（比如在选房/餐厅页切换行程）时，内容再柔和上浮一次，换清单不闪烁
@@ -22,6 +23,20 @@ function replayEnter(el, cls) {
   el.classList.remove('view-enter', 'trip-enter');
   void el.offsetWidth;
   el.classList.add(cls);
+}
+// 切换行程时在面板上盖一层临时的磨砂面纱（.trip-frost）：模糊只作用在
+// 这层覆盖物背后的已渲染画面上，内容本身保持静止（只跑它便宜的淡入），
+// 所以不会逐帧重绘几十张卡片。动画结束（或兜底超时）就把面纱摘掉。
+function spawnFrost(el) {
+  if (reduceMotion) return;
+  el.querySelectorAll('.trip-frost').forEach(v => v.remove());
+  const veil = document.createElement('div');
+  veil.className = 'trip-frost';
+  veil.setAttribute('aria-hidden', 'true');
+  el.appendChild(veil);
+  const drop = () => veil.remove();
+  veil.addEventListener('animationend', drop, { once: true });
+  setTimeout(drop, 600);
 }
 function Pane({ active, animKey, children }) {
   const ref = useRef(null);
@@ -31,9 +46,9 @@ function Pane({ active, animKey, children }) {
     prev.current = { active, animKey };
     if (!before || !active || !ref.current) return;
     if (!before.active) replayEnter(ref.current, 'view-enter');
-    else if (before.animKey !== animKey) replayEnter(ref.current, 'trip-enter');
+    else if (before.animKey !== animKey) { replayEnter(ref.current, 'trip-enter'); spawnFrost(ref.current); }
   }, [active, animKey]);
-  return <div ref={ref} hidden={!active}>{children}</div>;
+  return <div ref={ref} className="pane-root" hidden={!active}>{children}</div>;
 }
 
 function Shell() {
