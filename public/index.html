@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Denver 感恩节之旅 · Airbnb 一起选房</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <style>
   body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
   .card-img { aspect-ratio: 16/10; object-fit: cover; }
@@ -28,6 +29,11 @@
   .trip-tab { background:rgba(255,255,255,.15); color:#fff; }
   .trip-tab:hover { background:rgba(255,255,255,.28); }
   .trip-tab.active { background:#fff; color:#4f46e5; box-shadow:0 4px 14px rgba(0,0,0,.15); }
+  #toast { position:fixed; left:50%; top:24px; z-index:70; pointer-events:none; opacity:0; transform:translate(-50%,-16px) scale(.9);
+    transition: opacity .3s ease, transform .45s cubic-bezier(.2,1.6,.4,1); }
+  #toast.show { opacity:1; transform:translate(-50%,0) scale(1); }
+  @keyframes vote-pop { 0% { transform:scale(1); } 35% { transform:scale(1.12); } 100% { transform:scale(1); } }
+  .vote-pop { animation: vote-pop .45s ease; }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -114,6 +120,9 @@
 </main>
 
 <!-- 名字弹窗 -->
+<!-- 投票成功的庆祝横幅 -->
+<div id="toast" role="status" aria-live="polite" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white font-bold rounded-full px-6 py-3 shadow-xl max-w-[90vw] truncate"></div>
+
 <div id="nameModal" class="fixed inset-0 bg-black/50 items-center justify-center z-50">
   <div class="bg-white rounded-2xl p-6 w-80">
     <h3 class="font-bold mb-2">怎么称呼你？</h3>
@@ -267,6 +276,34 @@ function afterVote(id, votes){
   }, 700);
 }
 
+// 投票成功的庆祝，像收到 offer 一样：投票按钮炸开彩带和爱心 + 两侧礼炮 + 顶部横幅
+const CONFETTI_COLORS = ['#e11d48', '#fb7185', '#4f46e5', '#a855f7', '#ec4899', '#facc15'];
+let toastTimer = null, heartShape = null;
+function celebrate(id){
+  const l = STATE.listings.find(x => x.id === id);
+  if (!l) return; // 等待期间切了标签页
+  const toast = $('#toast');
+  toast.textContent = '🎉 投票成功！给「' + (l.title || '未命名房源') + '」+1';
+  toast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2400);
+
+  if (reduceMotion || !window.confetti) return;
+  const btn = $('#grid').querySelector('article[data-id="' + CSS.escape(id) + '"] .vote-btn');
+  if (btn) btn.classList.add('vote-pop');
+  const r = btn && btn.getBoundingClientRect();
+  const origin = r ? { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight } : { x: .5, y: .6 };
+  heartShape = heartShape || confetti.shapeFromText({ text: '❤️', scalar: 2 });
+  confetti({ particleCount: 90, spread: 75, startVelocity: 40, origin, colors: CONFETTI_COLORS });
+  confetti({ particleCount: 12, spread: 60, startVelocity: 32, origin, shapes: [heartShape], scalar: 2 });
+  const end = Date.now() + 800;
+  (function cannons(){
+    confetti({ particleCount: 5, angle: 60, spread: 60, origin: { x: 0, y: .75 }, colors: CONFETTI_COLORS });
+    confetti({ particleCount: 5, angle: 120, spread: 60, origin: { x: 1, y: .75 }, colors: CONFETTI_COLORS });
+    if (Date.now() < end) requestAnimationFrame(cannons);
+  })();
+}
+
 // 切换行程时重画标题、标签页、区域筛选和手动表单
 function renderTrip(){
   $('#tripSub').textContent = T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · 看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它';
@@ -336,7 +373,7 @@ async function doVote(id){
     const t = trip;
     ensureNameThen(async () => {
       const r = await api('/api/vote', 'POST', { trip: t, id, token: myToken, name: myName });
-      if (r.ok) afterVote(id, r.votes);
+      if (r.ok) { afterVote(id, r.votes); celebrate(id); }
     });
   }
 }
