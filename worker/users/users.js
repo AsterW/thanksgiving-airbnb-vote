@@ -46,14 +46,32 @@ export async function getUsers(env) {
 // fn(users) mutates the freshest list and returns the caller's result;
 // the commit is version-checked (see lib/store.js), so two people
 // logging in or being added in the same second can't erase each other.
-async function updateUsers(env, fn) {
+export async function updateUsers(env, fn) {
   return transact(env, USERS_KEY, async doc => {
     const users = doc || await buildUsers(env);
     const result = await fn(users);
     return { doc: users, result };
   });
 }
-export const publicUsers = users => users.map(u => ({ name: u.name, token: u.token }))
+
+// Emails are stored normalized (trimmed, lowercased). A bound email is
+// never shown in full — only a hint like "k•••@gmail.com" for the
+// "we sent a code to…" line.
+export const cleanEmail = v => String(v || '').trim().toLowerCase().slice(0, 120);
+export const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+export const maskEmail = email => {
+  const [local, domain] = String(email || '').split('@');
+  return domain ? `${local.slice(0, 1)}•••@${domain}` : '';
+};
+
+// The public shape of the user list. SECURITY: a user who bound an email
+// no longer has their token exposed here — otherwise anyone could grab
+// it from this list and the login code would be pointless. Unbound users
+// keep the old behavior (their token travels with the list, so picking
+// their name on any device just works).
+export const publicUsers = users => users.map(u => u.email
+  ? { name: u.name, emailBound: true, emailHint: maskEmail(u.email) }
+  : { name: u.name, token: u.token })
   .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
 // The user list's spelling of a name ("ken" -> "Ken"), or the name as given.
 export const canonName = (users, name) => (users.find(u => sameName(u.name, name)) || { name }).name;
@@ -74,13 +92,40 @@ export async function addUsers(env, names) {
   });
 }
 
+// This device may have voted under its own token before logging in as an
+// existing user: move those votes (same name only) onto the user's token.
+export async function migrateDeviceVotes(env, user, oldToken) {
+  if (!oldToken || oldToken === user.token) return;
+  for (const key of Object.keys(TRIPS)) {
+    await updateState(env, TRIPS[key], state => {
+      for (const l of state.listings) {
+        const votes = l.votes || [];
+        if (!votes.some(v => v.token === oldToken && sameName(v.name || '', user.name))) continue;
+        const hasUserVote = votes.some(v => v.token === user.token);
+        l.votes = votes.flatMap(v => {
+          if (v.token !== oldToken || !sameName(v.name || '', user.name)) return [v];
+          return hasUserVote ? [] : [{ ...v, token: user.token }];
+        });
+      }
+    });
+  }
+}
+
 // Log in as an existing name, or create it. Names are unique (case-insensitive).
 async function handleLogin(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const name = cleanName(body.name);
   if (!name) return j({ ok: false, error: '名字是必填的' });
-  await getUsers(env); // make sure the list (and its first-run build) exists
+  const allUsers = await getUsers(env); // also makes sure the first-run build exists
+  const existing = allUsers.find(u => sameName(u.name, name));
+  // A user who bound an email must prove it's them with a code — unless
+  // this device already holds their token (the normal "still logged in"
+  // case, e.g. a refresh: never interrupted). The client answers
+  // needCode with the send-code / verify flow in users/auth.js.
+  if (existing && existing.email && String(body.token || '') !== existing.token) {
+    return j({ ok: true, needCode: true, name: existing.name, emailHint: maskEmail(existing.email), users: publicUsers(allUsers) });
+  }
   const { user, users } = await updateUsers(env, users => {
     let user = users.find(u => sameName(u.name, name));
     if (!user) {
@@ -90,24 +135,7 @@ async function handleLogin(req, env) {
     }
     return { user, users };
   });
-  // This device may have voted under its own token before logging in as an
-  // existing user: move those votes (same name only) onto the user's token.
-  const oldToken = String(body.token || '');
-  if (oldToken && oldToken !== user.token) {
-    for (const key of Object.keys(TRIPS)) {
-      await updateState(env, TRIPS[key], state => {
-        for (const l of state.listings) {
-          const votes = l.votes || [];
-          if (!votes.some(v => v.token === oldToken && sameName(v.name || '', user.name))) continue;
-          const hasUserVote = votes.some(v => v.token === user.token);
-          l.votes = votes.flatMap(v => {
-            if (v.token !== oldToken || !sameName(v.name || '', user.name)) return [v];
-            return hasUserVote ? [] : [{ ...v, token: user.token }];
-          });
-        }
-      });
-    }
-  }
+  await migrateDeviceVotes(env, user, String(body.token || ''));
   return j({ ok: true, user: { name: user.name, token: user.token }, users: publicUsers(users) });
 }
 
