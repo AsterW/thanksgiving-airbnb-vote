@@ -9,6 +9,7 @@
 - **数据库**：Cloudflare KV —— 每段行程一个 key，各存一份 JSON（房源数组），没有传统数据库：
   - `nov25`（11/25–26 · 9人 · 1晚）→ `state:nov25:v1`
   - `nov26`（11/26–29 · 14人 · 3晚）→ `state:v1`（沿用原来的 key，之前的房源和投票都在这里）
+  - 全员共用、不分行程：`users:v1`（登录时选的名字，也是分账的成员名单）、`split:v1`（分账，全员一本账）。分账原来按行程存在上面两个 key 里，第一次读 `split:v1` 时自动合并过来（旧数据留在原处不删）
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 
 ## 前端（`public/index.html`，一个文件）
