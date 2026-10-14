@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Denver 感恩节之旅 · 选房 + 分账</title>
+<script>
+  // 每个浏览器会话第一次打开时播放开场动画；先在 <html> 上打标记，页面一出来就是开场的底色，不会闪一下
+  try { if (!sessionStorage.getItem('splashSeen')) document.documentElement.classList.add('splash', 'splash-lock'); } catch(e) {}
+</script>
+</head>
+<body class="bg-slate-100 min-h-screen">
+<div id="root"></div>
+<script type="module" src="/src/main.jsx"></script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+@media (max-width: 767px) { header h1 { padding-right: 6rem; } } /* 给右上角的用户按钮留位置 */
+.trip-tab { background:rgba(255,255,255,.15); color:#fff; }
+.trip-tab:hover { background:rgba(255,255,255,.28); }
+.trip-tab.active { background:#fff; color:#4f46e5; box-shadow:0 4px 14px rgba(0,0,0,.15); }

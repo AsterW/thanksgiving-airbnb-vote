@@ -1,0 +1,16 @@
+/* 左侧导航 */
+#sidebar { background: radial-gradient(120% 60% at 0% 0%, rgba(236,72,153,.35), transparent 60%), linear-gradient(180deg, #1e1b4b 0%, #312e81 55%, #4c1d95 100%); }
+.nav-item { position:relative; display:flex; align-items:center; gap:.85rem; width:100%; padding:.8rem 1rem; border-radius:1rem; color:rgba(224,231,255,.75); text-align:left; transition: background .2s, color .2s, transform .2s; }
+.nav-item:hover { background:rgba(255,255,255,.08); color:#fff; }
+.nav-item .nav-ico { display:grid; place-items:center; width:2.4rem; height:2.4rem; border-radius:.8rem; background:rgba(255,255,255,.08); font-size:1.15rem; transition: background .2s, transform .2s; }
+.nav-item:hover .nav-ico { transform: rotate(-6deg) scale(1.06); }
+.nav-item.active { background:#fff; color:#1e1b4b; box-shadow:0 10px 30px -8px rgba(0,0,0,.45); }
+.nav-item.active .nav-ico { background:linear-gradient(135deg,#6366f1,#ec4899); }
+.nav-item.active::before { content:''; position:absolute; left:-1rem; top:22%; bottom:22%; width:4px; border-radius:0 4px 4px 0; background:linear-gradient(#a5b4fc,#f9a8d4); }
+.nav-sub { display:block; font-size:.72rem; font-weight:500; opacity:.65; }
+/* 手机上变成底部标签栏 */
+#bottomNav { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.bnav-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:.55rem 0 .5rem; font-size:.72rem; font-weight:600; color:#64748b; }
+.bnav-item .nav-ico { font-size:1.3rem; transition: transform .2s; }
+.bnav-item.active { color:#4f46e5; }
+.bnav-item.active .nav-ico { transform: translateY(-2px) scale(1.12); }
