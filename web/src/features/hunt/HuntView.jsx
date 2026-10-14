@@ -145,7 +145,12 @@ export default function HuntView({ trip, active }) {
           的占位，槽从第一帧就在、动画只跑一次，数据到了原地换内容。 */}
       <div className="trip-blur">
         {!loaded ? (
-          <VoteBanner vote={null} listings={listings} T={T} />
+          // 高度写死 164px：真横幅在手机上的实测高度（内边距 32 + 标题区
+          // 三行 76 + 段落三行 48 + 间距 8）。加载框和真横幅同高，数据
+          // 到了原地替换，下面的内容不会被顶动。
+          <section className="rounded-2xl p-4 mb-5 h-[164px] flex items-center bg-white/40 border border-white/50 text-slate-400 text-sm" aria-hidden="true">
+            🗳️ 投票倒计时加载中…
+          </section>
         ) : voteInfo && voteInfo.open && voteInfo.voteEndsAt ? (
           <VoteBanner vote={voteInfo} listings={listings} T={T} />
         ) : closed ? (
