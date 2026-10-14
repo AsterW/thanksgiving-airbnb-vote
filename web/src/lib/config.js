@@ -8,7 +8,7 @@ export const TRIPS = {
 export const DEFAULT_TRIP = 'nov25';
 
 // 左侧导航的几个页面。tripScoped：页面内容按行程分（显示行程标签页和日期人数）
-// 顺序就是导航顺序：前四个直接摆在导航里，剩下四个收进「更多」的圆形展开菜单
+// 这里的顺序就是导航里的标签顺序，八个全直接摆出来
 export const VIEWS = {
   hunt: { title: '🏠 AirBnb hunting · 一起选房', sub: '看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它',
     nav: 'AirBnb hunting', navSub: '一起选房 · 投票', icon: '🏠', tripScoped: true },
@@ -27,6 +27,3 @@ export const VIEWS = {
   split: { title: '💰 Split that bill · 分账', sub: '全员一本账 · 共同支出记在这里，自动算清谁该给谁多少钱',
     nav: 'Split that bill', navSub: '分账 · 谁该给谁', icon: '💰' },
 };
-// 导航直接显示的四个；其余四个点「更多」在圆形菜单里展开
-export const NAV_PRIMARY = ['hunt', 'food', 'activities', 'flights'];
-export const NAV_MORE = ['calendar', 'games', 'angel', 'split'];
