@@ -124,7 +124,12 @@ function parseDirect(html) {
   const guests = numRe(html, /(\d+)\s*guests/i);
   if (!title && !image && bedrooms == null) return null;
   const images = collectImages([...html.matchAll(/"baseUrl":"(https:\/\/a0\.muscache\.com\/[^"]+)"/g)].map(m => m[1]), image);
-  return { ok: true, title, image, images, bedrooms, bathrooms, beds, guests, rating, reviews: ld.reviews };
+  // Airbnb's (slightly fuzzed) listing location. lat stays null when the page
+  // has none, so callers can tell "looked, not found" from "never looked".
+  const la = numRe(html, /"latitude":(-?\d+\.\d+)/), lo = numRe(html, /"longitude":(-?\d+\.\d+)/);
+  const geo = la != null && lo != null && Math.abs(la) <= 90 && Math.abs(lo) <= 180;
+  return { ok: true, title, image, images, bedrooms, bathrooms, beds, guests, rating, reviews: ld.reviews,
+    lat: geo ? la : null, lng: geo ? lo : null };
 }
 
 // Fallback: Airbnb often blocks datacenter IPs, so read the page through
@@ -217,6 +222,7 @@ async function handleAdd(req, env) {
     id: uid(), roomId, url,
     title: (info.title || '').slice(0, 120) || '未命名房源',
     image: info.image || '', images: info.images || [], area: '', priceUSD: null,
+    ...('lat' in info ? { lat: info.lat, lng: info.lng } : {}),
     sleeps: info.guests || null, bedrooms: info.bedrooms, beds: info.beds, bathrooms: info.bathrooms,
     rating: info.rating || null, reviews: info.reviews || null, note: '', addedBy: '', createdAt: Date.now(), votes: []
   };
@@ -298,6 +304,7 @@ async function handleEnrich(req, env) {
   if ((!listing.title || listing.title === '未命名房源') && info.title) listing.title = info.title.slice(0, 120);
   if (!listing.image && info.image) listing.image = info.image;
   if ((info.images || []).length > (listing.images || []).length) listing.images = info.images;
+  if ('lat' in info && listing.lat == null) { listing.lat = info.lat; listing.lng = info.lng; }
   if (listing.bedrooms == null && info.bedrooms != null) listing.bedrooms = info.bedrooms;
   if (listing.bathrooms == null && info.bathrooms != null) listing.bathrooms = info.bathrooms;
   if (listing.beds == null && info.beds != null) listing.beds = info.beds;
