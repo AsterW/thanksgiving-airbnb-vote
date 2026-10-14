@@ -16,9 +16,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
+      - name: Install
+        run: npm ci
+
+      # wrangler.toml's [build] step runs `npm run build` (the React frontend) first.
       - name: Deploy with Wrangler
-        run: npx -y wrangler@4 deploy
+        run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: 988374702c17cd8942be6b35f8361735

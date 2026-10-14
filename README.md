@@ -23,14 +23,15 @@ works for any group picking a place together.
 - Manual-add fallback when auto-scrape fails
 - Blackjack: one live table (up to 6 seats) everyone joins from their own
   phone, play chips only
-- No login, no build step, no database server
+- No passwords, no database server
 
 ## How it works
 
-- **Frontend** (`public/index.html`): one static page, vanilla JS + Tailwind CSS
-  via CDN. Voters are identified by a random token in `localStorage` — no
-  accounts.
-- **Backend** (`worker.js`): a Cloudflare Worker serving a small JSON API:
+- **Frontend** (`web/`): React + Vite + Tailwind, one folder per feature
+  (`web/src/features/hunt`, `split`, `blackjack`). People log in by picking
+  their name from the group's user list; votes are tied to that user's token.
+- **Backend** (`worker/`): a Cloudflare Worker, one folder per feature, each
+  exporting its own route table that `worker/index.js` merges. A small JSON API:
   `GET /api/state`, `POST /api/add`, `/api/add-manual`, `/api/vote`,
   `/api/enrich`, `/api/remove`. Every call names its tab (`?trip=` on the GET,
   `trip` in POST bodies: `nov25` or `nov26`); calls without one go to `nov26`.
@@ -48,8 +49,20 @@ works for any group picking a place together.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader
-  proxy. Prices are intentionally *not* scraped (Airbnb totals are JS-rendered
-  per dates/guests); cards link out to Airbnb for the live price.
+  proxy. Live prices for each trip's dates come from the same price request
+  Airbnb's own listing page makes (`worker/listings/prices.js`), cached 6 hours.
+
+## Develop
+
+```bash
+npm install
+npm run dev:api   # terminal 1: the worker on :8787 (KV + Blackjack run locally)
+npm run dev       # terminal 2: the page on :5173 with hot reload, /api proxied to :8787
+npm run check     # lint + build + bundle the worker, same as CI runs on every PR
+```
+
+`npm run dev:api` alone also works: it builds the page and serves everything on
+:8787, just without hot reload.
 
 ## Deploy your own
 
@@ -57,10 +70,11 @@ You need a free [Cloudflare](https://dash.cloudflare.com/sign-up) account and
 `wrangler`:
 
 ```bash
+npm install
 npx wrangler login
 npx wrangler kv namespace create VOTES_KV
 # put the printed namespace id into wrangler.toml under [[kv_namespaces]]
-npx wrangler deploy
+npx wrangler deploy   # builds the frontend first (wrangler.toml [build])
 ```
 
 You'll get `https://<worker-name>.<your-subdomain>.workers.dev` — share it
@@ -74,20 +88,21 @@ Notes:
 - `wrangler.toml` must declare `[assets] binding = "ASSETS"` because the
   worker serves the frontend through `env.ASSETS` — without it the homepage
   throws Error 1101.
-- `worker-single.js` (regenerate with `node build-single.js`) is a single-file
-  bundle you can paste into the Cloudflare dashboard's Worker Quick Edit if
-  you'd rather not use wrangler. Quick Edit doesn't create the Blackjack
-  Durable Object; `wrangler deploy` does, from the `[[durable_objects.bindings]]`
-  and `[[migrations]]` entries in `wrangler.toml`.
+- Pushes to `main` deploy through the GitHub Action (`.github/workflows/deploy.yml`).
+  There's no paste-into-Quick-Edit bundle anymore: the app has a build step.
 
 ## Project layout
 
-| File | What it is |
+| Path | What it is |
 |---|---|
-| `public/index.html` | Frontend (Chinese UI) |
-| `worker.js` | Worker, JSON API, and Airbnb scraper |
-| `wrangler.toml` | Deploy config (KV binding, assets) |
-| `build-single.js` | Builds `worker-single.js` from the two above |
+| `web/src/features/<feature>/` | One folder per page: components, hooks and CSS for that feature |
+| `web/src/components/` | Shared UI: splash, nav, header, login, toast |
+| `web/src/lib/`, `web/src/session/` | Shared helpers, trip/page config, the logged-in user |
+| `worker/index.js` | Worker entry: merges the route tables, serves `dist/` |
+| `worker/<feature>/` | `listings/`, `users/`, `split/`, `blackjack/`: storage, logic and routes |
+| `worker/config/` | Trips and seed listings |
+| `wrangler.toml` | Deploy config (build step, KV, assets, Durable Object) |
+| `CONTRIBUTING.md` | Where new code goes, and how to keep PRs from colliding |
 | `ARCHITECTURE.md` | Detailed technical notes (in Chinese) |
 
 ## License

@@ -1,0 +1,21 @@
+/* ---------- 21 点 ---------- */
+.bj-felt { background: radial-gradient(120% 80% at 50% 0%, #059669 0%, #065f46 55%, #064e3b 100%); }
+.bj-hand { display:flex; flex-wrap:wrap; gap:.35rem; min-height:4.4rem; }
+.bj-card { width:3rem; height:4.25rem; border-radius:.5rem; background:#fff; color:#0f172a; box-shadow:0 3px 8px rgba(0,0,0,.35);
+  display:flex; flex-direction:column; justify-content:space-between; padding:.25rem .35rem; font-weight:800; font-size:1rem; line-height:1; }
+.bj-card.red { color:#e11d48; }
+.bj-card .s { align-self:flex-end; font-size:1.25rem; }
+.bj-card.back { background: repeating-linear-gradient(45deg, #6366f1 0 6px, #a855f7 6px 12px); border:3px solid #fff; }
+.bj-card.deal { animation: bj-deal .35s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes bj-deal { from { opacity:0; transform: translate(0,-28px) rotate(-10deg) scale(.9); } to { opacity:1; transform:none; } }
+.bj-seat { background:rgba(0,0,0,.2); border:2px solid transparent; border-radius:1rem; padding:.6rem .7rem; transition: border-color .2s, box-shadow .2s; }
+.bj-seat.me { background:rgba(255,255,255,.12); }
+.bj-seat.turn { border-color:#facc15; box-shadow:0 0 0 4px rgba(250,204,21,.25); }
+.bj-seat.away { opacity:.55; }
+.bj-chip { width:3.1rem; height:3.1rem; border-radius:9999px; font-weight:800; font-size:.8rem; color:#fff; border:3px dashed rgba(255,255,255,.75);
+  box-shadow:0 3px 6px rgba(0,0,0,.35), inset 0 0 0 3px rgba(0,0,0,.15); transition: transform .15s; }
+.bj-chip:hover { transform: translateY(-3px); }
+.bj-chip:disabled { opacity:.35; transform:none; }
+.bj-btn { border-radius:.8rem; padding:.55rem 1.1rem; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.25); }
+.bj-btn:disabled { opacity:.4; }
+@media (prefers-reduced-motion: reduce) { .bj-card.deal { animation:none; } .bj-chip:hover { transform:none; } }

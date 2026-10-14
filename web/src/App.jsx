@@ -1,0 +1,69 @@
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { SessionProvider, useSession } from './session/SessionContext.jsx';
+import { ToastProvider } from './components/Toast.jsx';
+import Splash from './components/Splash.jsx';
+import { Sidebar, BottomNav } from './components/Nav.jsx';
+import Header from './components/Header.jsx';
+import AccountButton from './components/AccountButton.jsx';
+import LoginModal from './components/LoginModal.jsx';
+import HuntView from './features/hunt/HuntView.jsx';
+import SplitView from './features/split/SplitView.jsx';
+import BlackjackView from './features/blackjack/BlackjackView.jsx';
+import { useHashRoute } from './lib/useHashRoute.js';
+
+// 每个页面一直挂着（切走只是藏起来），回来时房源、地图、牌桌都还在；切回来时淡入一下
+function Pane({ active, children }) {
+  const ref = useRef(null);
+  const first = useRef(true);
+  useLayoutEffect(() => {
+    if (first.current) { first.current = false; return; }
+    if (!active || !ref.current) return;
+    ref.current.classList.remove('view-enter'); void ref.current.offsetWidth; ref.current.classList.add('view-enter');
+  }, [active]);
+  return <div ref={ref} hidden={!active}>{children}</div>;
+}
+
+function Shell() {
+  const [{ trip, view }, setRoute] = useHashRoute();
+  const { name, openLogin } = useSession();
+  const [splashDone, setSplashDone] = useState(false);
+  const askedOnce = useRef(false);
+
+  // 开场动画收走后，还没登录的人弹一次登录框
+  useEffect(() => {
+    if (!splashDone || askedOnce.current) return;
+    askedOnce.current = true;
+    if (!name) openLogin();
+  }, [splashDone, name, openLogin]);
+
+  const goView = v => { if (v === view) return; setRoute({ view: v }); window.scrollTo({ top: 0 }); };
+
+  return (
+    <div className="md:flex min-h-screen">
+      <Splash onDone={() => setSplashDone(true)} />
+      <Sidebar view={view} onView={goView} />
+      <BottomNav view={view} onView={goView} />
+      <div className="flex-1 min-w-0 pb-20 md:pb-0">
+        <Header view={view} trip={trip} onTrip={t => setRoute({ trip: t })} />
+        <main className="max-w-6xl mx-auto px-4 py-6">
+          <Pane active={view === 'hunt'}><HuntView trip={trip} active={view === 'hunt'} /></Pane>
+          <Pane active={view === 'split'}><SplitView active={view === 'split'} /></Pane>
+          <Pane active={view === 'blackjack'}><BlackjackView active={view === 'blackjack'} /></Pane>
+          <p className="md:hidden text-center text-slate-400 text-sm mt-10 mb-6">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
+        </main>
+      </div>
+      <AccountButton />
+      <LoginModal />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <SessionProvider>
+      <ToastProvider>
+        <Shell />
+      </ToastProvider>
+    </SessionProvider>
+  );
+}

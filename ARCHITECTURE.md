@@ -1,7 +1,7 @@
 # 技术链条说明：感恩节 Airbnb 投票站
 
 > 这是一个很薄的全栈：**浏览器 → Cloudflare 边缘节点 → Worker（后端）→ KV（数据库）**。
-> 前端是单个静态页面，部署在 Cloudflare Workers 免费计划上。
+> 前端是 React 单页应用（Vite 构建到 `dist/`），由同一个 Worker 托管，部署在 Cloudflare Workers 免费计划上。
 
 ## 整体架构
 
@@ -13,22 +13,26 @@
 - **21 点**：不走 KV，是一个 Durable Object（`BlackjackTable`，SQLite 存储，免费计划只能用这种）。整张桌子的状态在它的内存里，玩家用 WebSocket（`/api/bj`）连上来，每次有变化就把整桌推给所有人。规则和流程在 `BlackjackGame` 里（6 副牌、庄家软 17 停、Blackjack 3:2、头两张可加倍、不分牌不保险；15 秒下注、30 秒一手）。筹码只在玩家站起来或断线时存进它自己的存储（`p:<名字>`），不按局存。坐下要用登录名单里的名字和 token。不在 21 点页面又没坐下的人会断开连接，10 分钟没下注会被站起来，免得白占免费的运行时长
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 
-## 前端（`public/index.html`，一个文件）
+## 前端（`web/`，React + Vite + Tailwind）
 
-- 没用框架，**原生 JS + Tailwind CSS**（CDN 引入，写 class 名就行，不用构建）
-- 核心函数：
-  - `api()`：封装 `fetch` 调后端接口
-  - `render()` / `card()`：把房源数组拼成卡片 HTML。卡片含：照片、区域标签、右上 ✕ 删除按钮、标题、「X卧·X床·X卫·可住X人」、价格、⭐评分、备注、投票人小标签、投票按钮、「去 Airbnb ↗」外链
-  - `renderTrip()` / `switchTrip()`：顶部两个标签页对应两段行程（配置在 `TRIPS`：日期、人数、晚数、区域）。当前标签页记在 URL hash（`#nov25` / `#nov26`），可以直接分享某个标签页的链接
-  - `celebrate()`：投票成功后的庆祝动画——从投票按钮炸开彩带和爱心、两侧礼炮、顶部横幅（[canvas-confetti](https://github.com/catdad/canvas-confetti)，CDN 引入）。系统开了「减少动态效果」就只显示横幅；取消投票不触发
-- **按行程区分**：所有接口都带 `trip`；「去 Airbnb ↗」按当前标签页的日期和人数拼链接（打开就是实时总价）；可住人数不够的房源显示 ⚠️ 提醒；手动填的价格会记下 `priceNights`，老的预置房源没有这个字段，按 4 晚显示（它们是 11/25–29 的快照）
-- **身份（没做登录）**：第一次打开在 `localStorage` 生成随机 token（`vt`），投票时弹窗问名字（`vn`，只问一次）。点投票 = 把 `{token, name}` 推进房源的 `votes` 数组；再点一次 = 按 token 删掉（toggle）。所以清浏览器缓存就能换身份重投——熟人群里用，简单优先，防刷基本靠自觉
-- **加房源**：POST 链接 → 成功直接进列表；失败自动展开手动表单（URL 已预填）
-- 页面每次加载跑 `enrichMissing()`：没照片或没评分的房源自动调接口补全
+按功能分目录，多人同时开发时尽量不碰同一个文件：
 
-## 后端（`worker.js`，跑在 Worker 里）
+| 目录 | 内容 |
+|---|---|
+| `web/src/App.jsx` | 外框：开场动画、左侧导航/底部标签栏、标题、三个页面（切走只是藏起来，状态都还在） |
+| `web/src/features/hunt/` | 选房：`HuntView`（数据和投票）、`ListingGrid`（卡片换位动画 FLIP + 投票后锚定位置）、`ListingCard`、`Carousel`（照片轮播）、`ListingMap`（Leaflet 地图）、`AddListingForm`、`price.js`（实时价/排序） |
+| `web/src/features/split/` | 分账：成员、记一笔、余额和结清方案、支出记录（行内修改） |
+| `web/src/features/blackjack/` | 21 点：`useBlackjack`（WebSocket 连线、坐下/站起）、牌桌各部分组件 |
+| `web/src/session/` | 登录：从用户列表选名字，名字和 token 存在 `localStorage`（`vn` / `vt`） |
+| `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅 |
+| `web/src/lib/` | 共用：`api()`、行程和页面配置（`TRIPS`、`VIEWS`）、URL hash 路由（`#nov26/split`） |
 
-入口是 `fetch(request, env)`，按路径分发。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
+- 投票后先在原位更新，700ms 后再按新票数重排，卡片滑到新位置，投的那间在屏幕上不动
+- 页面每次加载会补抓缺照片/评分/位置的房源，并让后端刷新过期的实时价
+
+## 后端（`worker/`，跑在 Worker 里）
+
+入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`users/`（用户列表、登录）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
 
 | 路由 | 作用 |
 |---|---|
@@ -36,7 +40,7 @@
 | `POST /api/add` | 正则从链接提 roomId（`/rooms/(\d+)`）→ 查重（重复返回 `deduped`）→ 调抓取 → 新房源 `unshift` 到数组头 → 写回 KV |
 | `POST /api/add-manual` | 手动表单，走同样入库 |
 | `POST /api/vote` / `/api/remove` / `/api/enrich` | 投票、删除、补抓 |
-| 其他路径 | `env.ASSETS.fetch(request)` 返回静态 `index.html` |
+| 其他路径 | `env.ASSETS.fetch(request)` 返回构建好的页面（`dist/`） |
 
 ⚠️ 踩过的坑：`wrangler.toml` 的 `[assets]` 必须声明 `binding = "ASSETS"`，否则 `env.ASSETS` 是 `undefined`，首页报 Error 1101 而 `/api/*` 还正常。
 
@@ -53,13 +57,13 @@ Airbnb 会拦机房 IP（给 worker 返回机器人验证墙），所以做了�
 3. **再失败 → 走 r.jina.ai 阅读器代理**，转成 markdown 解析（`#` 标题、muscache 图片链接）
 4. 都失败 → 返回 `ok: false`，前端弹手动表单
 
-## 价格为什么是静态的
+## 实时价格（`worker/listings/prices.js`）
 
-Airbnb 的 4 晚总价是前端 JS 按日期/人数动态算的，静态 HTML 里没有可靠数字。所以站内价格只是 2026-09-30 核实的快照（预置房源）或手动填的；新抓的房源显示「价格以 Airbnb 页面为准」。
+Airbnb 房源页的价格框是浏览器单独请求的（GraphQL 持久化查询 `StaysPdpBookItQuery`，带公开的网页 API key）。Worker 用同样的请求，按每段行程的日期和人数查总价和是否可订；人数超过房源上限时按上限再查一次。结果存在房源的 `live` 字段，6 小时内不重复查。查询 hash 或 key 变了会查不到，卡片保留上次的价格并显示多久以前查的。
 
 ## 部署（`wrangler.toml`）
 
-声明 worker 名、入口文件、静态目录 `./public`、KV 绑定（`VOTES_KV` → namespace id）。`wrangler deploy` 一把梭；KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
+声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、21 点的 Durable Object。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
 
 **部署踩坑清单（2026-10-10）：**
 
