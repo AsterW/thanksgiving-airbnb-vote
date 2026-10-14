@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api.js';
+import { useSession } from '../../session/SessionContext.jsx';
 
 const EMPTY = { url: '', title: '', image: '', price: '', bedrooms: '', beds: '', baths: '', sleeps: '', area: '', note: '' };
 const num = v => (v ? Number(v) : null);
 
 // 加房源：贴链接自动抓取；抓不到就展开手动表单（链接已预填）
-export default function AddListingForm({ trip, T, zones, onAdded }) {
+export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
+  const { name } = useSession();
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState({ text: '', tone: 'text-slate-500' });
@@ -22,7 +24,7 @@ export default function AddListingForm({ trip, T, zones, onAdded }) {
     setBusy(true);
     setMsg({ text: '正在读取 Airbnb 房源信息…', tone: 'text-slate-500' });
     try {
-      const r = await api('/api/add', 'POST', { trip, url: u });
+      const r = await api('/api/add', 'POST', { trip, url: u, addedBy: name });
       if (r.ok) {
         setUrl('');
         setMsg({ text: r.deduped ? '这间已经在清单里了' : '已加入清单 🎉', tone: 'text-green-600' });
@@ -40,7 +42,7 @@ export default function AddListingForm({ trip, T, zones, onAdded }) {
   }
 
   async function addManual() {
-    const body = { trip, url: m.url.trim(), title: m.title.trim(), image: m.image.trim(), priceUSD: num(m.price), priceNights: T.nights,
+    const body = { trip, addedBy: name, url: m.url.trim(), title: m.title.trim(), image: m.image.trim(), priceUSD: num(m.price), priceNights: T.nights,
       bedrooms: num(m.bedrooms), beds: num(m.beds), bathrooms: num(m.baths), sleeps: num(m.sleeps), area: m.area, note: m.note.trim() };
     if (!body.url || !body.title) { alert('链接和标题是必填的'); return; }
     const r = await api('/api/add-manual', 'POST', body);
@@ -49,6 +51,7 @@ export default function AddListingForm({ trip, T, zones, onAdded }) {
   }
 
   const input = 'border rounded-lg px-3 py-2';
+  if (closed) return null; // 投票截止后不能再加房源（上面的结果面板会说明）
   return (
     <section className="bg-white rounded-2xl shadow p-5 mb-6">
       <h2 className="font-bold text-lg mb-3">➕ 添加候选房源</h2>

@@ -1,5 +1,6 @@
 import { ago } from '../../lib/format.js';
 import { liveOf, UNAVAILABLE } from './price.js';
+import { perPerson } from './deadline.js';
 
 export default function PriceBlock({ l, T }) {
   const v = liveOf(l, T);
@@ -16,6 +17,7 @@ export default function PriceBlock({ l, T }) {
         {v.original > v.total && <> <s className="text-sm font-normal text-slate-400">${v.original.toLocaleString()}</s></>}
         {' '}<span className="text-xs font-normal text-slate-500">/ {v.nights}晚总价</span>
       </div>
+      {(() => { const pp = perPerson(v.total, T); return <div className="text-sm font-bold text-indigo-700 mt-0.5">每人约 ${pp.each.toLocaleString()} <span className="font-normal text-xs text-slate-500">（{T.people} 人分 · 每人每晚 ${pp.perNight}）</span></div>; })()}
       <div className="text-xs text-emerald-700 mt-0.5">✓ Airbnb 实时价{v.guests < T.people ? ' · 按 ' + v.guests + ' 人计' : ''} · {ago(v.at)}</div>
     </>
   );
