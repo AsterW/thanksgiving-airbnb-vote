@@ -28,6 +28,9 @@ works for any group picking a place together.
   Google Maps or get directions
 - Blackjack: one live table (up to 6 seats) everyone joins from their own
   phone, play chips only
+- Flights: everyone enters their arrival and departure flights; a route map
+  (arrivals and departures separately), an airport pickup list people can
+  claim, and suggested times to be at the airport for departures
 - Secret Angel: swipe through gift categories to say what you'd love (or
   not), then the admin draws who secretly gives a gift to whom; everyone only
   sees their own match

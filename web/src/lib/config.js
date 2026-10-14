@@ -13,6 +13,8 @@ export const VIEWS = {
     nav: 'AirBnb hunting', navSub: '一起选房 · 投票', icon: '🏠', tripScoped: true },
   food: { title: '🍜 Restaurant hunting · 找餐厅', sub: '看中哪家就把 Google 地图链接贴进来，大家点想去',
     nav: 'Restaurants', navSub: '找餐厅 · Google 地图', icon: '🍜', tripScoped: true },
+  flights: { title: '✈️ Flights · 航班', sub: '大家填上到达和离开的航班 · 看航线地图，自动排接机和送机',
+    nav: 'Flights', navSub: '航班 · 接送机', icon: '✈️' },
   split: { title: '💰 Split that bill · 分账', sub: '全员一本账 · 共同支出记在这里，自动算清谁该给谁多少钱',
     nav: 'Split that bill', navSub: '分账 · 谁该给谁', icon: '💰' },
   blackjack: { title: '🃏 Blackjack · 21 点', sub: '大家同一桌，轮流跟庄家玩 · 筹码只是好玩，不跟分账挂钩',
