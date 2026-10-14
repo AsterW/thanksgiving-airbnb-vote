@@ -20,7 +20,7 @@ export const VIEWS = {
     nav: 'Flights', navSub: '航班 · 接送机', icon: '✈️' },
   calendar: { title: '📅 Calendar · 日程', sub: '按天看每个人的安排：住哪、航班、接送机',
     nav: 'Calendar', navSub: '日程 · 每天做什么', icon: '📅' },
-  games: { title: '🎲 Gameroom', sub: 'Blackjack、斗地主、掼蛋、川麻 · 筹码和豆子只是好玩，不跟分账挂钩',
+  games: { title: '🎲 Gameroom', sub: 'Blackjack、斗地主、掼蛋、川麻、鲁班躲技能 · 筹码和豆子只是好玩，不跟分账挂钩',
     nav: 'Gameroom', navSub: 'Blackjack · 斗地主 · 掼蛋 · 川麻', icon: '🎲' },
   angel: { title: '😇 Secret Angel · 神秘天使', sub: '刷卡片选你想要的礼物 · 大家选好后抽签，偷偷给分到的人准备惊喜',
     nav: 'Secret Angel', navSub: '选礼物 · 抽天使', icon: '😇' },
