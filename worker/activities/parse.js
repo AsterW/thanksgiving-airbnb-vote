@@ -3,7 +3,21 @@
 // for sharing (og:title / og:description), falling back to <title> and
 // the plain meta description. Deliberately small — a card only needs a
 // name and one line of text, and the card links out to the page itself.
+//
+// App-walled sites (Xiaohongshu is the one the group actually pastes):
+// a desktop fetch of a note link gets bounced to /login, whose page
+// title is the site's generic slogan — useless on a card. With a mobile
+// UA the same URL serves the note page itself; its og:title is empty,
+// but the note's title/desc are in the page's embedded
+// window.__INITIAL_STATE__ JSON, so look there too.
 import { SCRAPE_UA } from '../listings/scrape.js';
+
+const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+// Site slogans that show up as the "title" of login walls and home
+// shells. A card wearing one of these says nothing, so treat it as no
+// title at all (the caller falls back to the hostname).
+const GENERIC_TITLES = new Set(['小红书 - 你的生活兴趣社区', '小红书']);
 
 function getMeta(html, attr, key) {
   const m = html.match(new RegExp('<meta[^>]+' + attr + '=["\']' + key + '["\'][^>]*content=["\']([^"\']*)["\']', 'i'))
@@ -20,26 +34,21 @@ function decode(s) {
     .replace(/\s+/g, ' ').trim();
 }
 
-async function fetchHtml(url, ms) {
+async function fetchHtml(url, ms, ua) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
   try {
     const r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: {
-      'User-Agent': SCRAPE_UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'en-US,en;q=0.9,zh;q=0.8' } });
+      'User-Agent': ua, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'en-US,en;q=0.9,zh;q=0.8' } });
     if (!r.ok) return null;
     if (!/text\/html|xhtml/i.test(r.headers.get('content-type') || '')) return null;
     // Pages can be megabytes of scripts; the meta tags live in the head.
-    return (await r.text()).slice(0, 300000);
+    return { html: (await r.text()).slice(0, 400000), finalUrl: r.url || url };
   } catch (e) { return null; }
   finally { clearTimeout(t); }
 }
 
-// { ok, title, blurb } — ok:false when the page could not be read at all
-// (blocked, not HTML, timed out); title/blurb may still be empty on an
-// ok page that simply has no meta tags, callers fall back as they like.
-export async function fetchLinkInfo(url) {
-  const html = await fetchHtml(url, 10000);
-  if (!html) return { ok: false, title: '', blurb: '' };
+function metaInfo(html) {
   let title = decode(getMeta(html, 'property', 'og:title') || getMeta(html, 'name', 'twitter:title'));
   if (!title) {
     const m = html.match(/<title[^>]*>([^<]*)<\/title>/i);
@@ -47,5 +56,72 @@ export async function fetchLinkInfo(url) {
   }
   const blurb = decode(getMeta(html, 'property', 'og:description')
     || getMeta(html, 'name', 'description') || getMeta(html, 'name', 'twitter:description'));
+  return { title, blurb };
+}
+
+// One string field out of a JSON-ish blob. The blob is not strict JSON
+// (Xiaohongshu's state uses bare `undefined`), so pull the string
+// literal out with a regex and unescape just that literal.
+function stateField(seg, key) {
+  const re = new RegExp('"' + key + '"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"', 'g');
+  let m;
+  while ((m = re.exec(seg))) {
+    let v = '';
+    try { v = JSON.parse('"' + m[1] + '"'); } catch (e) { v = m[1].replace(/\\n/g, ' ').replace(/\\"/g, '"'); }
+    v = decode(v);
+    if (v) return v;
+  }
+  return '';
+}
+
+// The note's title/desc from window.__INITIAL_STATE__, when the page
+// embeds it. Prefer the region around noteDetailMap, where the note
+// being viewed lives; fall back to anywhere in the state blob.
+function stateInfo(html) {
+  const at = html.indexOf('__INITIAL_STATE__');
+  if (at < 0) return { title: '', blurb: '' };
+  const seg = html.slice(at, at + 400000);
+  const nd = seg.indexOf('noteDetailMap');
+  const region = nd >= 0 ? seg.slice(nd, nd + 100000) : seg;
+  return { title: stateField(region, 'title') || stateField(seg, 'title'),
+           blurb: stateField(region, 'desc') || stateField(seg, 'desc') };
+}
+
+const usable = title => !!title && !GENERIC_TITLES.has(title);
+
+// { ok, title, blurb } — ok:false when the page could not be read at all
+// (blocked, not HTML, timed out). A generic site slogan never counts as
+// a title; when a fetch lands on a login wall or finds nothing, retry
+// once with a mobile UA and look in the embedded page state as well.
+export async function fetchLinkInfo(url) {
+  let title = '', blurb = '', read = false;
+  const first = await fetchHtml(url, 10000, SCRAPE_UA);
+  if (first) {
+    read = true;
+    ({ title, blurb } = metaInfo(first.html));
+    const st = stateInfo(first.html);
+    if (!usable(title) && st.title) title = st.title;
+    if (!blurb && st.blurb) blurb = st.blurb;
+  }
+  // Retry with a mobile UA when the desktop fetch failed outright, got
+  // bounced to a login wall, or produced nothing usable — app-walled
+  // sites often serve the real page to a phone browser instead.
+  const walled = first && /\/login\b/.test(first.finalUrl);
+  if (!first || walled || !usable(title)) {
+    const mob = await fetchHtml(url, 10000, MOBILE_UA);
+    if (mob) {
+      read = true;
+      const mt = metaInfo(mob.html);
+      const ms = stateInfo(mob.html);
+      if (usable(ms.title) || usable(mt.title)) {
+        title = usable(ms.title) ? ms.title : mt.title;
+        blurb = ms.blurb || mt.blurb || blurb;
+      } else if (!usable(title) && (ms.blurb || mt.blurb)) {
+        blurb = ms.blurb || mt.blurb;
+      }
+    }
+  }
+  if (!read) return { ok: false, title: '', blurb: '' };
+  if (!usable(title)) title = '';
   return { ok: true, title: title.slice(0, 120), blurb: blurb.slice(0, 220) };
 }
