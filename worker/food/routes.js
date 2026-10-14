@@ -6,7 +6,7 @@ import { expandLink, isMapsLink, readLink } from './maps.js';
 import { placePhotos } from './photos.js';
 import { getFood, updateFood } from './store.js';
 
-const readBody = async req => { try { return await req.json(); } catch (e) { return {}; } };
+const readBody = async req => { try { return await req.json() || {}; } catch (e) { return {}; } };
 
 async function handleList(req, env, url) {
   return j({ ok: true, places: (await getFood(env, url.searchParams.get('trip'))).places });

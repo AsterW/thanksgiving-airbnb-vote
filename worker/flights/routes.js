@@ -82,7 +82,7 @@ async function handleGet(req, env) {
 // Save someone's flights (your own, or a friend's who isn't using the app).
 async function handleSave(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { users, user } = await caller(env, body.name, body.token);
   if (!user) return j({ ok: false, error: '先登录' });
   const target = users.find(u => sameName(u.name, cleanName(body.for || user.name)));
@@ -100,7 +100,7 @@ async function handleSave(req, env) {
 // "I'll pick them up": claim (or release) airport pickups for some arrivals.
 async function handlePickup(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { users, user } = await caller(env, body.name, body.token);
   if (!user) return j({ ok: false, error: '先登录' });
   const all = await updateFlights(env, all => {

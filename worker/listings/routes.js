@@ -13,7 +13,7 @@ import { splitView } from '../split/ledger.js';
 
 async function handleAdd(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const url = String(body.url || '').trim();
   const roomId = roomIdFrom(url);
   if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源链接（需要形如 airbnb.com/rooms/123… 的链接）' });
@@ -54,7 +54,7 @@ async function handleAdd(req, env) {
 
 async function handleAddManual(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const url = String(body.url || '').trim();
   const title = String(body.title || '').trim().slice(0, 120);
   const roomId = roomIdFrom(url);
@@ -79,7 +79,7 @@ async function handleAddManual(req, env) {
 
 async function handleVote(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { id, token, name } = body;
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
   const trip = tripOf(body.trip);
@@ -101,7 +101,7 @@ async function handleVote(req, env) {
 
 async function handleRemove(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
   const out = await updateState(env, trip, state => {
@@ -116,7 +116,7 @@ async function handleRemove(req, env) {
 
 async function handleEnrich(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   // Peek only to get the URL to scrape — do NOT hold this snapshot
   // across the scrape (see handleAdd: it can take up to ~35s, and

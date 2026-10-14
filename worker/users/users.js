@@ -77,7 +77,7 @@ export async function addUsers(env, names) {
 // Log in as an existing name, or create it. Names are unique (case-insensitive).
 async function handleLogin(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const name = cleanName(body.name);
   if (!name) return j({ ok: false, error: '名字是必填的' });
   await getUsers(env); // make sure the list (and its first-run build) exists
@@ -113,7 +113,7 @@ async function handleLogin(req, env) {
 
 async function handleMemberAdd(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const name = cleanName(body.name);
   if (!name) return j({ ok: false, error: '名字是必填的' });
   const users = await addUsers(env, [name]);

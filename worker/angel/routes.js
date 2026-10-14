@@ -82,7 +82,7 @@ async function handleGet(req, env, url) {
 
 async function handlePrefs(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
   if (!key) return j({ ok: false, error: '先登录' });
   const picks = {};
@@ -100,7 +100,7 @@ async function handlePrefs(req, env) {
 // Admin: leave someone out (or back in), e.g. a name on the list who isn't coming.
 async function handleExclude(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
   const target = cleanName(body.target).toLowerCase();
   const out = await updateAngel(env, a => {
@@ -121,7 +121,7 @@ async function handleExclude(req, env) {
 // saved preferences are never touched here.
 async function handleDraw(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
   const out = await updateAngel(env, a => {
     if (!key || key !== a.admin) return { error: '只有管理员可以抽签' };
@@ -142,7 +142,7 @@ async function handleDraw(req, env) {
 // away, they pass it on and the new admin can reshuffle right away.
 async function handleAdmin(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
   const target = cleanName(body.target).toLowerCase();
   const out = await updateAngel(env, a => {

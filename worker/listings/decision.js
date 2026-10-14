@@ -45,7 +45,7 @@ async function caller(env, name, token) {
 // Admin: pick a different listing (or listingId null to go back to the vote result).
 async function handleDecision(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   const user = await caller(env, body.name, body.token);
   if (!user || user.name.toLowerCase() !== ADMIN) return j({ ok: false, error: '只有管理员可以改选' });
@@ -62,7 +62,7 @@ async function handleDecision(req, env) {
 // Booking the pick: claim ("I'll book it"), release, or mark booked with details.
 async function handleBooking(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   const user = await caller(env, body.name, body.token);
   if (!user) return j({ ok: false, error: '先登录' });

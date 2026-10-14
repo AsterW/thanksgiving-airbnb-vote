@@ -24,7 +24,7 @@ export function cleanPlace(p) {
 
 async function handleActivityVote(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { id, token, name } = body;
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
   const out = await updateActivities(env, doc => {
@@ -44,7 +44,7 @@ async function handleActivityVote(req, env) {
 
 async function handleActivityAdd(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const url = String(body.url || '').trim().slice(0, 1000);
   let parsed;
   try { parsed = new URL(url); } catch (e) { /* handled below */ }
@@ -98,7 +98,7 @@ async function handleActivityAdd(req, env) {
 
 async function handleActivityRemove(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const out = await updateActivities(env, doc => {
     const i = doc.items.findIndex(a => a.id === body.id);
     if (i < 0) return { error: '活动不存在' };
@@ -116,7 +116,7 @@ async function handleActivityRemove(req, env) {
 // can fix a pin.
 async function handleActivityPlace(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const place = cleanPlace(body.place);
   const out = await updateActivities(env, doc => {
     const act = doc.items.find(a => a.id === body.id);
@@ -136,7 +136,7 @@ async function handleActivityPlace(req, env) {
 // absolute http(s) URLs only, anything else clears the picture.
 async function handleActivityImage(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const img = String(body.img || '').trim().slice(0, 1000);
   const out = await updateActivities(env, doc => {
     const act = doc.items.find(a => a.id === body.id);

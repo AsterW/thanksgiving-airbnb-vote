@@ -68,7 +68,7 @@ export async function pickArea(trip, listings, l) {
 // concurrent votes/adds aren't clobbered.
 async function handleZones(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   const peek = await getState(env, trip);
   const known = peek.listings.map(l => ({ ...l })); // assignments made below count as neighbors for the next ones
@@ -91,7 +91,7 @@ async function handleZones(req, env) {
 // Set (or clear) a listing's area by hand. It won't be auto-assigned after that.
 async function handleSetArea(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   const out = await updateState(env, trip, state => {
     const listing = state.listings.find(l => l.id === body.id);
