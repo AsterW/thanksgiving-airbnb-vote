@@ -5,6 +5,7 @@ import { load, save } from '../../lib/storage.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import AddListingForm from './AddListingForm.jsx';
 import VoteBanner from './VoteBanner.jsx';
 import DecisionPanel from './DecisionPanel.jsx';
@@ -24,6 +25,7 @@ export default function HuntView({ trip, active }) {
   const T = TRIPS[trip];
   const { token, name, ensureName } = useSession();
   const toast = useToast();
+  const confirm = useConfirm();
   const { listings, refresh, patch, vote: voteInfo, setVote, loaded } = useListings(trip, token);
   const closed = !!voteInfo && !voteInfo.open;
   const isAdmin = String(name).toLowerCase() === 'aster';
@@ -72,7 +74,7 @@ export default function HuntView({ trip, active }) {
 
   async function setArea(l, area) {
     const r = await api('/api/area', 'POST', { trip, id: l.id, area });
-    if (r.ok) patch(l.id, () => r.listing); else alert('改区域失败：' + (r.error || ''));
+    if (r.ok) patch(l.id, () => r.listing); else toast('改区域失败：' + (r.error || ''));
   }
 
   function afterVote(id, votes) {
@@ -104,16 +106,16 @@ export default function HuntView({ trip, active }) {
   }
 
   async function remove(l) {
-    if (!confirm('确定要删除「' + (l.title || '未命名房源') + '」吗？删掉后大家就看不到了。')) return;
+    if (!await confirm({ title: '删除这个房源？', message: '确定要删除「' + (l.title || '未命名房源') + '」吗？删掉后大家就看不到了。', confirmText: '删除', danger: true })) return;
     const r = await api('/api/remove', 'POST', { trip, id: l.id });
-    if (r.ok) await refresh(); else alert('删除失败：' + (r.error || '稍后再试'));
+    if (r.ok) await refresh(); else toast('删除失败：' + (r.error || '稍后再试'));
   }
 
   async function choose(l) {
-    if (!confirm('把「' + (l.title || '未命名房源') + '」定为 ' + T.date + ' 的房子？')) return;
+    if (!await confirm({ title: '就定这间？', message: '把「' + (l.title || '未命名房源') + '」定为 ' + T.date + ' 的房子？', confirmText: '就定这间' })) return;
     ensureName(async me => {
       const r = await api('/api/decision', 'POST', { trip, name: me.name, token: me.token, listingId: l.id });
-      if (r.ok) { setVote(r.vote); window.scrollTo({ top: 0, behavior: 'smooth' }); } else alert(r.error || '没成功');
+      if (r.ok) { setVote(r.vote); window.scrollTo({ top: 0, behavior: 'smooth' }); } else toast(r.error || '没成功');
     });
   }
 

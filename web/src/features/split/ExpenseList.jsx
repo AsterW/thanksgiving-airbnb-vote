@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { fmtMoney } from '../../lib/format.js';
+import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import PeoplePicker from './PeoplePicker.jsx';
 
 // 支出记录。✎ 修改：编辑框直接展开在这一行下面；Enter 保存，Esc 取消
 export default function ExpenseList({ expenses, names, onSaved, onGone }) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(null);
 
@@ -18,9 +22,9 @@ export default function ExpenseList({ expenses, names, onSaved, onGone }) {
   const cancel = () => { setEditingId(null); setDraft(null); };
 
   async function remove(id) {
-    if (!confirm('删除这笔支出？')) return;
+    if (!await confirm({ title: '删除这笔支出？', message: '删掉后大家的余额会重新计算。', confirmText: '删除', danger: true })) return;
     const r = await api('/api/expense-remove', 'POST', { id });
-    if (r.ok) onSaved(r); else alert('删除失败，稍后再试');
+    if (r.ok) onSaved(r); else toast('删除失败，稍后再试');
   }
 
   if (!expenses.length) return (
@@ -45,7 +49,7 @@ export default function ExpenseList({ expenses, names, onSaved, onGone }) {
           </div>
           {e.id === editingId && draft && (
             <Editor id={e.id} draft={draft} setDraft={setDraft} names={names} onCancel={cancel}
-              onSaved={r => { cancel(); onSaved(r); }} onGone={() => { cancel(); onGone(); alert('这笔已经被别人删掉了'); }} />
+              onSaved={r => { cancel(); onSaved(r); }} onGone={() => { cancel(); onGone(); toast('这笔已经被别人删掉了'); }} />
           )}
         </div>
       ))}

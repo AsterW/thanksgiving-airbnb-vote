@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useSession } from '../../session/SessionContext.jsx';
+import { useToast } from '../../components/Toast.jsx';
 
 const EMPTY = { url: '', title: '', image: '', price: '', bedrooms: '', beds: '', baths: '', sleeps: '', area: '', note: '' };
 const num = v => (v ? Number(v) : null);
@@ -8,6 +9,7 @@ const num = v => (v ? Number(v) : null);
 // 加房源：贴链接自动抓取；抓不到就展开手动表单（链接已预填）
 export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
   const { name } = useSession();
+  const toast = useToast();
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState({ text: '', tone: 'text-slate-500' });
@@ -44,10 +46,10 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
   async function addManual() {
     const body = { trip, addedBy: name, url: m.url.trim(), title: m.title.trim(), image: m.image.trim(), priceUSD: num(m.price), priceNights: T.nights,
       bedrooms: num(m.bedrooms), beds: num(m.beds), bathrooms: num(m.baths), sleeps: num(m.sleeps), area: m.area, note: m.note.trim() };
-    if (!body.url || !body.title) { alert('链接和标题是必填的'); return; }
+    if (!body.url || !body.title) { toast('链接和标题是必填的'); return; }
     const r = await api('/api/add-manual', 'POST', body);
     if (r.ok) { setM(EMPTY); setManualOpen(false); await onAdded(); }
-    else alert('添加失败：' + (r.error || ''));
+    else toast('添加失败：' + (r.error || ''));
   }
 
   const input = 'border rounded-lg px-3 py-2';

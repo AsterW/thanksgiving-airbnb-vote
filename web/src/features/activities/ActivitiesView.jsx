@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { celebrateVote } from '../../lib/celebrate.js';
 import { reduceMotion } from '../../lib/motion.js';
 import ActivityCard from './ActivityCard.jsx';
@@ -32,6 +33,7 @@ const byAdded = (a, b) => (b.createdAt || 0) - (a.createdAt || 0);
 export default function ActivitiesView({ active }) {
   const { token, ensureName } = useSession();
   const toast = useToast();
+  const confirm = useConfirm();
   const [activities, setActivities] = useState([]);
   const [area, setArea] = useState('all');
   const [sortBy, setSortBy] = useState('votes');
@@ -87,10 +89,10 @@ export default function ActivitiesView({ active }) {
   }
 
   async function remove(a) {
-    if (!confirm('确定要删除「' + a.title + '」吗？删掉后大家就看不到了。')) return;
+    if (!await confirm({ title: '删除这个活动？', message: '确定要删除「' + a.title + '」吗？删掉后大家就看不到了。', confirmText: '删除', danger: true })) return;
     const r = await api('/api/activity-remove', 'POST', { id: a.id });
     if (r.ok) setActivities(prev => prev.filter(x => x.id !== a.id));
-    else alert('删除失败，稍后再试');
+    else toast('删除失败，稍后再试');
   }
 
   async function savePlace(place) {
@@ -101,7 +103,7 @@ export default function ActivitiesView({ active }) {
     if (r.ok) {
       setActivities(prev => prev.map(x => x.id === a.id ? r.activity : x));
       toast(place ? '📍 地点已保存' : '📍 地点已清除');
-    } else alert('地点保存失败，稍后再试');
+    } else toast('地点保存失败，稍后再试');
   }
 
   function focusCard(id) {
