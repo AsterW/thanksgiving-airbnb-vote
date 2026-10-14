@@ -21,6 +21,10 @@ works for any group picking a place together.
 - Sort by votes or price, filter by area
 - Anyone with the link can remove a listing (with a confirm dialog)
 - Manual-add fallback when auto-scrape fails
+- Restaurants: paste a link copied from Google Maps to add a place to the
+  trip's list (name and pin come from the link; if it doesn't point to one
+  place, you get "not found"), vote for the ones you want to try, open each in
+  Google Maps or get directions
 - Blackjack: one live table (up to 6 seats) everyone joins from their own
   phone, play chips only
 - No passwords, no database server
@@ -28,7 +32,7 @@ works for any group picking a place together.
 ## How it works
 
 - **Frontend** (`web/`): React + Vite + Tailwind, one folder per feature
-  (`web/src/features/hunt`, `split`, `blackjack`). People log in by picking
+  (`web/src/features/hunt`, `food`, `split`, `blackjack`). People log in by picking
   their name from the group's user list; votes are tied to that user's token.
 - **Backend** (`worker/`): a Cloudflare Worker, one folder per feature, each
   exporting its own route table that `worker/index.js` merges. A small JSON API:
@@ -40,6 +44,7 @@ works for any group picking a place together.
   that tab's listings array as JSON. Two keys are shared by the whole group
   rather than per tab: `users:v1` (the name list people log in with, which is
   also the Split-that-bill member list) and `split:v1` (one expense ledger).
+  Restaurants are per trip again: `food:nov25:v1` and `food:nov26:v1`.
 - **Blackjack** (`GET /api/bj`, a WebSocket): the table lives in one Durable
   Object, `BlackjackTable` (SQLite-backed, which the free plan requires). The
   game runs there and every seated or watching client gets the whole table
@@ -99,7 +104,7 @@ Notes:
 | `web/src/components/` | Shared UI: splash, nav, header, login, toast |
 | `web/src/lib/`, `web/src/session/` | Shared helpers, trip/page config, the logged-in user |
 | `worker/index.js` | Worker entry: merges the route tables, serves `dist/` |
-| `worker/<feature>/` | `listings/`, `users/`, `split/`, `blackjack/`: storage, logic and routes |
+| `worker/<feature>/` | `listings/`, `food/`, `users/`, `split/`, `blackjack/`: storage, logic and routes |
 | `worker/config/` | Trips and seed listings |
 | `wrangler.toml` | Deploy config (build step, KV, assets, Durable Object) |
 | `CONTRIBUTING.md` | Where new code goes, and how to keep PRs from colliding |

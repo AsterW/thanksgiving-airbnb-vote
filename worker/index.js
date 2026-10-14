@@ -5,11 +5,12 @@
 import { routes as listingRoutes } from './listings/routes.js';
 import { routes as userRoutes } from './users/users.js';
 import { routes as splitRoutes } from './split/routes.js';
+import { routes as foodRoutes } from './food/routes.js';
 
 // The Durable Object class must be exported from the entry module.
 export { BlackjackTable } from './blackjack/table.js';
 
-const ROUTES = { ...listingRoutes, ...userRoutes, ...splitRoutes };
+const ROUTES = { ...listingRoutes, ...userRoutes, ...splitRoutes, ...foodRoutes };
 
 export default {
   async fetch(request, env) {

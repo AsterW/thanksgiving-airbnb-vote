@@ -10,6 +10,7 @@
   - `nov25`（11/25–26 · 9人 · 1晚）→ `state:nov25:v1`
   - `nov26`（11/26–29 · 14人 · 3晚）→ `state:v1`（沿用原来的 key，之前的房源和投票都在这里）
   - 全员共用、不分行程：`users:v1`（登录时选的名字，也是分账的成员名单）、`split:v1`（分账，全员一本账）。分账原来按行程存在上面两个 key 里，第一次读 `split:v1` 时自动合并过来（旧数据留在原处不删）
+  - 餐厅：每段行程一份，`food:nov25:v1` / `food:nov26:v1`（`{ places: [...] }`，每家有名字、Google 地图链接、坐标、备注、想去的人）
 - **21 点**：不走 KV，是一个 Durable Object（`BlackjackTable`，SQLite 存储，免费计划只能用这种）。整张桌子的状态在它的内存里，玩家用 WebSocket（`/api/bj`）连上来，每次有变化就把整桌推给所有人。规则和流程在 `BlackjackGame` 里（6 副牌、庄家软 17 停、Blackjack 3:2、头两张可加倍、不分牌不保险；15 秒下注、30 秒一手）。筹码只在玩家站起来或断线时存进它自己的存储（`p:<名字>`），不按局存。坐下要用登录名单里的名字和 token。不在 21 点页面又没坐下的人会断开连接，10 分钟没下注会被站起来，免得白占免费的运行时长
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 
@@ -19,8 +20,9 @@
 
 | 目录 | 内容 |
 |---|---|
-| `web/src/App.jsx` | 外框：开场动画、左侧导航/底部标签栏、标题、三个页面（切走只是藏起来，状态都还在） |
+| `web/src/App.jsx` | 外框：开场动画、左侧导航/底部标签栏、标题、四个页面（切走只是藏起来，状态都还在） |
 | `web/src/features/hunt/` | 选房：`HuntView`（数据和投票）、`ListingGrid`（卡片换位动画 FLIP + 投票后锚定位置）、`ListingCard`、`Carousel`（照片轮播）、`ListingMap`（Leaflet 地图）、`AddListingForm`、`price.js`（实时价/排序） |
+| `web/src/features/food/` | 找餐厅：贴 Google 地图链接加店（`AddPlaceForm`）、店铺卡片（想去 / 在 Google 地图打开 / 导航）、`FoodMap`（Leaflet 钉子） |
 | `web/src/features/split/` | 分账：成员、记一笔、余额和结清方案、支出记录（行内修改） |
 | `web/src/features/blackjack/` | 21 点：`useBlackjack`（WebSocket 连线、坐下/站起）、牌桌各部分组件 |
 | `web/src/session/` | 登录：从用户列表选名字，名字和 token 存在 `localStorage`（`vn` / `vt`） |
@@ -32,7 +34,7 @@
 
 ## 后端（`worker/`，跑在 Worker 里）
 
-入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`users/`（用户列表、登录）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
+入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`food/`（餐厅：读 Google 地图链接）、`users/`（用户列表、登录）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
 
 | 路由 | 作用 |
 |---|---|
@@ -40,6 +42,7 @@
 | `POST /api/add` | 正则从链接提 roomId（`/rooms/(\d+)`）→ 查重（重复返回 `deduped`）→ 调抓取 → 新房源 `unshift` 到数组头 → 写回 KV |
 | `POST /api/add-manual` | 手动表单，走同样入库 |
 | `POST /api/vote` / `/api/remove` / `/api/enrich` | 投票、删除、补抓 |
+| `GET /api/food?trip=…`、`POST /api/food/add` / `vote` / `remove` | 餐厅（`worker/food/`）。只接受从 Google 地图复制的链接：店名和坐标从链接本身读（`/maps/place/<店名>/…!3d<纬度>!4d<经度>`，或带店铺 id 的 `?q=` 链接），`maps.app.goo.gl` 短链接只跟着跳转展开，不抓 Google 的页面、不按店名搜索；读不出店名就回“找不到这家餐厅” |
 | 其他路径 | `env.ASSETS.fetch(request)` 返回构建好的页面（`dist/`） |
 
 ⚠️ 踩过的坑：`wrangler.toml` 的 `[assets]` 必须声明 `binding = "ASSETS"`，否则 `env.ASSETS` 是 `undefined`，首页报 Error 1101 而 `/api/*` 还正常。
