@@ -38,6 +38,7 @@ export default function FlightForm({ people, onSaved }) {
   const [departure, setDeparture] = useState(blank('departure'));
   const [noFlight, setNoFlight] = useState(false);
   const [msg, setMsg] = useState({ text: '', ok: false });
+  const [open, setOpen] = useState(false); // 默认折叠：地图才是主角，填表点开标题才展开
 
   useEffect(() => { if (name && !who) setWho(name); }, [name, who]);
   const mine = people.find(p => p.name === who);
@@ -45,39 +46,47 @@ export default function FlightForm({ people, onSaved }) {
     setArrival(toForm(mine?.arrival, 'arrival')); setDeparture(toForm(mine?.departure, 'departure')); setNoFlight(!!mine?.noFlight); setMsg({ text: '', ok: false });
   }, [who, mine?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!name) return (
-    <section className="glass-card rounded-2xl p-6 text-center">
-      <p className="text-slate-600 mb-3">登录后填你的航班</p>
-      <button onClick={() => openLogin()} className="bg-indigo-600 text-white font-bold rounded-xl px-6 py-2">登录</button>
-    </section>
-  );
-
   async function save() {
     const legOrNull = f => (filled(f) ? f : null);
     const r = await api('/api/flights', 'POST', { name, token, for: who, noFlight, arrival: noFlight ? null : legOrNull(arrival), departure: noFlight ? null : legOrNull(departure) });
     if (r.ok) { setMsg({ text: '保存好了 ✈️', ok: true }); onSaved(r); } else setMsg({ text: r.error || '保存失败', ok: false });
   }
 
+  const myRecord = people.find(p => p.name === name);
+  const hint = !name ? '登录后填你的航班' : (myRecord?.arrival || myRecord?.departure || myRecord?.noFlight) ? '你的已经填好了，要改点这里' : '点这里填你的到达 / 离开航班';
   return (
     <section className="glass-card rounded-2xl p-5">
-      <div className="flex flex-wrap items-center gap-3 mb-4">
-        <h2 className="font-bold text-lg">🧳 填航班</h2>
-        <select value={who} onChange={e => setWho(e.target.value)} className="border rounded-full px-3 py-1 text-sm">
-          {users.map(u => <option key={u.name} value={u.name}>{u.name === name ? u.name + '（我）' : '帮 ' + u.name + ' 填'}</option>)}
-        </select>
-        <label className="inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={noFlight} onChange={e => setNoFlight(e.target.checked)} /> 不坐飞机（开车来 / 本来就在当地）</label>
-      </div>
-      {!noFlight && (
-        <div className="grid md:grid-cols-2 gap-4">
-          <Leg title="🛬 到达航班" kind="arrival" f={arrival} set={setArrival} />
-          <Leg title="🛫 离开航班" kind="departure" f={departure} set={setDeparture} />
+      <button onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-2 text-left">
+        <span className="font-bold text-lg">🧳 填航班</span>
+        <span className="text-sm text-slate-500 truncate">{hint}</span>
+        <span className="ml-auto shrink-0 text-sm text-slate-400">{open ? '收起 ▴' : '展开 ▾'}</span>
+      </button>
+      {open && (!name ? (
+        <div className="text-center pt-4">
+          <p className="text-slate-600 mb-3">登录后填你的航班</p>
+          <button onClick={() => openLogin()} className="btn-primary font-bold rounded-xl px-6 py-2">登录</button>
         </div>
-      )}
-      <div className="flex items-center gap-3 mt-4">
-        <button onClick={save} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-6 py-2">保存</button>
-        <span className={'text-sm ' + (msg.ok ? 'text-emerald-600' : 'text-rose-600')}>{msg.text}</span>
-        <span className="text-xs text-slate-400 ml-auto">时间都填机场当地时间（登机牌上的时间），跨时区和红眼航班会自动算</span>
-      </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3 mb-4 mt-4">
+            <select value={who} onChange={e => setWho(e.target.value)} className="border rounded-full px-3 py-1 text-sm">
+              {users.map(u => <option key={u.name} value={u.name}>{u.name === name ? u.name + '（我）' : '帮 ' + u.name + ' 填'}</option>)}
+            </select>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-600"><input type="checkbox" checked={noFlight} onChange={e => setNoFlight(e.target.checked)} /> 不坐飞机（开车来 / 本来就在当地）</label>
+          </div>
+          {!noFlight && (
+            <div className="grid md:grid-cols-2 gap-4">
+              <Leg title="🛬 到达航班" kind="arrival" f={arrival} set={setArrival} />
+              <Leg title="🛫 离开航班" kind="departure" f={departure} set={setDeparture} />
+            </div>
+          )}
+          <div className="flex items-center gap-3 mt-4">
+            <button onClick={save} className="btn-primary font-bold rounded-xl px-6 py-2">保存</button>
+            <span className={'text-sm ' + (msg.ok ? 'text-emerald-600' : 'text-rose-600')}>{msg.text}</span>
+            <span className="text-xs text-slate-400 ml-auto">时间都填机场当地时间（登机牌上的时间），跨时区和红眼航班会自动算</span>
+          </div>
+        </>
+      ))}
     </section>
   );
 }
