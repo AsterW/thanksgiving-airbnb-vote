@@ -10,39 +10,20 @@ body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 .view-enter { animation: view-in .35s ease; }
 @keyframes view-in { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
 @media (prefers-reduced-motion: reduce) { .view-enter { animation:none; } }
-/* 切换行程（25–26 ↔ 26–29）时内容柔和落定：淡入 + 一丝缩放回稳。
-   不要把 filter: blur 加在内容上 —— 整块面板（含几十张卡片和地图）逐帧
-   重绘模糊是手机上动画卡顿的元凶，录屏里文字发糊也是它。内容的动画只
-   动 opacity 和 transform，浏览器合成器能全程 60fps；想要的水晶虚化
-   交给下面那层临时面纱。 */
-.trip-enter { animation: trip-in .4s cubic-bezier(.22,1,.36,1); }
+/* 切换行程（25–26 ↔ 26–29）的转场，定稿：iOS 式交叉淡入 + 微缩放
+   回稳，全程只动 opacity 和 transform，合成器 60fps。
+   试过两回虚化都卡（真机验证）：① 给内容加 filter: blur —— 整块面板
+   逐帧重绘；② 盖一层 backdrop-filter 磨砂面纱 —— 全屏毛玻璃动画在
+   这台手机 GPU 上同样扛不住。所以这段动画里不要再出现任何形式的
+   blur/filter/backdrop 动画；iOS 的顺滑靠的是曲线和交叉淡入，不是糊。 */
+.trip-enter { animation: trip-in .45s cubic-bezier(.32,.72,0,1); }
 @keyframes trip-in {
-  from { opacity:0; transform: scale(.988) translateY(6px); }
-  to { opacity:1; transform: scale(1) translateY(0); }
+  0% { opacity:0; transform: scale(.984) translateY(10px); }
+  55% { opacity:1; }
+  78% { transform: scale(1.0015) translateY(0); }
+  100% { opacity:1; transform: scale(1) translateY(0); }
 }
 @media (prefers-reduced-motion: reduce) { .trip-enter { animation:none; } }
-
-/* 面板根：给行程面纱提供定位上下文，isolation 把面板内各元素的
-   z-index 关在面板里，面纱的层级才说了算 */
-.pane-root { position:relative; isolation:isolate; }
-
-/* 水晶面纱：切换行程时盖在面板上的一层临时磨砂玻璃。新内容在它下面
-   静止地完成淡入，模糊的是面纱的 backdrop —— 浏览器只需合成这一层
-   背景表面，而不是逐帧重绘底下所有卡片和地图。0.45 秒内从 6px 模糊
-   + 一层 faint 白色雾气化开到完全透明，JS 在动画结束时把它摘掉。 */
-.trip-frost { position:absolute; inset:0; z-index:40; pointer-events:none;
-  background:rgba(255,255,255,.16);
-  -webkit-backdrop-filter: blur(6px) saturate(1.15); backdrop-filter: blur(6px) saturate(1.15);
-  animation: frost-in .45s ease-out both; }
-@keyframes frost-in {
-  from { -webkit-backdrop-filter: blur(6px) saturate(1.15); backdrop-filter: blur(6px) saturate(1.15); background:rgba(255,255,255,.16); }
-  to { -webkit-backdrop-filter: blur(0) saturate(1); backdrop-filter: blur(0) saturate(1); background:rgba(255,255,255,0); }
-}
-/* 不支持 backdrop-filter 的浏览器：面纱只剩白色雾气的淡出，依然顺滑 */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .trip-frost { -webkit-backdrop-filter:none; backdrop-filter:none; }
-}
-@media (prefers-reduced-motion: reduce) { .trip-frost { display:none; animation:none; } }
 
 /* ==== Liquid Glass · 阶段 1：外壳（侧栏 / 底部栏 / 页头）====
    材质变量集中放这里，后续卡片、控件、弹窗阶段直接复用同一套 token。 */
