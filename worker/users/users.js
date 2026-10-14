@@ -16,6 +16,13 @@ export const cleanName = v => String(v || '').trim().slice(0, 20);
 const USERS_KEY = 'users:v1';
 export const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
 
+// User management (deleting accounts) is restricted to this account.
+// PM's token is a real credential — PM is email-bound, so the token is
+// not in the public user list — and the delete endpoint checks the
+// caller's token against it, so the permission can't be borrowed by
+// picking a name from the list.
+export const USER_ADMIN = 'pm';
+
 // First run: build the list from everyone who already voted or was added
 // as a splitwise member, reusing the token from their votes.
 async function buildUsers(env) {
@@ -148,8 +155,31 @@ async function handleMemberAdd(req, env) {
   return j({ ok: true, users: publicUsers(users) });
 }
 
+// Delete a user account (PM only — see USER_ADMIN). Removes the account
+// from the list; votes and expenses already recorded under that name in
+// other features are history and stay as they are.
+async function handleUserDelete(req, env) {
+  let body = {};
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
+  const target = cleanName(body.name);
+  if (!target) return j({ ok: false, error: '先选要删的人' });
+  const users = await getUsers(env);
+  const presented = String(body.token || '');
+  const caller = presented ? users.find(u => u.token === presented) : null;
+  if (!caller || !sameName(caller.name, USER_ADMIN)) return j({ ok: false, error: '只有 PM 能删用户' });
+  if (sameName(target, USER_ADMIN)) return j({ ok: false, error: '不能删 PM 自己' });
+  if (!users.some(u => sameName(u.name, target))) return j({ ok: false, error: '没这个用户' });
+  const out = await updateUsers(env, list => {
+    const i = list.findIndex(u => sameName(u.name, target));
+    if (i >= 0) list.splice(i, 1);
+    return list;
+  });
+  return j({ ok: true, users: publicUsers(out) });
+}
+
 export const routes = {
   'GET /api/users': async (req, env) => j({ ok: true, users: publicUsers(await getUsers(env)) }),
   'POST /api/login': handleLogin,
   'POST /api/member': handleMemberAdd,
+  'POST /api/users/delete': handleUserDelete,
 };
