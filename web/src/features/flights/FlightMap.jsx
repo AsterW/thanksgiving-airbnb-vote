@@ -27,22 +27,50 @@ function arc(a, b, n = 64) {
 }
 
 // 机头朝上的小飞机，转到航向
-const PLANE = color => '<div class="fl-plane"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="' + color + '" stroke="#fff" stroke-width="1.2" stroke-linejoin="round" '
-  + 'd="M12 1.5c.9 0 1.6 1 1.6 2.3v5.7l7.9 4.6v2.2l-7.9-2.3v4.6l2.3 1.7v1.8L12 21l-3.9 1.1v-1.8l2.3-1.7v-4.6l-7.9 2.3v-2.2l7.9-4.6V3.8c0-1.3.7-2.3 1.6-2.3z"/></svg></div>';
+const PLANE = color => '<svg viewBox="0 0 24 24" width="22" height="22"><path fill="' + color + '" stroke="#fff" stroke-width="1.4" stroke-linejoin="round" '
+  + 'd="M12 1.5c.9 0 1.6 1 1.6 2.3v5.7l7.9 4.6v2.2l-7.9-2.3v4.6l2.3 1.7v1.8L12 21l-3.9 1.1v-1.8l2.3-1.7v-4.6l-7.9 2.3v-2.2l7.9-4.6V3.8c0-1.3.7-2.3 1.6-2.3z"/></svg>';
+
+// 航线在当前缩放下的像素折线，带累计长度：飞机按像素距离走，屏幕上匀速，不会忽快忽慢
+function project(m, pts) {
+  const lp = pts.map(ll => m.latLngToLayerPoint(ll));
+  const cum = [0];
+  for (let i = 1; i < lp.length; i++) cum.push(cum[i - 1] + lp[i].distanceTo(lp[i - 1]));
+  return { lp, cum, total: cum[cum.length - 1] };
+}
+// 折线上走了 d 像素的那个点（不取整，子像素位置）
+function pointAt({ lp, cum, total }, d) {
+  d = Math.max(0, Math.min(total, d));
+  let k = 1;
+  while (k < cum.length - 1 && cum[k] < d) k++;
+  const seg = cum[k] - cum[k - 1] || 1, f = (d - cum[k - 1]) / seg;
+  return { x: lp[k - 1].x + (lp[k].x - lp[k - 1].x) * f, y: lp[k - 1].y + (lp[k].y - lp[k - 1].y) * f };
+}
 
 // 动起来：每条航线先顺着飞行方向画出来（到达从外地画进丹佛，离开从丹佛画出去），
 // 然后线上的虚线一直往前流，小飞机沿着航线慢慢绕圈飞。系统开了「减少动态效果」就不动。
 // instant=true 时不重播画线动画：只是数据刷新（别人刚填了航班）时，线和飞机直接到位，
 // 不然每次有人保存，整张图都要闪一遍、飞机全部从头飞。
+//
+// 飞机不用 Leaflet 的 marker：marker 每次移动都会把位置取整到整像素，飞得慢时就一顿一顿地抖。
+// 这里自己放在一个图层里，用不取整的 translate3d 定位；机头方向取前后各 12 像素的连线，再平滑地转过去。
 function animate(m, group, drawn, instant) {
   const timers = [], planes = [];
+  const pane = m.getPane('flPlanes') || m.createPane('flPlanes');
+  pane.style.zIndex = 650; pane.style.pointerEvents = 'none';
+  const reproject = () => planes.forEach(p => { p.path = project(m, p.pts); });
+  const hide = () => { pane.style.visibility = 'hidden'; };
+  const show = () => { reproject(); pane.style.visibility = ''; };
+  m.on('zoomstart', hide); m.on('zoomend viewreset', show);
+
   const spawn = ({ flow, pts, color, minutes }, i) => {
     flow.addTo(group);
-    const plane = L.marker(pts[0], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'pin-wrap', html: PLANE(color), iconSize: [0, 0] }) }).addTo(m);
+    const el = document.createElement('div');
+    el.className = 'fl-plane'; el.innerHTML = PLANE(color);
+    pane.appendChild(el);
     // 飞得慢一点、稳一点：时长按真实飞行时间拉长（2 小时约 13 秒一圈，13 小时封顶 30 秒），
     // 每架错开相位起飞，不会齐刷刷从起点排队出发
     const period = Math.min(30000, Math.max(9000, 6000 + minutes * 45));
-    planes.push({ plane, pts, period, start: performance.now() - (i * 0.37 % 1) * period });
+    planes.push({ el, pts, period, start: performance.now() - (i * 0.37 % 1) * period, path: project(m, pts), ang: null });
   };
   drawn.forEach((d, i) => {
     if (instant) { spawn(d, i); return; }
@@ -59,33 +87,31 @@ function animate(m, group, drawn, instant) {
       spawn(d, i);
     }, delay + 1300));
   });
-  // 航线某一点的经纬度（t 是 0..1 的进度）
-  const at = (pts, t) => {
-    const x = t * (pts.length - 1), k = Math.min(pts.length - 2, Math.floor(x)), f = x - k;
-    const [a, b] = [pts[k], pts[k + 1]];
-    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
-  };
+
   let raf = 0;
   const tick = now => {
     for (const p of planes) {
       // rAF 给的时间可能比加飞机那一刻还早一点，别让进度变成负数
       const t = (Math.max(0, now - p.start) % p.period) / p.period;
-      p.plane.setLatLng(at(p.pts, t));
-      const el = p.plane.getElement();
-      if (!el) continue;
-      // 机头朝向看前方一点点的位置，而不是当前这一小段的端点：转弯时不会一格一格地顿
-      const pa = m.latLngToContainerPoint(at(p.pts, t));
-      const pb = m.latLngToContainerPoint(at(p.pts, Math.min(1, t + 0.012)));
-      const glyph = el.firstChild;
-      if (glyph) glyph.style.transform = 'translate(-50%, -50%) rotate(' + (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI + 90) + 'deg)';
+      const d = t * p.path.total;
+      const pos = pointAt(p.path, d), a = pointAt(p.path, d - 12), b = pointAt(p.path, d + 12);
+      const target = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI + 90;
+      // 平滑转向：每帧只转差值的一部分（走最短的那个方向），回到起点时直接对准
+      if (p.ang === null || t < 0.01) p.ang = target;
+      else p.ang += ((((target - p.ang) % 360) + 540) % 360 - 180) * 0.2;
+      p.el.style.transform = 'translate3d(' + pos.x + 'px,' + pos.y + 'px,0) translate(-50%,-50%) rotate(' + p.ang + 'deg)';
       // 一圈的头尾各淡入淡出一下：飞到终点先淡出、回到起点再淡入，不会「啪」地瞬移回去
-      const fade = Math.min(1, t / 0.07, (1 - t) / 0.07);
-      el.style.opacity = String(Math.max(0, fade));
+      p.el.style.opacity = String(Math.max(0, Math.min(1, t / 0.07, (1 - t) / 0.07)));
     }
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
-  return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); planes.forEach(p => p.plane.remove()); };
+  return () => {
+    timers.forEach(clearTimeout); cancelAnimationFrame(raf);
+    planes.forEach(p => p.el.remove());
+    m.off('zoomstart', hide); m.off('zoomend viewreset', show);
+    pane.style.visibility = '';
+  };
 }
 
 // 大家的航线：到达 / 离开分开看。同一条航线的人合成一条线，线越粗人越多

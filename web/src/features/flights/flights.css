@@ -7,6 +7,7 @@
 .ap-pin.hub { background:#e11d48; font-size:12px; padding:3px 8px; box-shadow:0 0 0 3px rgba(225,29,72,.25), 0 2px 6px rgba(15,23,42,.35); }
 .fl-flow { stroke-dasharray: 2 14; stroke-linecap: round; animation: fl-flow .9s linear infinite; }
 @keyframes fl-flow { from { stroke-dashoffset: 16; } to { stroke-dashoffset: 0; } } /* offset 变小 = 虚线往线的终点走 */
-.fl-plane { position:absolute; pointer-events:none; filter: drop-shadow(0 1px 2px rgba(15,23,42,.45)); }
+/* 飞机由 JS 用 translate3d 放到子像素位置；不加 filter（每帧重绘阴影会让移动的元素发虚发抖） */
+.fl-plane { position:absolute; left:0; top:0; pointer-events:none; will-change: transform, opacity; }
 .fl-plane svg { display:block; }
 @media (prefers-reduced-motion: reduce) { .fl-flow { animation:none; } }
