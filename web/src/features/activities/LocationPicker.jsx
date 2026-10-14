@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
+import { addSatellite } from '../../lib/tiles.js';
 
 // Pick a card's location on a map: search a place name (OpenStreetMap's
 // Nominatim, the same source the worker uses for listing zones), click
@@ -55,9 +56,7 @@ export default function LocationPicker({ initial, onSave, onClose }) {
 
   useEffect(() => {
     const m = L.map(box.current, { scrollWheelZoom: true, zoomSnap: 0.25 });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(m);
+    addSatellite(m);
     map.current = m;
     if (initial && initial.lat != null) m.setView([initial.lat, initial.lng], 13);
     else m.setView(DENVER, 9);

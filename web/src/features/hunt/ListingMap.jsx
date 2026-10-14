@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
+import { addLightGray } from '../../lib/tiles.js';
 import { esc, statsLine } from '../../lib/format.js';
 import { effPrice, isBooked } from './price.js';
 
@@ -33,10 +34,7 @@ export default function ListingMap({ items, T, token, fitKey, visible, hotId, on
   useEffect(() => {
     if (!visible || map.current) return;
     const m = L.map(box.current, { scrollWheelZoom: false, zoomControl: true, attributionControl: true, zoomSnap: 0.25 });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, className: 'osm-tiles',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(m);
+    addLightGray(m);
     m.setView([39.2, -105.3], 7); // 科罗拉多中部，等房源坐标来了再缩放
     m.on('click', () => m.scrollWheelZoom.enable()); // 点一下地图之后才允许滚轮缩放，免得滚页面时误缩放
     m.on('mouseout', () => m.scrollWheelZoom.disable());
