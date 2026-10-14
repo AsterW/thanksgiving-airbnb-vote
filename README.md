@@ -14,6 +14,9 @@ works for any group picking a place together.
 - Paste any Airbnb listing link → title, photo, bedrooms/beds/baths, capacity,
   and rating are auto-filled
 - One-tap voting with voter names, toggle to unvote
+- Separate tabs (and separate lists) for each leg of the trip — Nov 25–26 for
+  9 people, Nov 26–29 for 14; "Go to Airbnb" opens each listing with that
+  tab's dates and guest count
 - Sort by votes or price, filter by area
 - Anyone with the link can remove a listing (with a confirm dialog)
 - Manual-add fallback when auto-scrape fails
@@ -26,9 +29,11 @@ works for any group picking a place together.
   accounts.
 - **Backend** (`worker.js`): a Cloudflare Worker serving a small JSON API:
   `GET /api/state`, `POST /api/add`, `/api/add-manual`, `/api/vote`,
-  `/api/enrich`, `/api/remove`.
-- **Storage**: Cloudflare KV — a single key (`state:v1`) holding the listings
-  array as JSON.
+  `/api/enrich`, `/api/remove`. Every call names its tab (`?trip=` on the GET,
+  `trip` in POST bodies: `nov25` or `nov26`); calls without one go to `nov26`.
+- **Storage**: Cloudflare KV — one key per trip tab (`state:nov25:v1` for the
+  9-person leg, the original `state:v1` for the 14-person leg), each holding
+  that tab's listings array as JSON.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader
