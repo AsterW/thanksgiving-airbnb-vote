@@ -7,14 +7,21 @@ import { readDoc, transact } from '../lib/store.js';
 import { TRIPS } from '../config/trips.js';
 import { getState, updateState } from '../listings/state.js';
 
-export const cleanName = v => String(v || '').trim().slice(0, 20);
+// Names are account identity, so they are normalized hard: invisible
+// characters (zero-width etc.) are stripped and every run of whitespace
+// (spaces, tabs, full-width spaces) collapses to one space. Without this,
+// "PM fake", "PM  fake" and "PM fake " would register as different
+// accounts that merely LOOK the same.
+const squashName = v => String(v ?? '').replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\s+/g, ' ');
+export const cleanName = v => squashName(v).trim().slice(0, 20);
+export const nameKey = v => squashName(v).trim().toLowerCase();
 
 // One global user list shared by both trips, so people pick their name
 // from a dropdown instead of typing it again on every device. Each user
 // owns the vote token their votes are recorded under; picking an existing
 // user on a new device adopts that token, so their votes show as theirs.
 const USERS_KEY = 'users:v1';
-export const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+export const sameName = (a, b) => nameKey(a) === nameKey(b);
 
 // User management (deleting accounts) is restricted to this account.
 // PM's token is a real credential — PM is email-bound, so the token is
