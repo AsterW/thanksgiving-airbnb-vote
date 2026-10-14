@@ -1,4 +1,5 @@
-// GET /api/weather?trip=…: each weather place of the trip, one entry per day.
+// GET /api/weather?trip=…&lat=…&lng=…: the weather at one place for each day of
+// the trip (the page asks for the region the listings are filtered to).
 // Cached in KV for everyone: history never changes (kept for good), the
 // forecast is refreshed at most every 3 hours. So Open-Meteo sees a few calls
 // a day no matter how many people open the page.
@@ -28,9 +29,13 @@ async function placeWeather(env, place, days) {
 
 async function handleWeather(req, env, url) {
   const trip = tripOf(url.searchParams.get('trip'));
-  const days = stayDays(trip.checkIn, trip.checkOut);
-  const rows = await Promise.all((trip.weatherAt || []).map(async p => ({ place: p.name, days: await placeWeather(env, p, days) })));
-  return j({ ok: true, rows });
+  const q = url.searchParams;
+  const lat = q.has('lat') ? Number(q.get('lat')) : NaN, lng = q.has('lng') ? Number(q.get('lng')) : NaN; // Number(null) would be 0
+  if (!isFinite(lat) || !isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return j({ ok: false, error: 'lat/lng required' }, 400);
+  // Round to 0.1° (~10 km): weather doesn't change over that, and nearby
+  // requests (a region's center moves a little as listings are added) share the cache.
+  const place = { lat: Math.round(lat * 10) / 10, lng: Math.round(lng * 10) / 10 };
+  return j({ ok: true, days: await placeWeather(env, place, stayDays(trip.checkIn, trip.checkOut)) });
 }
 
 export const routes = { 'GET /api/weather': handleWeather };
