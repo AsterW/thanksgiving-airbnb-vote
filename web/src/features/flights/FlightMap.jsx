@@ -31,12 +31,23 @@ const PLANE = color => '<div class="fl-plane"><svg viewBox="0 0 24 24" width="22
   + 'd="M12 1.5c.9 0 1.6 1 1.6 2.3v5.7l7.9 4.6v2.2l-7.9-2.3v4.6l2.3 1.7v1.8L12 21l-3.9 1.1v-1.8l2.3-1.7v-4.6l-7.9 2.3v-2.2l7.9-4.6V3.8c0-1.3.7-2.3 1.6-2.3z"/></svg></div>';
 
 // 动起来：每条航线先顺着飞行方向画出来（到达从外地画进丹佛，离开从丹佛画出去），
-// 然后线上的虚线一直往前流，小飞机沿着航线一圈圈地飞。系统开了「减少动态效果」就不动。
-function animate(m, group, drawn) {
+// 然后线上的虚线一直往前流，小飞机沿着航线慢慢绕圈飞。系统开了「减少动态效果」就不动。
+// instant=true 时不重播画线动画：只是数据刷新（别人刚填了航班）时，线和飞机直接到位，
+// 不然每次有人保存，整张图都要闪一遍、飞机全部从头飞。
+function animate(m, group, drawn, instant) {
   const timers = [], planes = [];
-  drawn.forEach(({ line, flow, pts, color, minutes }, i) => {
-    const el = line.getElement();
-    if (!el) return;
+  const spawn = ({ flow, pts, color, minutes }, i) => {
+    flow.addTo(group);
+    const plane = L.marker(pts[0], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'pin-wrap', html: PLANE(color), iconSize: [0, 0] }) }).addTo(m);
+    // 飞得慢一点、稳一点：时长按真实飞行时间拉长（2 小时约 13 秒一圈，13 小时封顶 30 秒），
+    // 每架错开相位起飞，不会齐刷刷从起点排队出发
+    const period = Math.min(30000, Math.max(9000, 6000 + minutes * 45));
+    planes.push({ plane, pts, period, start: performance.now() - (i * 0.37 % 1) * period });
+  };
+  drawn.forEach((d, i) => {
+    if (instant) { spawn(d, i); return; }
+    const el = d.line.getElement();
+    if (!el) { spawn(d, i); return; }
     const len = el.getTotalLength();
     const delay = i * 250;
     el.style.strokeDasharray = len; el.style.strokeDashoffset = len;
@@ -45,23 +56,31 @@ function animate(m, group, drawn) {
     el.style.strokeDashoffset = 0;
     timers.push(setTimeout(() => {
       el.style.transition = ''; el.style.strokeDasharray = ''; el.style.strokeDashoffset = '';
-      flow.addTo(group);
-      const plane = L.marker(pts[0], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'pin-wrap', html: PLANE(color), iconSize: [0, 0] }) }).addTo(m);
-      // 长途飞得慢一点：2 小时的航班一圈约 3.5 秒，13 小时的约 9 秒
-      planes.push({ plane, pts, period: Math.min(9000, Math.max(3000, 2000 + minutes * 9)), start: performance.now() });
+      spawn(d, i);
     }, delay + 1300));
   });
+  // 航线某一点的经纬度（t 是 0..1 的进度）
+  const at = (pts, t) => {
+    const x = t * (pts.length - 1), k = Math.min(pts.length - 2, Math.floor(x)), f = x - k;
+    const [a, b] = [pts[k], pts[k + 1]];
+    return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+  };
   let raf = 0;
   const tick = now => {
     for (const p of planes) {
       // rAF 给的时间可能比加飞机那一刻还早一点，别让进度变成负数
       const t = (Math.max(0, now - p.start) % p.period) / p.period;
-      const x = t * (p.pts.length - 1), k = Math.min(p.pts.length - 2, Math.floor(x)), f = x - k;
-      const [a, b] = [p.pts[k], p.pts[k + 1]];
-      p.plane.setLatLng([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
-      const pa = m.latLngToContainerPoint(a), pb = m.latLngToContainerPoint(b);
-      const svg = p.plane.getElement()?.firstChild;
-      if (svg) svg.style.transform = 'translate(-50%, -50%) rotate(' + (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI + 90) + 'deg)';
+      p.plane.setLatLng(at(p.pts, t));
+      const el = p.plane.getElement();
+      if (!el) continue;
+      // 机头朝向看前方一点点的位置，而不是当前这一小段的端点：转弯时不会一格一格地顿
+      const pa = m.latLngToContainerPoint(at(p.pts, t));
+      const pb = m.latLngToContainerPoint(at(p.pts, Math.min(1, t + 0.012)));
+      const glyph = el.firstChild;
+      if (glyph) glyph.style.transform = 'translate(-50%, -50%) rotate(' + (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI + 90) + 'deg)';
+      // 一圈的头尾各淡入淡出一下：飞到终点先淡出、回到起点再淡入，不会「啪」地瞬移回去
+      const fade = Math.min(1, t / 0.07, (1 - t) / 0.07);
+      el.style.opacity = String(Math.max(0, fade));
     }
     raf = requestAnimationFrame(tick);
   };
@@ -72,6 +91,7 @@ function animate(m, group, drawn) {
 // 大家的航线：到达 / 离开分开看。同一条航线的人合成一条线，线越粗人越多
 export default function FlightMap({ people, mode }) {
   const box = useRef(null), map = useRef(null), layer = useRef(null);
+  const shownMode = useRef(null); // 画线动画只在第一次看这个模式时播，之后的数据刷新直接到位
 
   useEffect(() => {
     const m = L.map(box.current, { scrollWheelZoom: false, worldCopyJump: true, zoomSnap: 0.25 });
@@ -131,7 +151,9 @@ export default function FlightMap({ people, mode }) {
     m.invalidateSize();
     if (bounds.length) m.fitBounds(bounds, { padding: [30, 30], maxZoom: 6, animate: false });
     if (reduceMotion) { drawn.forEach(d => d.flow.addTo(layer.current)); return; }
-    return animate(m, layer.current, drawn);
+    const instant = shownMode.current === mode;
+    shownMode.current = mode;
+    return animate(m, layer.current, drawn, instant);
   }, [people, mode]);
 
   return <div ref={box} className="flight-map"></div>;
