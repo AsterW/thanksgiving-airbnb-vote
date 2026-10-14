@@ -24,14 +24,17 @@ const BANNERS = {
 };
 const bannerOf = area => BANNERS[area] || 'linear-gradient(135deg,#64748b,#334155)';
 
-// Most votes first; ties keep the curated seed order.
+// 点赞数：多的在前；同票保持原来的顺序（种子卡的编辑顺序）。
+// 加入时间：新的在前；种子卡没有 createdAt（算 0，最早），同时间的保持原顺序。
 const byVotes = (a, b) => (b.votes || []).length - (a.votes || []).length;
+const byAdded = (a, b) => (b.createdAt || 0) - (a.createdAt || 0);
 
 export default function ActivitiesView({ active }) {
   const { token, ensureName } = useSession();
   const toast = useToast();
   const [activities, setActivities] = useState([]);
   const [area, setArea] = useState('all');
+  const [sortBy, setSortBy] = useState('votes');
   const [mapOpen, setMapOpen] = useState(false);
   const [pickerFor, setPickerFor] = useState(null);
   const [popId, setPopId] = useState(null);
@@ -50,8 +53,8 @@ export default function ActivitiesView({ active }) {
 
   const groups = useMemo(() => areas
     .filter(x => area === 'all' || x === area)
-    .map(x => ({ area: x, items: activities.filter(a => a.area === x).sort(byVotes) }))
-    .filter(g => g.items.length), [activities, areas, area]);
+    .map(x => ({ area: x, items: activities.filter(a => a.area === x).sort(sortBy === 'added' ? byAdded : byVotes) }))
+    .filter(g => g.items.length), [activities, areas, area, sortBy]);
 
   // 地图和下面列表看同一批活动：选了某个区域组，地图就只钉那一组并重新取景
   //（之前地图永远收到全量活动，和分组筛选脱节）
@@ -123,6 +126,11 @@ export default function ActivitiesView({ active }) {
           className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (mapOpen ? 'bg-emerald-600 text-white border-emerald-600' : 'glass-pill text-slate-600')}>
           🗺️ 活动地图
         </button>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="排序"
+          className="glass-pill rounded-full px-4 py-1.5 text-sm text-slate-600 ml-auto">
+          <option value="votes">按点赞数</option>
+          <option value="added">按加入时间（最新在前）</option>
+        </select>
       </div>
       {mapOpen && <ActivitiesMap items={mapItems} token={token} visible={mapOpen} onFocus={focusCard} />}
       {groups.map(g => (
