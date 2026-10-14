@@ -39,6 +39,7 @@
 | `web/src/session/` | 登录：从用户列表选名字，名字和 token 存在 `localStorage`（`vn` / `vt`） |
 | `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅、照片轮播 `Carousel`（选房和餐厅卡片都用） |
 | `web/src/lib/` | 共用：`api()`、行程和页面配置（`TRIPS`、`VIEWS`）、URL hash 路由（`#nov26/split`） |
+| `web/public/` | 原样拷进 `dist/`：`manifest.webmanifest` 和图标（`icon-192/512.png`、`apple-touch-icon.png`），配合 `web/index.html` 里的苹果标签，网站能「添加到主屏幕」。从主屏幕打开没有浏览器地址栏——iPhone 上 Safari / Chrome 都不让网页自己隐藏地址栏（全屏接口只给视频），这是横屏玩游戏唯一的真全屏办法；躲技能在 iPhone 浏览器里会提示这一点 |
 
 - 投票后先在原位更新，700ms 后再按新票数重排，卡片滑到新位置，投的那间在屏幕上不动
 - 页面每次加载会补抓缺照片/评分/位置的房源，并让后端刷新过期的实时价

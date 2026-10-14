@@ -14,6 +14,11 @@ import './dodge.css';
 const secs = ticks => (ticks / HZ).toFixed(1);
 const isTouch = () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 const PORTRAIT = '(orientation: portrait)';
+// iPhone 上的 Safari / Chrome 都不让网页隐藏地址栏（全屏接口只给视频用），横屏时会占掉一截屏幕。
+// 从主屏幕图标打开（添加到主屏幕）就没有地址栏，所以在浏览器里打开时提示一下。
+const IOS = typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+const fromHomeScreen = () => navigator.standalone === true || window.matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+const HOME_TIP = '📲 iPhone 想去掉地址栏：点「分享」→「添加到主屏幕」，以后从主屏幕的图标打开就是全屏';
 
 async function enterFull() {
   try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }); } catch (e) { /* not allowed here (iPhone) */ }
@@ -77,11 +82,22 @@ export default function DodgeView({ active }) {
     return () => document.removeEventListener('visibilitychange', f);
   }, [playing]);
   const full = touch && !!run;
+  // while a run is on screen: no scrolling, and no text selection / long-press copy menu
+  // (a stray long-press on iPhone used to select text and pop up 拷贝)
   useEffect(() => {
     if (!full) return;
+    const stop = e => e.preventDefault();
     document.documentElement.classList.add('dg-lock');
-    return () => document.documentElement.classList.remove('dg-lock');
+    window.getSelection?.()?.removeAllRanges();
+    document.addEventListener('selectstart', stop);
+    document.addEventListener('contextmenu', stop);
+    return () => {
+      document.documentElement.classList.remove('dg-lock');
+      document.removeEventListener('selectstart', stop);
+      document.removeEventListener('contextmenu', stop);
+    };
   }, [full]);
+  const [homeTip] = useState(() => touch && IOS && !fromHomeScreen());
 
   function start() {
     if (touch) enterFull(); // must happen right on the tap
@@ -129,7 +145,8 @@ export default function DodgeView({ active }) {
   const pause = paused && !result && (
     <div className="dg-over">
       {touch && portrait
-        ? <><div className="text-4xl">📱↻</div><div className="text-lg font-bold mt-2">把手机横过来</div><div className="text-sm text-slate-300 mt-1">横屏才能玩，转过来就能继续</div></>
+        ? <><div className="text-4xl">📱↻</div><div className="text-lg font-bold mt-2">把手机横过来</div><div className="text-sm text-slate-300 mt-1">横屏才能玩，转过来就能继续</div>
+            {homeTip && <div className="dg-tip mt-3">{HOME_TIP}</div>}</>
         : <><div className="text-lg font-bold">暂停了</div><button onClick={() => setPaused(false)} className="dg-btn bg-amber-400 text-slate-900 mt-3">继续</button></>}
       <button onClick={quit} className="dg-btn bg-white/15 text-white mt-2">不玩了</button>
     </div>
@@ -157,6 +174,7 @@ export default function DodgeView({ active }) {
                 <li>地上先出现提示（线、圈、框），然后技能才放出来</li>
               </ul>
               {mine && <p className="mt-3 text-amber-200 font-bold">你的最好：{secs(mine.ticks)} 秒</p>}
+              {homeTip && <p className="dg-tip mt-3">{HOME_TIP}</p>}
               <button onClick={start} className="dg-btn bg-amber-400 text-slate-900 mt-4 text-lg">开始</button>
               {msg && <p className="mt-2 text-sm text-amber-200">{msg}</p>}
             </div>

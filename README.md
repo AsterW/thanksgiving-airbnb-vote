@@ -51,6 +51,11 @@ works for any group picking a place together.
 - **Frontend** (`web/`): React + Vite + Tailwind, one folder per feature
   (`web/src/features/hunt`, `food`, `split`, `games`, `blackjack`, `ddz`, `guandan`, `mahjong`, `dodge`). People log in by picking
   their name from the group's user list; votes are tied to that user's token.
+- **Add to home screen** (`web/public/manifest.webmanifest`, the icons, the
+  Apple tags in `web/index.html`): opened from a home-screen icon, the site
+  runs without the browser bar. On iPhone that is the only way to get a true
+  full screen (Safari and Chrome there can't hide their bar for a page), so
+  the dodge game shows a tip about it when played in the browser.
 - **Backend** (`worker/`): a Cloudflare Worker, one folder per feature, each
   exporting its own route table that `worker/index.js` merges. A small JSON API:
   `GET /api/state`, `POST /api/add`, `/api/add-manual`, `/api/vote`,
