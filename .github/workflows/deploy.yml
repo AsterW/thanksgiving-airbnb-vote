@@ -6,7 +6,29 @@ on:
   workflow_dispatch:  # also allow manual runs from the Actions tab
 
 jobs:
+  # Gate: the worker must pass the behavioral suite (malformed-input fuzz
+  # + concurrency storms, run against a local wrangler dev instance)
+  # before anything deploys. See tests/robustness/.
+  robustness:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Robustness suite
+        run: npm run test:robustness
+
   deploy:
+    needs: robustness
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
