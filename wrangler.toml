@@ -38,6 +38,10 @@ new_sqlite_classes = ["DdzHall"]
 name = "GD_HALL"
 class_name = "GuandanHall"
 
+[[durable_objects.bindings]]
+name = "MJ_HALL"
+class_name = "MahjongHall"
+
 [[migrations]]
 tag = "v3"
-new_sqlite_classes = ["GuandanHall"]
+new_sqlite_classes = ["GuandanHall", "MahjongHall"]

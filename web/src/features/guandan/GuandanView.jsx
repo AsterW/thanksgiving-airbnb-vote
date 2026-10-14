@@ -99,7 +99,8 @@ export default function GuandanView({ active }) {
       ? <button onClick={() => send({ type: 'auto', on: false })} className="gt-btn bg-fuchsia-500 text-white">取消托管</button>
       : t.phase === 'playing' || t.phase === 'tribute' ? <button onClick={() => send({ type: 'auto', on: true })} className="gt-btn bg-white/15 text-white">托管</button> : null;
     if (t.phase === 'waiting') return <>{deal('开始游戏')}<span className="text-sm text-emerald-100">空位由机器人补上，对面是队友</span>{stand}</>;
-    if (t.phase === 'result') return stand;
+    // 再来一局 is in the result banner; full screen also puts it here, where it's always on screen
+    if (t.phase === 'result') return full ? <>{deal('🔁 再来一局')}{stand}</> : stand;
     if (t.phase === 'tribute') {
       if (!t.mustReturn) return <><span className="text-sm text-emerald-100">等还贡…</span>{auto}{stand}</>;
       return <><button onClick={giveBack} disabled={sel.size !== 1} className="gt-btn bg-amber-400 text-slate-900">还贡</button>

@@ -58,7 +58,8 @@ export default function DdzView({ active }) {
       ? <button onClick={() => send({ type: 'auto', on: false })} className="gt-btn bg-fuchsia-500 text-white">取消托管</button>
       : t.phase === 'playing' || t.phase === 'bidding' ? <button onClick={() => send({ type: 'auto', on: true })} className="gt-btn bg-white/15 text-white">托管</button> : null;
     if (t.phase === 'waiting') return <>{deal('开始游戏')}<span className="text-sm text-emerald-100">空位由机器人补上</span>{stand}</>;
-    if (t.phase === 'result') return stand; // 再来一局 is in the result banner
+    // 再来一局 is in the result banner; full screen also puts it here, where it's always on screen
+    if (t.phase === 'result') return full ? <>{deal('🔁 再来一局')}{stand}</> : stand;
     if (!myTurn || mySeat.auto) return <><span className="text-sm text-emerald-100">{t.phase === 'bidding' ? '等别人叫地主…' : '等别人出牌…'}</span>{auto}{stand}</>;
     if (t.phase === 'bidding') {
       const call = t.bidStage === 'call';
