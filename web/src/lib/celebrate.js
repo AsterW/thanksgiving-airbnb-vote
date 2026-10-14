@@ -1,7 +1,8 @@
-import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
-import { reduceMotion } from '../../lib/motion.js';
+import { confetti, CONFETTI_COLORS } from './confetti.js';
+import { reduceMotion } from './motion.js';
 
-// 投票成功的庆祝，像收到 offer 一样：投票按钮炸开彩带和爱心 + 两侧礼炮
+// 所有投票动作共用的庆祝（房源 / 餐厅 / 活动都调这个，和 Airbnb 列表一致）：
+// 投票按钮炸开彩带和爱心 + 两侧礼炮，像收到 offer 一样
 // （顶部横幅和按钮的弹跳 vote-pop 由调用方管：类名得走 React，直接改 DOM 会被下一次渲染覆盖）
 let heartShape = null;
 export function celebrateVote(btn) {

@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
+import { celebrateVote } from '../../lib/celebrate.js';
+import { reduceMotion } from '../../lib/motion.js';
 import ActivityCard from './ActivityCard.jsx';
 import AddActivityForm from './AddActivityForm.jsx';
 import ActivitiesMap from './ActivitiesMap.jsx';
@@ -29,6 +31,8 @@ export default function ActivitiesView({ active }) {
   const [area, setArea] = useState('all');
   const [mapOpen, setMapOpen] = useState(false);
   const [pickerFor, setPickerFor] = useState(null);
+  const [popId, setPopId] = useState(null);
+  const popTimer = useRef(null);
 
   const load = useCallback(async () => {
     try { const r = await api('/api/activities'); if (r.ok) setActivities(r.activities || []); } catch (e) {}
@@ -46,7 +50,9 @@ export default function ActivitiesView({ active }) {
     .map(x => ({ area: x, items: activities.filter(a => a.area === x).sort(byVotes) }))
     .filter(g => g.items.length), [activities, areas, area]);
 
-  async function vote(a) {
+  // 和 Airbnb 房源投票完全一致：成功投出 → 🎉 toast + 按钮弹跳 + 彩带庆祝；
+  // 取消投票安安静静，不庆祝。
+  async function vote(a, btn) {
     if ((a.votes || []).some(v => v.token === token)) {
       const r = await api('/api/activity-vote', 'POST', { id: a.id, token, name: null });
       if (r.ok) setActivities(prev => prev.map(x => x.id === a.id ? { ...x, votes: r.votes } : x));
@@ -57,6 +63,12 @@ export default function ActivitiesView({ active }) {
       if (!r.ok) return;
       setActivities(prev => prev.map(x => x.id === a.id ? { ...x, votes: r.votes } : x));
       toast('🎉 投票成功！给「' + a.title + '」+1');
+      if (!reduceMotion) {
+        setPopId(a.id);
+        clearTimeout(popTimer.current);
+        popTimer.current = setTimeout(() => setPopId(null), 450);
+      }
+      celebrateVote(btn);
     });
   }
 
@@ -110,7 +122,7 @@ export default function ActivitiesView({ active }) {
         <section key={g.area} className="mb-8">
           <h2 className="font-bold text-lg mb-3">{g.area}</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {g.items.map(a => <ActivityCard key={a.id} a={a} token={token} banner={bannerOf(a.area)} onVote={vote} onRemove={remove} onSetPlace={setPickerFor} />)}
+            {g.items.map(a => <ActivityCard key={a.id} a={a} token={token} banner={bannerOf(a.area)} pop={popId === a.id} onVote={vote} onRemove={remove} onSetPlace={setPickerFor} />)}
           </div>
         </section>
       ))}

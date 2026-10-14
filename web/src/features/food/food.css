@@ -14,3 +14,7 @@
 .food-flash { animation: food-flash 1.4s ease; }
 @keyframes food-flash { 0%, 100% { box-shadow:0 1px 3px rgba(0,0,0,.1); } 30% { box-shadow:0 0 0 4px #818cf8, 0 10px 25px -5px rgba(79,70,229,.35); } }
 @media (prefers-reduced-motion: reduce) { .food-flash { animation:none; } .fpin { transition:none; } }
+
+/* Vote celebration: the button pop, same as the Airbnb list (hunt.css). */
+@keyframes vote-pop { 0% { transform:scale(1); } 35% { transform:scale(1.12); } 100% { transform:scale(1); } }
+.vote-pop { animation: vote-pop .45s ease; }
