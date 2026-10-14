@@ -51,6 +51,14 @@ async function fetchHtml(url, ms, ua) {
   finally { clearTimeout(t); }
 }
 
+// A share image only counts if it's an absolute http(s) URL — og:image
+// is occasionally a relative path or a data URI, neither of which a
+// card banner can use.
+function cleanImg(u) {
+  const v = decode(u || '').slice(0, 1000);
+  return /^https?:\/\//i.test(v) ? v : '';
+}
+
 function metaInfo(html) {
   let title = decode(getMeta(html, 'property', 'og:title') || getMeta(html, 'name', 'twitter:title'));
   if (!title) {
@@ -59,7 +67,10 @@ function metaInfo(html) {
   }
   const blurb = decode(getMeta(html, 'property', 'og:description')
     || getMeta(html, 'name', 'description') || getMeta(html, 'name', 'twitter:description'));
-  return { title, blurb };
+  // The page's own share picture (og:image is the one every site sets
+  // for link previews) — the card banner uses it instead of a bare emoji.
+  const img = cleanImg(getMeta(html, 'property', 'og:image') || getMeta(html, 'name', 'twitter:image'));
+  return { title, blurb, img };
 }
 
 // One string field out of a JSON-ish blob. The blob is not strict JSON
@@ -82,12 +93,21 @@ function stateField(seg, key) {
 // being viewed lives; fall back to anywhere in the state blob.
 function stateInfo(html) {
   const at = html.indexOf('__INITIAL_STATE__');
-  if (at < 0) return { title: '', blurb: '' };
+  if (at < 0) return { title: '', blurb: '', img: '' };
   const seg = html.slice(at, at + 400000);
   const nd = seg.indexOf('noteDetailMap');
   const region = nd >= 0 ? seg.slice(nd, nd + 100000) : seg;
+  // The note's first photo: the state carries an imageList per note;
+  // look for its urlDefault/url entries after that marker instead of
+  // grabbing some unrelated "url" elsewhere in the blob.
+  let img = '';
+  const il = region.indexOf('imageList');
+  if (il >= 0) {
+    const pics = region.slice(il, il + 20000);
+    img = cleanImg(stateField(pics, 'urlDefault') || stateField(pics, 'url'));
+  }
   return { title: stateField(region, 'title') || stateField(seg, 'title'),
-           blurb: stateField(region, 'desc') || stateField(seg, 'desc') };
+           blurb: stateField(region, 'desc') || stateField(seg, 'desc'), img };
 }
 
 const usable = title => !!title && !GENERIC_TITLES.has(title) && !WALL_RE.test(title);
@@ -121,13 +141,16 @@ async function redditInfo(url) {
   const data = await fetchJson('https://www.reddit.com/oembed?url=' + encodeURIComponent(clean), 10000);
   if (!data || !data.title) return null;
   const bits = ['Reddit' + (sub ? ' r/' + sub : ''), data.author_name ? '作者 u/' + data.author_name : ''];
-  return { title: decode(String(data.title)), blurb: decode(bits.filter(Boolean).join(' · ')) };
+  return { title: decode(String(data.title)), blurb: decode(bits.filter(Boolean).join(' · ')),
+           img: cleanImg(data.thumbnail_url) };
 }
 
-// { ok, title, blurb } — ok:false when the page could not be read at all
-// (blocked, not HTML, timed out). A generic site slogan never counts as
-// a title; when a fetch lands on a login wall or finds nothing, retry
-// once with a mobile UA and look in the embedded page state as well.
+// { ok, title, blurb, img } — ok:false when the page could not be read
+// at all (blocked, not HTML, timed out). A generic site slogan never
+// counts as a title; when a fetch lands on a login wall or finds
+// nothing, retry once with a mobile UA and look in the embedded page
+// state as well. img is the page's share picture (or '' when the page
+// offers none) for the card banner.
 export async function fetchLinkInfo(url) {
   // Reddit gets its own route (see redditInfo); the generic scrape below
   // only ever sees its bot wall.
@@ -135,16 +158,17 @@ export async function fetchLinkInfo(url) {
   try { host = new URL(url).hostname; } catch (e) { /* unusable URL: caller validates */ }
   if (/(^|\.)reddit\.com$/.test(host) || /(^|\.)redd\.it$/.test(host)) {
     const ri = await redditInfo(url);
-    if (ri && usable(ri.title)) return { ok: true, title: ri.title.slice(0, 120), blurb: ri.blurb.slice(0, 220) };
+    if (ri && usable(ri.title)) return { ok: true, title: ri.title.slice(0, 120), blurb: ri.blurb.slice(0, 220), img: ri.img || '' };
   }
-  let title = '', blurb = '', read = false;
+  let title = '', blurb = '', img = '', read = false;
   const first = await fetchHtml(url, 10000, SCRAPE_UA);
   if (first) {
     read = true;
-    ({ title, blurb } = metaInfo(first.html));
+    ({ title, blurb, img } = metaInfo(first.html));
     const st = stateInfo(first.html);
     if (!usable(title) && st.title) title = st.title;
     if (!blurb && st.blurb) blurb = st.blurb;
+    if (!img && st.img) img = st.img;
   }
   // Retry with a mobile UA when the desktop fetch failed outright, got
   // bounced to a login wall, or produced nothing usable — app-walled
@@ -156,6 +180,7 @@ export async function fetchLinkInfo(url) {
       read = true;
       const mt = metaInfo(mob.html);
       const ms = stateInfo(mob.html);
+      if (!img) img = ms.img || mt.img;
       if (usable(ms.title) || usable(mt.title)) {
         title = usable(ms.title) ? ms.title : mt.title;
         blurb = ms.blurb || mt.blurb || blurb;
@@ -164,7 +189,7 @@ export async function fetchLinkInfo(url) {
       }
     }
   }
-  if (!read) return { ok: false, title: '', blurb: '' };
+  if (!read) return { ok: false, title: '', blurb: '', img: '' };
   if (!usable(title)) title = '';
-  return { ok: true, title: title.slice(0, 120), blurb: blurb.slice(0, 220) };
+  return { ok: true, title: title.slice(0, 120), blurb: blurb.slice(0, 220), img };
 }

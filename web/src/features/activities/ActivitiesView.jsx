@@ -12,12 +12,15 @@ import { AREA_ORDER } from './areas.js';
 import './activities.css';
 
 // Banner gradient per area, so the three bases read as three colours.
+// Member-added cards get a violet one of their own — they used to fall
+// through to the grey default and looked like placeholders.
 const BANNERS = {
   'Denver 市区': 'linear-gradient(135deg,#f59e0b,#ef4444)',
   'Denver 周边': 'linear-gradient(135deg,#0ea5e9,#6366f1)',
   '落基山 · Estes Park': 'linear-gradient(135deg,#059669,#0d9488)',
   'Colorado Springs · 南下顺路': 'linear-gradient(135deg,#db2777,#f59e0b)',
   '大沙丘区域': 'linear-gradient(135deg,#d97706,#92400e)',
+  '大家添加的': 'linear-gradient(135deg,#8b5cf6,#ec4899)',
 };
 const bannerOf = area => BANNERS[area] || 'linear-gradient(135deg,#64748b,#334155)';
 
