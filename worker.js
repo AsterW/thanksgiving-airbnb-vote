@@ -49,6 +49,23 @@ function getMeta(html, prop) {
        || html.match(new RegExp('<meta[^>]+content=["\']([^"\']+)["\'][^>]*property=["\']' + prop + '["\']', 'i'));
   return m ? m[1] : '';
 }
+// Listing photos, in Airbnb's gallery order. Skips platform icons and user avatars.
+const MAX_IMAGES = 10;
+function collectImages(urls, cover) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of [cover, ...urls]) {
+    if (!raw || !/^https:\/\/a0\.muscache\.com\/im\/pictures\//.test(raw)) continue;
+    if (/AirbnbPlatformAssets|airbnb-platform-assets|\/user\//i.test(raw)) continue;
+    const base = raw.split('?')[0];
+    if (seen.has(base)) continue;
+    seen.add(base);
+    out.push(base + '?im_w=720');
+    if (out.length >= MAX_IMAGES) break;
+  }
+  return out;
+}
+
 function numRe(html, re) { const m = html.match(re); return m ? parseFloat(m[1]) : null; }
 
 const SCRAPE_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
@@ -97,7 +114,8 @@ function parseDirect(html) {
   const beds = numRe(html, /(\d+)\s*beds(?![a-z])/i);
   const guests = numRe(html, /(\d+)\s*guests/i);
   if (!title && !image && bedrooms == null) return null;
-  return { ok: true, title, image, bedrooms, bathrooms, beds, guests, rating, reviews: ld.reviews };
+  const images = collectImages([...html.matchAll(/"baseUrl":"(https:\/\/a0\.muscache\.com\/[^"]+)"/g)].map(m => m[1]), image);
+  return { ok: true, title, image, images, bedrooms, bathrooms, beds, guests, rating, reviews: ld.reviews };
 }
 
 // Fallback: Airbnb often blocks datacenter IPs, so read the page through
@@ -112,8 +130,9 @@ async function parseViaReader(url) {
   const imgM = md.match(/!\[[^\]]*\]\((https:\/\/a0\.muscache\.com\/[^)]*?\/Hosting-[^)]+?)\)/);
   const image = imgM ? imgM[1] : '';
   if (!title && !image) return null;
+  const images = collectImages([...md.matchAll(/!\[[^\]]*\]\((https:\/\/a0\.muscache\.com\/[^)]*?\/Hosting-[^)]+?)\)/g)].map(m => m[1]), image);
   return { ok: true, title,
-    image,
+    image, images,
     bedrooms: numRe(md, /(\d+)\s*bedrooms?/i),
     bathrooms: numRe(md, /(\d+(?:\.\d+)?)\s*baths?/i),
     beds: numRe(md, /(\d+)\s*beds(?![a-z])/i),
@@ -170,7 +189,7 @@ async function handleAdd(req, env) {
   const listing = {
     id: uid(), roomId, url,
     title: (info.title || '').slice(0, 120) || '未命名房源',
-    image: info.image || '', area: '', priceUSD: null,
+    image: info.image || '', images: info.images || [], area: '', priceUSD: null,
     sleeps: info.guests || null, bedrooms: info.bedrooms, beds: info.beds, bathrooms: info.bathrooms,
     rating: info.rating || null, reviews: info.reviews || null, note: '', addedBy: '', createdAt: Date.now(), votes: []
   };
@@ -239,6 +258,7 @@ async function handleEnrich(req, env) {
   if (!info.ok) return j({ ok: false });
   if ((!listing.title || listing.title === '未命名房源') && info.title) listing.title = info.title.slice(0, 120);
   if (!listing.image && info.image) listing.image = info.image;
+  if ((info.images || []).length > (listing.images || []).length) listing.images = info.images;
   if (listing.bedrooms == null && info.bedrooms != null) listing.bedrooms = info.bedrooms;
   if (listing.bathrooms == null && info.bathrooms != null) listing.bathrooms = info.bathrooms;
   if (listing.beds == null && info.beds != null) listing.beds = info.beds;
