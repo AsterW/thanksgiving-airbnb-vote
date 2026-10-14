@@ -6,6 +6,8 @@ import { fetchListingInfo, roomIdFrom } from './scrape.js';
 import { getState, saveState } from './state.js';
 import { handlePrices } from './prices.js';
 import { needsArea, pickArea, routes as zoneRoutes } from './zones.js';
+import { closedError, voteView, votingOpen, routes as decisionRoutes } from './decision.js';
+import { cleanName } from '../users/users.js';
 import { getSplit } from '../split/store.js';
 import { splitView } from '../split/ledger.js';
 
@@ -16,6 +18,7 @@ async function handleAdd(req, env) {
   const roomId = roomIdFrom(url);
   if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源链接（需要形如 airbnb.com/rooms/123… 的链接）' });
   const trip = tripOf(body.trip);
+  if (!votingOpen(trip)) return closedError();
   // Fast-path dedupe check only — do NOT hold this snapshot across the scrape.
   const preState = await getState(env, trip);
   const preExisting = preState.listings.find(l => l.roomId === roomId);
@@ -38,7 +41,7 @@ async function handleAdd(req, env) {
     image: info.image || '', images: info.images || [], area: area || '', priceUSD: null,
     ...('lat' in info ? { lat: info.lat, lng: info.lng } : {}),
     sleeps: info.guests || null, bedrooms: info.bedrooms, beds: info.beds, bathrooms: info.bathrooms,
-    rating: info.rating || null, reviews: info.reviews || null, note: '', addedBy: '', createdAt: Date.now(), votes: []
+    rating: info.rating || null, reviews: info.reviews || null, note: '', addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: []
   };
   state.listings.unshift(listing);
   await saveState(env, trip, state);
@@ -53,6 +56,7 @@ async function handleAddManual(req, env) {
   const roomId = roomIdFrom(url);
   if (!roomId || !title) return j({ ok: false, error: '链接和标题是必填的' });
   const trip = tripOf(body.trip);
+  if (!votingOpen(trip)) return closedError();
   const state = await getState(env, trip);
   if (state.listings.find(l => l.roomId === roomId)) return j({ ok: false, error: '这间已经在清单里了' });
   const num = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
@@ -61,7 +65,7 @@ async function handleAddManual(req, env) {
     priceUSD: num(body.priceUSD), priceNights: num(body.priceNights), sleeps: num(body.sleeps), bedrooms: num(body.bedrooms),
     beds: num(body.beds), bathrooms: num(body.bathrooms),
     rating: null, reviews: null, note: String(body.note || '').slice(0, 200),
-    addedBy: '', createdAt: Date.now(), votes: [] };
+    addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: [] };
   state.listings.unshift(listing);
   await saveState(env, trip, state);
   return j({ ok: true, listing });
@@ -73,6 +77,7 @@ async function handleVote(req, env) {
   const { id, token, name } = body;
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
   const trip = tripOf(body.trip);
+  if (!votingOpen(trip)) return closedError();
   const state = await getState(env, trip);
   const listing = state.listings.find(l => l.id === id);
   if (!listing) return j({ ok: false, error: '房源不存在' });
@@ -90,6 +95,7 @@ async function handleRemove(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
+  if (!votingOpen(trip)) return closedError();
   const state = await getState(env, trip);
   const i = state.listings.findIndex(l => l.id === body.id);
   if (i < 0) return j({ ok: false, error: '房源不存在' });
@@ -135,8 +141,9 @@ async function handleEnrich(req, env) {
 // The trip's listings plus the whole group's ledger. members/expenses
 // inside trip state are pre-merge leftovers, kept in KV but not served.
 async function handleState(req, env, url) {
-  const { members, expenses, ...state } = await getState(env, tripOf(url.searchParams.get('trip')));
-  return j({ ...state, ...splitView(await getSplit(env)) });
+  const trip = tripOf(url.searchParams.get('trip'));
+  const { members, expenses, decision, booking, ...state } = await getState(env, trip);
+  return j({ ...state, vote: voteView({ ...state, decision, booking }, trip), ...splitView(await getSplit(env)) });
 }
 
 export const routes = {
@@ -148,4 +155,5 @@ export const routes = {
   'POST /api/enrich': handleEnrich,
   'POST /api/prices': handlePrices,
   ...zoneRoutes,
+  ...decisionRoutes,
 };

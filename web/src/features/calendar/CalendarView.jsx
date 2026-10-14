@@ -30,6 +30,7 @@ export default function CalendarView({ active }) {
   const { name, users } = useSession();
   const [who, setWho] = useState(null);
   const [listings, setListings] = useState({});
+  const [votes, setVotes] = useState({});
   const [people, setPeople] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const dayRefs = useRef({});
@@ -39,13 +40,14 @@ export default function CalendarView({ active }) {
     try {
       const [flights, ...states] = await Promise.all([api('/api/flights'), ...Object.keys(TRIPS).map(t => api('/api/state?trip=' + t))]);
       setListings(Object.fromEntries(Object.keys(TRIPS).map((t, i) => [t, states[i].listings || []])));
+      setVotes(Object.fromEntries(Object.keys(TRIPS).map((t, i) => [t, states[i].vote || null])));
       if (flights.ok) setPeople(flights.people);
     } catch (e) {}
     setLoaded(true);
   }, []);
   useEffect(() => { if (active) load(); }, [active, load]);
 
-  const days = useMemo(() => byDay([...stayEvents(listings), ...flightEvents(people, me)]), [listings, people, me]);
+  const days = useMemo(() => byDay([...stayEvents(listings, votes), ...flightEvents(people, me)]), [listings, votes, people, me]);
   const jump = date => dayRefs.current[date]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const hasFlights = me === ALL || people.some(p => p.name.toLowerCase() === me.toLowerCase() && (p.arrival || p.departure || p.noFlight));
 

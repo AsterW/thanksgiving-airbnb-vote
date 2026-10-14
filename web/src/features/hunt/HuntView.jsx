@@ -6,6 +6,8 @@ import { reduceMotion } from '../../lib/motion.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import AddListingForm from './AddListingForm.jsx';
+import VoteBanner from './VoteBanner.jsx';
+import DecisionPanel from './DecisionPanel.jsx';
 import Toolbar from './Toolbar.jsx';
 import ListingMap from './ListingMap.jsx';
 import ListingGrid from './ListingGrid.jsx';
@@ -20,9 +22,19 @@ const REORDER_DELAY = 700; // 投票后先在原位更新，过一会儿再按�
 
 export default function HuntView({ trip, active }) {
   const T = TRIPS[trip];
-  const { token, ensureName } = useSession();
+  const { token, name, ensureName } = useSession();
   const toast = useToast();
-  const { listings, refresh, patch } = useListings(trip, token);
+  const { listings, refresh, patch, vote: voteInfo, setVote } = useListings(trip, token);
+  const closed = !!voteInfo && !voteInfo.open;
+  const isAdmin = String(name).toLowerCase() === 'aster';
+  // 页面开着的时候到了截止时间：重新拉一次，切到结果面板
+  useEffect(() => {
+    if (!voteInfo || !voteInfo.open || !voteInfo.voteEndsAt) return;
+    const ms = Date.parse(voteInfo.voteEndsAt) - Date.now() + 1500;
+    if (ms > 2147483647) return; // setTimeout 等不了那么久，下次打开页面再说
+    const id = setTimeout(refresh, Math.max(0, ms));
+    return () => clearTimeout(id);
+  }, [voteInfo, refresh]);
   const [filter, setFilter] = useState('all');
   const [sortBy, setSortBy] = useState('votes');
   const [showMap, setShowMap] = useState(() => load('showMap') !== '0');
@@ -82,7 +94,8 @@ export default function HuntView({ trip, active }) {
     }
     ensureName(async me => {
       const r = await api('/api/vote', 'POST', { trip: t, id: l.id, token: me.token, name: me.name });
-      if (!r.ok || t !== tripRef.current) return; // 等待期间切了行程：这间已经不在页面上了
+      if (!r.ok) { if (r.error) { toast(r.error); refresh(); } return; }
+      if (t !== tripRef.current) return; // 等待期间切了行程：这间已经不在页面上了
       afterVote(l.id, r.votes);
       toast('🎉 投票成功！给「' + (l.title || '未命名房源') + '」+1');
       if (!reduceMotion) { setPopId(l.id); timers.current.push(setTimeout(() => setPopId(null), 450)); }
@@ -93,7 +106,15 @@ export default function HuntView({ trip, active }) {
   async function remove(l) {
     if (!confirm('确定要删除「' + (l.title || '未命名房源') + '」吗？删掉后大家就看不到了。')) return;
     const r = await api('/api/remove', 'POST', { trip, id: l.id });
-    if (r.ok) await refresh(); else alert('删除失败，稍后再试');
+    if (r.ok) await refresh(); else alert('删除失败：' + (r.error || '稍后再试'));
+  }
+
+  async function choose(l) {
+    if (!confirm('把「' + (l.title || '未命名房源') + '」定为 ' + T.date + ' 的房子？')) return;
+    ensureName(async me => {
+      const r = await api('/api/decision', 'POST', { trip, name: me.name, token: me.token, listingId: l.id });
+      if (r.ok) { setVote(r.vote); window.scrollTo({ top: 0, behavior: 'smooth' }); } else alert(r.error || '没成功');
+    });
   }
 
   function focusCard(id) {
@@ -115,7 +136,9 @@ export default function HuntView({ trip, active }) {
   const fitKey = trip + '|' + filter + '|' + visible.map(l => l.id + (l.lat != null ? '@' : '')).sort().join(',');
   return (
     <>
-      <AddListingForm trip={trip} T={T} zones={zoneNames} onAdded={refresh} />
+      {voteInfo && voteInfo.open && voteInfo.voteEndsAt && <VoteBanner vote={voteInfo} listings={listings} T={T} />}
+      {closed && <DecisionPanel trip={trip} T={T} vote={voteInfo} listings={listings} onVote={setVote} />}
+      <AddListingForm trip={trip} T={T} zones={zoneNames} closed={closed} onAdded={refresh} />
       <Toolbar tabs={tabs} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}
         showMap={showMap} onToggleMap={() => { save('showMap', showMap ? '0' : '1'); setShowMap(!showMap); }} />
       {region && <WeatherStrip trip={trip} name={region.name} lat={region.lat} lng={region.lng} />}
@@ -123,7 +146,8 @@ export default function HuntView({ trip, active }) {
       <div ref={gridBox}>
         <ListingGrid items={items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
           emptyText={(filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 链接进来吧 👆'}
-          zones={zoneNames} onVote={vote} onRemove={remove} onSetArea={setArea} onHover={setHotId} />
+          zones={zoneNames} closed={closed} chosenId={voteInfo?.chosenId} onChoose={closed && isAdmin ? choose : null}
+          onVote={vote} onRemove={remove} onSetArea={setArea} onHover={setHotId} />
       </div>
     </>
   );
