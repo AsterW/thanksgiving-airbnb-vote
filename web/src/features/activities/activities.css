@@ -1,0 +1,3 @@
+/* Activities page: vote button's filled state (base styling is Tailwind
+   classes on the button, same as the hunt cards). */
+.act-vote-btn.voted { background:#e11d48 !important; color:#fff !important; border-color:#e11d48 !important; }

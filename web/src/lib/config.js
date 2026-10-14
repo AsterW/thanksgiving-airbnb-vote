@@ -19,4 +19,6 @@ export const VIEWS = {
     nav: 'Blackjack', navSub: '21 点 · 大家同一桌', icon: '🃏' },
   angel: { title: '😇 Secret Angel · 神秘天使', sub: '刷卡片选你想要的礼物 · 大家选好后抽签，偷偷给分到的人准备惊喜',
     nav: 'Secret Angel', navSub: '选礼物 · 抽天使', icon: '😇' },
+  activities: { title: '🎿 Activities · 玩什么', sub: '从 Reddit、本地媒体和官方推荐里扒的第一批 20 个候选 · 喜欢哪个就投票，票高的优先排进行程',
+    nav: 'Activities', navSub: '玩什么 · 投票', icon: '🎿' },
 };
