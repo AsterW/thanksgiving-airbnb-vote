@@ -58,6 +58,10 @@ Airbnb 会拦机房 IP（给 worker 返回机器人验证墙），所以做了�
 3. **再失败 → 走 r.jina.ai 阅读器代理**，转成 markdown 解析（`#` 标题、muscache 图片链接）
 4. 都失败 → 返回 `ok: false`，前端弹手动表单
 
+## 区域标签页（`worker/listings/zones.js`、`web/src/features/hunt/zones.js`）
+
+每段行程在 `worker/config/trips.js` 里配几个区域（中心点 + 半径 km），名字和前端 `TRIPS.areas` 一致。房源有了位置但没区域时，后端按顺序分：落在配置的区域里（几个都包含就取最小的）→ 25 km 内最近的已分区房源的区域 → OpenStreetMap（Nominatim）反查城镇名，比如 Steamboat Springs，作为新区域。加房源、补抓到位置时当场分；页面加载时 `POST /api/zones` 把还没分的补上（每次最多 8 间，查城镇名间隔 1 秒，符合 Nominatim 的使用规则）。前端标签页 = 配置的区域（固定顺序）+ 房源里出现的其他区域（按数量排）+「未分区」。卡片左上角的区域标签可以点开改（`POST /api/area`），手动改过的（`areaManual`）不会再被自动分。
+
 ## 实时价格（`worker/listings/prices.js`）
 
 Airbnb 房源页的价格框是浏览器单独请求的（GraphQL 持久化查询 `StaysPdpBookItQuery`，带公开的网页 API key）。Worker 用同样的请求，按每段行程的日期和人数查总价和是否可订；人数超过房源上限时按上限再查一次。结果存在房源的 `live` 字段，6 小时内不重复查。查询 hash 或 key 变了会查不到，卡片保留上次的价格并显示多久以前查的。

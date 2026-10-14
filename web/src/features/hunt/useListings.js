@@ -15,8 +15,9 @@ export function useListings(trip, token) {
     try { s = await api('/api/state?trip=' + t); } catch (e) { return; }
     if (t !== tripRef.current) return;
     setListings(s.listings || []);
-    enrichMissing(t, s.listings || []);
     refreshPrices(t);
+    await assignZones(t, s.listings || []); // 先按位置分好区域，再去补抓（补抓到位置的那间后端会顺手分区）
+    enrichMissing(t, s.listings || []);
   }, [trip]); // eslint-disable-line react-hooks/exhaustive-deps -- helpers below only use stable setters
 
   // 没照片、没评分、照片太少或还没查过位置的房源，一间间去补抓
@@ -29,6 +30,14 @@ export function useListings(trip, token) {
         if (t === tripRef.current && r.ok && r.listing) patch(l.id, () => r.listing);
       } catch (e) {}
     }
+  }
+  // 有位置但还没区域的房源：后端按位置分区（必要时查城镇名，会多出新标签页）
+  async function assignZones(t, list) {
+    if (!list.some(l => !l.area && !l.areaManual && l.lat != null)) return;
+    let r;
+    try { r = await api('/api/zones', 'POST', { trip: t }); } catch (e) { return; }
+    if (t !== tripRef.current || !r.ok) return;
+    setListings(ls => ls.map(l => (r.areas[l.id] && r.areas[l.id] !== l.area ? { ...l, area: r.areas[l.id] } : l)));
   }
   // 让后端去 Airbnb 查过期（>6 小时）的实时价
   async function refreshPrices(t) {
