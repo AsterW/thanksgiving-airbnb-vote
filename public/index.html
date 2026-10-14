@@ -389,7 +389,6 @@ function card(l){
     + '<button onclick="doVote(\'' + l.id + '\')" class="vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2 ' + (voted ? 'voted' : '') + '">' + (voted ? '❤️ 已投 · ' : '🤍 投票 · ') + n + '</button>'
     + '<a href="' + esc(airbnbLink(l)) + '" target="_blank" rel="noopener" title="按 ' + T.date + ' · ' + T.people + '人查看实时价格" class="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>'
     + '</div>'
-    + '<button onclick="splitListing(\'' + l.id + '\')" class="mt-2 border-2 border-emerald-100 text-emerald-700 rounded-xl py-1.5 text-sm font-medium hover:border-emerald-400">💰 用这间分账</button>'
     + '</div></article>';
 }
 
@@ -879,15 +878,6 @@ async function removeExpense(id){
   if (!confirm('删除这笔支出？')) return;
   const r = await api('/api/expense-remove', 'POST', { id });
   if (r.ok) { applySplitView(r); renderSplit(); } else alert('删除失败，稍后再试');
-}
-// 卡片上的「用这间分账」：把房源标题和总价预填进分账表单
-function splitListing(id){
-  const l = STATE.listings.find(x => x.id === id);
-  if (!l) return;
-  $('#eDesc').value = l.title || '房费';
-  if (l.priceUSD) $('#eAmount').value = l.priceUSD;
-  switchView('split');
-  $('#eAmount').focus({ preventScroll: true });
 }
 $('#memberBtn').onclick = addMember;
 $('#memberInput').addEventListener('keydown', e => { if (e.key === 'Enter') addMember(); });
