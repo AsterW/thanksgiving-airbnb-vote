@@ -6,7 +6,9 @@
 ## 整体架构
 
 - **运行平台**：Cloudflare Workers（无服务器，按请求执行，全球边缘节点就近响应）
-- **数据库**：Cloudflare KV —— 就一个 key（`state:v1`）存整个 JSON（房源数组），没有传统数据库
+- **数据库**：Cloudflare KV —— 每段行程一个 key，各存一份 JSON（房源数组），没有传统数据库：
+  - `nov25`（11/25–26 · 9人 · 1晚）→ `state:nov25:v1`
+  - `nov26`（11/26–29 · 14人 · 3晚）→ `state:v1`（沿用原来的 key，之前的房源和投票都在这里）
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 
 ## 前端（`public/index.html`，一个文件）
@@ -15,17 +17,19 @@
 - 核心函数：
   - `api()`：封装 `fetch` 调后端接口
   - `render()` / `card()`：把房源数组拼成卡片 HTML。卡片含：照片、区域标签、右上 ✕ 删除按钮、标题、「X卧·X床·X卫·可住X人」、价格、⭐评分、备注、投票人小标签、投票按钮、「去 Airbnb ↗」外链
+  - `renderTrip()` / `switchTrip()`：顶部两个标签页对应两段行程（配置在 `TRIPS`：日期、人数、晚数、区域）。当前标签页记在 URL hash（`#nov25` / `#nov26`），可以直接分享某个标签页的链接
+- **按行程区分**：所有接口都带 `trip`；「去 Airbnb ↗」按当前标签页的日期和人数拼链接（打开就是实时总价）；可住人数不够的房源显示 ⚠️ 提醒；手动填的价格会记下 `priceNights`，老的预置房源没有这个字段，按 4 晚显示（它们是 11/25–29 的快照）
 - **身份（没做登录）**：第一次打开在 `localStorage` 生成随机 token（`vt`），投票时弹窗问名字（`vn`，只问一次）。点投票 = 把 `{token, name}` 推进房源的 `votes` 数组；再点一次 = 按 token 删掉（toggle）。所以清浏览器缓存就能换身份重投——熟人群里用，简单优先，防刷基本靠自觉
 - **加房源**：POST 链接 → 成功直接进列表；失败自动展开手动表单（URL 已预填）
 - 页面每次加载跑 `enrichMissing()`：没照片或没评分的房源自动调接口补全
 
 ## 后端（`worker.js`，跑在 Worker 里）
 
-入口是 `fetch(request, env)`，按路径分发：
+入口是 `fetch(request, env)`，按路径分发。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
 
 | 路由 | 作用 |
 |---|---|
-| `GET /api/state` | 读 KV；没有就用 10 间预置房源初始化（seed 数据，含标题/照片/价格/评分） |
+| `GET /api/state?trip=…` | 读该行程的 KV；没有就初始化（`nov26` 用 10 间预置房源 seed，`nov25` 从空清单开始） |
 | `POST /api/add` | 正则从链接提 roomId（`/rooms/(\d+)`）→ 查重（重复返回 `deduped`）→ 调抓取 → 新房源 `unshift` 到数组头 → 写回 KV |
 | `POST /api/add-manual` | 手动表单，走同样入库 |
 | `POST /api/vote` / `/api/remove` / `/api/enrich` | 投票、删除、补抓 |

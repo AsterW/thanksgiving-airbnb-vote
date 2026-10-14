@@ -25,6 +25,9 @@
   .car-arrow[disabled] { visibility:hidden; }
   @media (hover:none) { .car-arrow { display:none; } }
   .just-voted { box-shadow: 0 0 0 3px #fb7185, 0 10px 25px -5px rgba(225,29,72,.35); transition: box-shadow .6s ease; }
+  .trip-tab { background:rgba(255,255,255,.15); color:#fff; }
+  .trip-tab:hover { background:rgba(255,255,255,.28); }
+  .trip-tab.active { background:#fff; color:#4f46e5; box-shadow:0 4px 14px rgba(0,0,0,.15); }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -32,7 +35,8 @@
 <header class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white px-6 py-8">
   <div class="max-w-6xl mx-auto">
     <h1 class="text-2xl md:text-3xl font-bold">🏔️ Denver 感恩节之旅 · Airbnb 一起选房</h1>
-    <p class="mt-2 text-indigo-100">11月25–29 · 10–15人 · 看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它</p>
+    <p id="tripSub" class="mt-2 text-indigo-100">&nbsp;</p>
+    <nav id="tabs" class="mt-5 flex flex-wrap gap-2"></nav>
   </div>
 </header>
 
@@ -53,17 +57,12 @@
         <input id="mUrl" class="border rounded-lg px-3 py-2" placeholder="房源链接 *">
         <input id="mTitle" class="border rounded-lg px-3 py-2" placeholder="房源标题 *">
         <input id="mImage" class="border rounded-lg px-3 py-2" placeholder="照片链接（可选）">
-        <input id="mPrice" class="border rounded-lg px-3 py-2" type="number" placeholder="4晚总价 USD（可选）">
+        <input id="mPrice" class="border rounded-lg px-3 py-2" type="number" placeholder="总价 USD（可选）">
         <input id="mBedrooms" class="border rounded-lg px-3 py-2" type="number" placeholder="卧室数">
         <input id="mBeds" class="border rounded-lg px-3 py-2" type="number" placeholder="床位数">
         <input id="mBaths" class="border rounded-lg px-3 py-2" placeholder="浴室数（可填 2.5）">
         <input id="mSleeps" class="border rounded-lg px-3 py-2" type="number" placeholder="可住人数">
-        <select id="mArea" class="border rounded-lg px-3 py-2">
-          <option value="">区域（可选）</option>
-          <option>大沙丘区域</option>
-          <option>落基山 · Estes Park</option>
-          <option>其他</option>
-        </select>
+        <select id="mArea" class="border rounded-lg px-3 py-2"></select>
         <input id="mNote" class="border rounded-lg px-3 py-2" placeholder="一句话亮点（可选）">
       </div>
       <button id="manualBtn" class="mt-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl px-5 py-2">手动加入</button>
@@ -72,9 +71,7 @@
 
   <!-- 工具条 -->
   <section class="flex flex-wrap items-center gap-2 mb-4">
-    <button data-f="all" class="filter-chip active border rounded-full px-4 py-1.5 text-sm bg-white">全部</button>
-    <button data-f="大沙丘区域" class="filter-chip border rounded-full px-4 py-1.5 text-sm bg-white">大沙丘区域</button>
-    <button data-f="落基山 · Estes Park" class="filter-chip border rounded-full px-4 py-1.5 text-sm bg-white">落基山 · Estes Park</button>
+    <div id="filters" class="contents"></div>
     <select id="sortSel" class="ml-auto border rounded-full px-4 py-1.5 text-sm bg-white">
       <option value="votes">按票数排序</option>
       <option value="price">按价格从低到高</option>
@@ -99,6 +96,13 @@
 
 <script>
 const $ = s => document.querySelector(s);
+// 两段行程，各自一份候选清单（后端按 trip 分开存）
+const TRIPS = {
+  nov25: { date: '11月25–26', people: 9, nights: 1, checkIn: '2026-11-25', checkOut: '2026-11-26', areas: ['Denver 市区', 'Denver 周边'] },
+  nov26: { date: '11月26–29', people: 14, nights: 3, checkIn: '2026-11-26', checkOut: '2026-11-29', areas: ['大沙丘区域', '落基山 · Estes Park'] },
+};
+let trip = TRIPS[location.hash.slice(1)] ? location.hash.slice(1) : 'nov25';
+let T = TRIPS[trip];
 let STATE = { listings: [] };
 let myToken = localStorage.getItem('vt');
 if (!myToken) { myToken = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); localStorage.setItem('vt', myToken); }
@@ -121,12 +125,19 @@ function statsLine(l){
   return parts.length ? parts.join(' · ') : '户型信息待补充';
 }
 
+// 按当前行程的日期和人数打开 Airbnb，直接看到实时总价
+function airbnbLink(l){
+  return 'https://www.airbnb.com/rooms/' + l.roomId + '?adults=' + T.people + '&check_in=' + T.checkIn + '&check_out=' + T.checkOut;
+}
+
 function card(l){
   const voted = (l.votes || []).some(v => v.token === myToken);
   const n = (l.votes || []).length;
   const voters = (l.votes || []).map(v => '<span class="chip">' + esc(v.name || '匿名') + '</span>').join('');
-  const price = l.priceUSD ? '<div class="text-lg font-bold text-slate-800">约 $' + Number(l.priceUSD).toLocaleString() + ' <span class="text-xs font-normal text-slate-500">/ 4晚含税费</span></div>'
+  // 早期预置房源没有 priceNights，它们的价格是 11/25–29 的 4 晚总价
+  const price = l.priceUSD ? '<div class="text-lg font-bold text-slate-800">约 $' + Number(l.priceUSD).toLocaleString() + ' <span class="text-xs font-normal text-slate-500">/ ' + (l.priceNights || 4) + '晚含税费</span></div>'
     : '<div class="text-sm text-slate-500">价格以 Airbnb 页面为准</div>';
+  const tooSmall = l.sleeps && l.sleeps < T.people ? '<p class="text-sm text-amber-600 mb-2">⚠️ 最多住 ' + l.sleeps + ' 人，不够 ' + T.people + ' 人</p>' : '';
   const rating = l.rating ? '<span class="text-sm">⭐ ' + l.rating + (l.reviews ? '（' + l.reviews + '条评价）' : '') + '</span>' : '';
   const area = l.area ? '<span class="absolute top-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded-full">' + esc(l.area) + '</span>' : '';
   const del = '<button onclick="removeListing(\'' + l.id + '\')" title="删除这个房源" class="absolute top-3 right-3 bg-black/60 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>';
@@ -144,13 +155,14 @@ function card(l){
     + '<div class="p-4 flex flex-col flex-1">'
     + '<h3 class="font-bold leading-snug mb-1">' + esc(l.title || '未命名房源') + '</h3>'
     + '<p class="text-sm text-slate-500 mb-2">' + esc(statsLine(l)) + '</p>'
+    + tooSmall
     + '<div class="mb-1">' + price + '</div>'
     + '<div class="mb-2">' + rating + '</div>'
     + (l.note ? '<p class="text-sm text-slate-600 mb-2">💡 ' + esc(l.note) + '</p>' : '')
     + (voters ? '<div class="mb-3">' + voters + '</div>' : '<div class="mb-3 text-xs text-slate-400">还没有人投票，来当第一个吧</div>')
     + '<div class="mt-auto flex gap-2">'
     + '<button onclick="doVote(\'' + l.id + '\')" class="vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2 ' + (voted ? 'voted' : '') + '">' + (voted ? '❤️ 已投 · ' : '🤍 投票 · ') + n + '</button>'
-    + '<a href="' + esc(l.url) + '" target="_blank" rel="noopener" class="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>'
+    + '<a href="' + esc(airbnbLink(l)) + '" target="_blank" rel="noopener" title="按 ' + T.date + ' · ' + T.people + '人查看实时价格" class="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>'
     + '</div></div></article>';
 }
 
@@ -188,7 +200,7 @@ function render(anchorId){
   if (filter !== 'all') list = list.filter(l => l.area === filter);
   if (sortBy === 'votes') list.sort((a,b) => (b.votes||[]).length - (a.votes||[]).length || (a.priceUSD||1e9) - (b.priceUSD||1e9));
   else list.sort((a,b) => (a.priceUSD||1e9) - (b.priceUSD||1e9));
-  grid.innerHTML = list.length ? list.map(card).join('') : '<p class="text-slate-400 col-span-full text-center py-10">这个区域还没有候选，贴个链接进来吧 👆</p>';
+  grid.innerHTML = list.length ? list.map(card).join('') : '<p class="text-slate-400 col-span-full text-center py-10">' + (filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 链接进来吧 👆</p>';
   $('#countLbl').textContent = '共 ' + STATE.listings.length + ' 间候选';
   restoreSlides(grid);
 
@@ -224,12 +236,47 @@ function afterVote(id, votes){
   }, 700);
 }
 
-async function refresh(){ const s = await api('/api/state'); STATE = s; render(); enrichMissing(); }
+// 切换行程时重画标题、标签页、区域筛选和手动表单
+function renderTrip(){
+  $('#tripSub').textContent = T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · 看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它';
+  $('#tabs').innerHTML = Object.keys(TRIPS).map(k => {
+    const t = TRIPS[k];
+    return '<button data-trip="' + k + '" class="trip-tab rounded-full px-5 py-2 font-bold' + (k === trip ? ' active' : '') + '">'
+      + t.date + ' <span class="font-normal text-sm opacity-80">· ' + t.people + '人 · ' + t.nights + '晚</span></button>';
+  }).join('');
+  $('#filters').innerHTML = ['all'].concat(T.areas).map(a =>
+    '<button data-f="' + esc(a) + '" class="filter-chip border rounded-full px-4 py-1.5 text-sm bg-white' + (a === filter ? ' active' : '') + '">' + (a === 'all' ? '全部' : esc(a)) + '</button>'
+  ).join('');
+  $('#mArea').innerHTML = '<option value="">区域（可选）</option>' + T.areas.concat('其他').map(a => '<option>' + esc(a) + '</option>').join('');
+  $('#mPrice').placeholder = T.nights + '晚总价 USD（可选）';
+}
+
+function switchTrip(k){
+  if (k === trip) return;
+  trip = k; T = TRIPS[k]; filter = 'all';
+  if (reorderTimer) { clearTimeout(reorderTimer); reorderTimer = null; } // 别让上一页投票后的重排画到新标签页
+  history.replaceState(null, '', '#' + k);
+  STATE = { listings: [] };
+  $('#grid').innerHTML = ''; $('#countLbl').textContent = ''; $('#addMsg').textContent = '';
+  renderTrip();
+  refresh();
+}
+
+async function refresh(){
+  const t = trip;
+  const s = await api('/api/state?trip=' + t);
+  if (t !== trip) return; // 等待期间切了标签页，丢掉旧结果
+  STATE = s; render(); enrichMissing();
+}
 
 async function enrichMissing(){
+  const t = trip;
   for (const l of STATE.listings) {
     if (!l.image || l.rating == null || !l.images || l.images.length < 2) {
       try { const r = await api('/api/enrich', 'POST', { id: l.id }); if (r.ok && r.listing && (r.listing.image || (r.listing.images && r.listing.images.length))) { const i = STATE.listings.findIndex(x => x.id === l.id); if (i >= 0) STATE.listings[i] = r.listing; render(); } } catch(e){}
+    if (t !== trip) return;
+    if (!l.image || l.rating == null) {
+      try { const r = await api('/api/enrich', 'POST', { trip: t, id: l.id }); if (t === trip && r.ok && r.listing && r.listing.image) { const i = STATE.listings.findIndex(x => x.id === l.id); if (i >= 0) STATE.listings[i] = r.listing; render(); } } catch(e){}
     }
   }
 }
@@ -253,11 +300,12 @@ async function doVote(id){
   const l = STATE.listings.find(x => x.id === id);
   const voted = (l.votes || []).some(v => v.token === myToken);
   if (voted) {
-    const r = await api('/api/vote', 'POST', { id, token: myToken, name: null });
-    if (r.ok) afterVote(id, r.votes);
+    const r = await api('/api/vote', 'POST', { trip, id, token: myToken, name: null });
+    if (r.ok) afterVote(id, r.votes); // 切了标签页就找不到这间，afterVote 会忽略
   } else {
+    const t = trip;
     ensureNameThen(async () => {
-      const r = await api('/api/vote', 'POST', { id, token: myToken, name: myName });
+      const r = await api('/api/vote', 'POST', { trip: t, id, token: myToken, name: myName });
       if (r.ok) afterVote(id, r.votes);
     });
   }
@@ -267,7 +315,7 @@ async function removeListing(id){
   const l = STATE.listings.find(x => x.id === id);
   if (!l) return;
   if (!confirm('确定要删除「' + (l.title || '未命名房源') + '」吗？删掉后大家就看不到了。')) return;
-  const r = await api('/api/remove', 'POST', { id });
+  const r = await api('/api/remove', 'POST', { trip, id });
   if (r.ok) await refresh(); else alert('删除失败，稍后再试');
 }
 
@@ -277,7 +325,7 @@ async function addListing(){
   const btn = $('#addBtn'); btn.disabled = true; btn.textContent = '抓取中…';
   $('#addMsg').textContent = '正在读取 Airbnb 房源信息…';
   try {
-    const r = await api('/api/add', 'POST', { url });
+    const r = await api('/api/add', 'POST', { trip, url });
     if (r.ok) {
       $('#urlInput').value = '';
       $('#addMsg').textContent = r.deduped ? '这间已经在清单里了' : '已加入清单 🎉';
@@ -300,8 +348,8 @@ $('#addBtn').onclick = addListing;
 $('#urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') addListing(); });
 
 $('#manualBtn').onclick = async () => {
-  const body = { url: $('#mUrl').value.trim(), title: $('#mTitle').value.trim(), image: $('#mImage').value.trim(),
-    priceUSD: $('#mPrice').value ? Number($('#mPrice').value) : null,
+  const body = { trip, url: $('#mUrl').value.trim(), title: $('#mTitle').value.trim(), image: $('#mImage').value.trim(),
+    priceUSD: $('#mPrice').value ? Number($('#mPrice').value) : null, priceNights: T.nights,
     bedrooms: $('#mBedrooms').value ? Number($('#mBedrooms').value) : null,
     beds: $('#mBeds').value ? Number($('#mBeds').value) : null,
     bathrooms: $('#mBaths').value ? Number($('#mBaths').value) : null,
@@ -313,12 +361,17 @@ $('#manualBtn').onclick = async () => {
   else alert('添加失败：' + (r.error || ''));
 };
 
-document.querySelectorAll('.filter-chip').forEach(b => b.onclick = () => {
+// 筛选按钮和标签页都是动态生成的，用事件委托
+$('#filters').onclick = e => {
+  const b = e.target.closest('.filter-chip');
+  if (!b) return;
   document.querySelectorAll('.filter-chip').forEach(x => x.classList.remove('active'));
   b.classList.add('active'); filter = b.dataset.f; render();
-});
+};
+$('#tabs').onclick = e => { const b = e.target.closest('.trip-tab'); if (b) switchTrip(b.dataset.trip); };
 $('#sortSel').onchange = e => { sortBy = e.target.value; render(); };
 
+renderTrip();
 refresh();
 </script>
 </body>
