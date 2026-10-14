@@ -3,6 +3,7 @@ import Carousel from '../../components/Carousel.jsx';
 import PriceBlock from './PriceBlock.jsx';
 import AreaBadge from './AreaBadge.jsx';
 import { isBooked } from './price.js';
+import { useSession } from '../../session/SessionContext.jsx';
 
 // 按当前行程的日期和人数打开 Airbnb，直接看到实时总价
 const airbnbLink = (l, T) => 'https://www.airbnb.com/rooms/' + l.roomId + '?adults=' + T.people + '&check_in=' + T.checkIn + '&check_out=' + T.checkOut;
@@ -10,7 +11,9 @@ const airbnbLink = (l, T) => 'https://www.airbnb.com/rooms/' + l.roomId + '?adul
 // closed：投票已截止（不能投、不能删）；chosen：大家选定的这间；onChoose：管理员截止后改选（不是管理员时没有）
 export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, closed, chosen, onChoose, onVote, onRemove, onSetArea }) {
   const votes = l.votes || [];
-  const voted = votes.some(v => v.token === token);
+  const { name: myName } = useSession();
+  // A vote is mine by token OR by account name — tokens rotate (email bind).
+  const voted = votes.some(v => v.token === token || (!!myName && String(v.name || '').toLowerCase() === myName.toLowerCase()));
   const pics = l.images && l.images.length ? l.images : l.image ? [l.image] : [];
   return (
     <article ref={cardRef} data-id={l.id}

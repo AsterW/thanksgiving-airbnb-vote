@@ -7,7 +7,8 @@ import { getState, updateState } from './state.js';
 import { handlePrices } from './prices.js';
 import { needsArea, pickArea, routes as zoneRoutes } from './zones.js';
 import { closedError, voteView, votingOpen, routes as decisionRoutes } from './decision.js';
-import { cleanName } from '../users/users.js';
+import { cleanName, getUsers } from '../users/users.js';
+import { dedupeVotes, isVoteBy } from '../lib/votes.js';
 import { getSplit } from '../split/store.js';
 import { splitView } from '../split/ledger.js';
 
@@ -84,10 +85,14 @@ async function handleVote(req, env) {
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
+  // The voter is the account: resolve its name from the token as well, so
+  // an unvote (no name sent) still finds votes left under an older token.
+  const me = (await getUsers(env).catch(() => [])).find(u => u.token === token);
+  const voterName = name || (me && me.name) || null;
   const out = await updateState(env, trip, state => {
     const listing = state.listings.find(l => l.id === id);
     if (!listing) return { error: '房源不存在' };
-    listing.votes = (listing.votes || []).filter(v => v.token !== token);
+    listing.votes = dedupeVotes((listing.votes || []).filter(v => !isVoteBy(v, token, voterName)));
     let voted = false;
     if (name) {
       listing.votes.push({ token: String(token).slice(0, 80), name: String(name).slice(0, 20), at: Date.now() });
@@ -155,6 +160,7 @@ async function handleEnrich(req, env) {
 async function handleState(req, env, url) {
   const trip = tripOf(url.searchParams.get('trip'));
   const { members, expenses, decision, booking, ...state } = await getState(env, trip);
+  state.listings = (state.listings || []).map(l => ({ ...l, votes: dedupeVotes(l.votes) }));
   return j({ ...state, vote: voteView({ ...state, decision, booking }, trip), ...splitView(await getSplit(env)) });
 }
 

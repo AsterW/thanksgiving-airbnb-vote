@@ -1,7 +1,8 @@
 // Restaurant routes: the trip's restaurant shortlist, adding from a copied
 // Google Maps link, voting for the ones you want to go to, removing.
 import { j, uid } from '../lib/http.js';
-import { cleanName } from '../users/users.js';
+import { cleanName, getUsers } from '../users/users.js';
+import { dedupeVotes, isVoteBy } from '../lib/votes.js';
 import { expandLink, isMapsLink, readLink } from './maps.js';
 import { placePhotos } from './photos.js';
 import { getFood, updateFood } from './store.js';
@@ -9,7 +10,8 @@ import { getFood, updateFood } from './store.js';
 const readBody = async req => { try { return await req.json() || {}; } catch (e) { return {}; } };
 
 async function handleList(req, env, url) {
-  return j({ ok: true, places: (await getFood(env, url.searchParams.get('trip'))).places });
+  const places = (await getFood(env, url.searchParams.get('trip'))).places;
+  return j({ ok: true, places: places.map(p => ({ ...p, votes: dedupeVotes(p.votes) })) });
 }
 
 // Restaurants come only from a copied Google Maps link. If the link doesn't
@@ -49,10 +51,12 @@ async function handleAdd(req, env) {
 async function handleVote(req, env) {
   const { trip, id, token, name } = await readBody(req);
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
+  const me = (await getUsers(env).catch(() => [])).find(u => u.token === token);
+  const voterName = name || (me && me.name) || null;
   const out = await updateFood(env, trip, food => {
     const place = food.places.find(p => p.id === id);
     if (!place) return { error: '这家已经被删掉了' };
-    place.votes = place.votes.filter(v => v.token !== token);
+    place.votes = dedupeVotes((place.votes || []).filter(v => !isVoteBy(v, token, voterName)));
     if (name) place.votes.push({ token: String(token).slice(0, 80), name: cleanName(name), at: Date.now() });
     return { votes: place.votes };
   });
