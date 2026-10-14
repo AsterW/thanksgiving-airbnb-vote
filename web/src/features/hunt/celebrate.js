@@ -1,11 +1,11 @@
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
 
-// 投票成功的庆祝，像收到 offer 一样：投票按钮炸开彩带和爱心 + 两侧礼炮（顶部横幅由调用方显示）
+// 投票成功的庆祝，像收到 offer 一样：投票按钮炸开彩带和爱心 + 两侧礼炮
+// （顶部横幅和按钮的弹跳 vote-pop 由调用方管：类名得走 React，直接改 DOM 会被下一次渲染覆盖）
 let heartShape = null;
 export function celebrateVote(btn) {
   if (reduceMotion) return;
-  if (btn) { btn.classList.remove('vote-pop'); void btn.offsetWidth; btn.classList.add('vote-pop'); }
   const r = btn && btn.getBoundingClientRect();
   const origin = r ? { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight } : { x: 0.5, y: 0.6 };
   heartShape = heartShape || confetti.shapeFromText({ text: '❤️', scalar: 2 });

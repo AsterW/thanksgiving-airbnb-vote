@@ -30,7 +30,10 @@ export function useBlackjack(active) {
       if (m.type !== 'state') return;
       setSt({ ...m, at: Date.now() });
       if (m.you) satConfirmed.current = true;
-      else if (wantSeat.current && (satConfirmed.current || m.error)) { wantSeat.current = false; satConfirmed.current = false; } // 被站起来了，或者坐不下
+      else if (wantSeat.current && (satConfirmed.current || m.error)) { // 被站起来了，或者坐不下
+        wantSeat.current = false; satConfirmed.current = false;
+        disconnectIfIdle(); // 不在这页的话就断开，别让 Durable Object 一直开着占免费额度
+      }
       if (m.error === '先登录再坐下') openLogin(me => actions.current.sit(me));
       else if (m.error || m.notice) flash(m.error || m.notice);
     };

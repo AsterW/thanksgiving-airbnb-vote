@@ -35,8 +35,8 @@ export default function BlackjackView({ active }) {
   // 这次渲染里新出现的牌按顺序错开 90ms
   const fresh = [];
   const cardDelay = id => { if (shown.current.has(id)) return null; let i = fresh.indexOf(id); if (i < 0) { fresh.push(id); i = fresh.length - 1; } return i * 90; };
+  useEffect(() => { shown.current.clear(); }, [t?.round]); // 先清上一局，再记这一局画过的牌
   useEffect(() => { fresh.forEach(id => shown.current.add(id)); });
-  useEffect(() => { shown.current.clear(); }, [t?.round]);
 
   // 自己赢了撒点彩带
   useEffect(() => {

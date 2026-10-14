@@ -4,7 +4,7 @@ import ListingCard from './ListingCard.jsx';
 
 // The card grid. When the order changes, cards glide to their new spots (FLIP).
 // If anchorId is set, the page scrolls so that card stays where it was on screen.
-export default function ListingGrid({ items, T, token, glowId, anchorId, emptyText, onVote, onRemove, onHover }) {
+export default function ListingGrid({ items, T, token, glowId, popId, anchorId, emptyText, onVote, onRemove, onHover }) {
   const nodes = useRef(new Map());
   const orderKey = items.map(l => l.id).join(',');
   const lastKey = useRef(orderKey);
@@ -42,7 +42,7 @@ export default function ListingGrid({ items, T, token, glowId, anchorId, emptyTe
     <section className="grid md:grid-cols-2 lg:grid-cols-3 gap-5"
       onMouseOver={e => onHover(e.target.closest('article[data-id]')?.dataset.id || null)} onMouseLeave={() => onHover(null)}>
       {items.length
-        ? items.map(l => <ListingCard key={l.id} l={l} T={T} token={token} glow={glowId === l.id} cardRef={ref(l.id)} onVote={onVote} onRemove={onRemove} />)
+        ? items.map(l => <ListingCard key={l.id} l={l} T={T} token={token} glow={glowId === l.id} pop={popId === l.id} cardRef={ref(l.id)} onVote={onVote} onRemove={onRemove} />)
         : <p className="text-slate-400 col-span-full text-center py-10">{emptyText}</p>}
     </section>
   );

@@ -6,7 +6,7 @@ import { isBooked } from './price.js';
 // 按当前行程的日期和人数打开 Airbnb，直接看到实时总价
 const airbnbLink = (l, T) => 'https://www.airbnb.com/rooms/' + l.roomId + '?adults=' + T.people + '&check_in=' + T.checkIn + '&check_out=' + T.checkOut;
 
-export default function ListingCard({ l, T, token, glow, cardRef, onVote, onRemove }) {
+export default function ListingCard({ l, T, token, glow, pop, cardRef, onVote, onRemove }) {
   const votes = l.votes || [];
   const voted = votes.some(v => v.token === token);
   const pics = l.images && l.images.length ? l.images : l.image ? [l.image] : [];
@@ -29,7 +29,7 @@ export default function ListingCard({ l, T, token, glow, cardRef, onVote, onRemo
           ? <div className="mb-3">{votes.map(v => <span key={v.token} className="chip">{v.name || '匿名'}</span>)}</div>
           : <div className="mb-3 text-xs text-slate-400">还没有人投票，来当第一个吧</div>}
         <div className="mt-auto flex gap-2">
-          <button onClick={e => onVote(l, e.currentTarget)} className={'vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2 ' + (voted ? 'voted' : '')}>
+          <button onClick={e => onVote(l, e.currentTarget)} className={'vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2' + (voted ? ' voted' : '') + (pop ? ' vote-pop' : '')}>
             {(voted ? '❤️ 已投 · ' : '🤍 投票 · ') + votes.length}
           </button>
           <a href={airbnbLink(l, T)} target="_blank" rel="noopener" title={'按 ' + T.date + ' · ' + T.people + '人查看实时价格'}
