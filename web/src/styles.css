@@ -21,10 +21,13 @@ body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 .trip-enter { animation: trip-in .45s cubic-bezier(.32,.72,0,1); }
 @keyframes trip-in {
   0% { opacity:0; transform: scale(.984) translateY(10px); filter: blur(6px); }
-  55% { opacity:1; filter: blur(0); }
+  45% { opacity:1; filter: blur(0); }
   78% { transform: scale(1.0015) translateY(0); }
   100% { opacity:1; transform: scale(1) translateY(0); filter: blur(0); }
 }
+/* 切行程时动画推迟两帧的占位（见 App.jsx 的 Pane）：新内容画完之前
+   面板先藏着，避免「新清单闪现一下又跳回虚化重播」的回弹感 */
+.trip-pre { opacity:0; }
 @media (prefers-reduced-motion: reduce) { .trip-enter { animation:none; } }
 
 /* ==== Liquid Glass · 阶段 1：外壳（侧栏 / 底部栏 / 页头）====
