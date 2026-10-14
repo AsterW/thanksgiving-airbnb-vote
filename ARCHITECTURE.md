@@ -10,6 +10,7 @@
   - `nov25`（11/25–26 · 9人 · 1晚）→ `state:nov25:v1`
   - `nov26`（11/26–29 · 14人 · 3晚）→ `state:v1`（沿用原来的 key，之前的房源和投票都在这里）
   - 全员共用、不分行程：`users:v1`（登录时选的名字，也是分账的成员名单）、`split:v1`（分账，全员一本账）。分账原来按行程存在上面两个 key 里，第一次读 `split:v1` 时自动合并过来（旧数据留在原处不删）
+- **Secret Angel**：`angel:v1`（全员一份）。`prefs` 按名字（小写）存每人的礼物偏好（分类 id → `love` / `nope`，加一句备注）；`excluded` 是管理员排除的人；`draw` 是抽签结果（天使 → 要送礼的人）。管理员是名字为 Aster 的用户（`worker/angel/routes.js` 的 `ADMIN`）。抽签把所有参加的人随机排成一个圈，每人送给下一个（`worker/angel/draw.js`），所以不会抽到自己、也不会两人互送。接口只返回调用者自己的那一对。和投票一样，身份靠用户列表里的名字 + token，不是真正的密码登录
 - **21 点**：不走 KV，是一个 Durable Object（`BlackjackTable`，SQLite 存储，免费计划只能用这种）。整张桌子的状态在它的内存里，玩家用 WebSocket（`/api/bj`）连上来，每次有变化就把整桌推给所有人。规则和流程在 `BlackjackGame` 里（6 副牌、庄家软 17 停、Blackjack 3:2、头两张可加倍、不分牌不保险；15 秒下注、30 秒一手）。筹码只在玩家站起来或断线时存进它自己的存储（`p:<名字>`），不按局存。坐下要用登录名单里的名字和 token。不在 21 点页面又没坐下的人会断开连接，10 分钟没下注会被站起来，免得白占免费的运行时长
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 

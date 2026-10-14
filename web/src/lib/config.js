@@ -13,4 +13,6 @@ export const VIEWS = {
     nav: 'Split that bill', navSub: '分账 · 谁该给谁', icon: '💰' },
   blackjack: { title: '🃏 Blackjack · 21 点', sub: '大家同一桌，轮流跟庄家玩 · 筹码只是好玩，不跟分账挂钩',
     nav: 'Blackjack', navSub: '21 点 · 大家同一桌', icon: '🃏' },
+  angel: { title: '😇 Secret Angel · 神秘天使', sub: '刷卡片选你想要的礼物 · 大家选好后抽签，偷偷给分到的人准备惊喜',
+    nav: 'Secret Angel', navSub: '选礼物 · 抽天使', icon: '😇' },
 };
