@@ -14,6 +14,7 @@
   #nameModal { display:none; }
   #nameModal.open { display:flex; }
   .vote-btn.voted { background:#e11d48 !important; color:#fff !important; border-color:#e11d48 !important; }
+  .just-voted { box-shadow: 0 0 0 3px #fb7185, 0 10px 25px -5px rgba(225,29,72,.35); transition: box-shadow .6s ease; }
 </style>
 </head>
 <body class="bg-slate-100 min-h-screen">
@@ -122,7 +123,7 @@ function card(l){
   const img = l.image
     ? '<img src="' + esc(l.image) + '" class="card-img w-full rounded-t-2xl" loading="lazy" alt="">'
     : '<div class="card-img w-full rounded-t-2xl bg-slate-200 flex items-center justify-center text-slate-400 text-4xl">🏠</div>';
-  return '<article class="bg-white rounded-2xl shadow overflow-hidden flex flex-col">'
+  return '<article data-id="' + esc(l.id) + '" class="bg-white rounded-2xl shadow overflow-hidden flex flex-col">'
     + '<div class="relative">' + img + area + del + '</div>'
     + '<div class="p-4 flex flex-col flex-1">'
     + '<h3 class="font-bold leading-snug mb-1">' + esc(l.title || '未命名房源') + '</h3>'
@@ -137,13 +138,52 @@ function card(l){
     + '</div></div></article>';
 }
 
-function render(){
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let reorderTimer = null;
+
+// Re-render the grid. Cards that change position glide to their new spot (FLIP).
+// If anchorId is given, the page scrolls so that card stays where it was on screen.
+function render(anchorId){
+  if (reorderTimer) { clearTimeout(reorderTimer); reorderTimer = null; }
+  const grid = $('#grid');
+  const before = {};
+  grid.querySelectorAll('article[data-id]').forEach(el => { before[el.dataset.id] = el.getBoundingClientRect(); });
   let list = STATE.listings.slice();
   if (filter !== 'all') list = list.filter(l => l.area === filter);
   if (sortBy === 'votes') list.sort((a,b) => (b.votes||[]).length - (a.votes||[]).length || (a.priceUSD||1e9) - (b.priceUSD||1e9));
   else list.sort((a,b) => (a.priceUSD||1e9) - (b.priceUSD||1e9));
-  $('#grid').innerHTML = list.length ? list.map(card).join('') : '<p class="text-slate-400 col-span-full text-center py-10">这个区域还没有候选，贴个链接进来吧 👆</p>';
+  grid.innerHTML = list.length ? list.map(card).join('') : '<p class="text-slate-400 col-span-full text-center py-10">这个区域还没有候选，贴个链接进来吧 👆</p>';
   $('#countLbl').textContent = '共 ' + STATE.listings.length + ' 间候选';
+
+  const anchorEl = anchorId && grid.querySelector('article[data-id="' + CSS.escape(anchorId) + '"]');
+  if (anchorEl && before[anchorId]) window.scrollBy(0, anchorEl.getBoundingClientRect().top - before[anchorId].top);
+  if (reduceMotion) return;
+  grid.querySelectorAll('article[data-id]').forEach(el => {
+    const a = before[el.dataset.id];
+    if (!a) return;
+    const b = el.getBoundingClientRect();
+    const dx = a.left - b.left, dy = a.top - b.top;
+    if (!dx && !dy) return;
+    el.animate([{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }],
+      { duration: 450, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  });
+}
+
+// After a vote: update just that card in place first, then reorder a moment later
+// so the user sees their vote land before the list shuffles.
+function afterVote(id, votes){
+  const i = STATE.listings.findIndex(x => x.id === id);
+  if (i < 0) return;
+  STATE.listings[i].votes = votes;
+  const old = $('#grid').querySelector('article[data-id="' + CSS.escape(id) + '"]');
+  if (!old || sortBy !== 'votes') { render(id); return; }
+  old.outerHTML = card(STATE.listings[i]);
+  if (reorderTimer) clearTimeout(reorderTimer);
+  reorderTimer = setTimeout(() => {
+    render(id);
+    const el = $('#grid').querySelector('article[data-id="' + CSS.escape(id) + '"]');
+    if (el) { el.classList.add('just-voted'); setTimeout(() => el.classList.remove('just-voted'), 1200); }
+  }, 700);
 }
 
 async function refresh(){ const s = await api('/api/state'); STATE = s; render(); enrichMissing(); }
@@ -176,11 +216,11 @@ async function doVote(id){
   const voted = (l.votes || []).some(v => v.token === myToken);
   if (voted) {
     const r = await api('/api/vote', 'POST', { id, token: myToken, name: null });
-    if (r.ok) { const i = STATE.listings.findIndex(x => x.id === id); STATE.listings[i].votes = r.votes; render(); }
+    if (r.ok) afterVote(id, r.votes);
   } else {
     ensureNameThen(async () => {
       const r = await api('/api/vote', 'POST', { id, token: myToken, name: myName });
-      if (r.ok) { const i = STATE.listings.findIndex(x => x.id === id); STATE.listings[i].votes = r.votes; render(); }
+      if (r.ok) afterVote(id, r.votes);
     });
   }
 }
