@@ -77,13 +77,13 @@ works for any group picking a place together.
   豆子 are saved the same way as Blackjack chips, in each hall's own storage,
   so every game's leaderboard is separate and play never touches the KV
   write budget.
-- **鲁班七号躲技能** (`POST /api/dodge/start`, `/api/dodge/finish`,
-  `GET /api/dodge/board`): the game is a deterministic simulation
-  (`worker/dodge/sim.js`, also bundled into the page) that runs in the
-  browser. A run starts with a seed from the `DodgeBoard` Durable Object; at
-  the end the browser sends its recorded inputs and the object replays them
-  to work out the real survival time, so scores can't be made up. Bests are
-  kept in the object's storage, not KV.
+- **鲁班七号躲技能** (`POST /api/dodge/score`, `GET /api/dodge/board`): the
+  game runs entirely in the browser (`web/src/features/dodge/sim.js`). When a
+  run ends the page posts how long you survived to the `DodgeBoard` Durable
+  Object, which checks the login and keeps each person's best in its own
+  storage (not KV). Nothing is held between requests, so a run of any length
+  is recorded; if the post fails, the page keeps the score on the device and
+  sends it again later.
 - **Listing enrichment**: pasted Airbnb URLs are scraped server-side. Because
   Airbnb bot-blocks datacenter IPs, the scraper tries three levels: direct
   fetch → `airbnb.co.uk` (same listing, no bot wall) → the `r.jina.ai` reader

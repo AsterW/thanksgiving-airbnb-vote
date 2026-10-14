@@ -1,9 +1,7 @@
-// 鲁班七号躲技能: the whole game as a deterministic simulation. The browser
-// runs it to play; the server runs it again on the player's recorded inputs
-// to check how long they really survived, so a score can't be made up.
-// Deterministic means: a seeded random generator, a fixed 60 ticks a second,
-// and only + - * / and sqrt on numbers (Math.sin / cos can differ in the last
-// digit between browsers, so the few angles we need come from our own sine).
+// 鲁班七号躲技能: the whole game as a simulation stepped 60 times a second,
+// run in the browser. When you die, the page posts how many ticks you lasted.
+// It's seeded and only uses + - * / and sqrt (with our own sine for the few
+// angles), so the same seed and inputs always play out the same way.
 //
 // Inputs are events [tick, type, a, b], applied at the start of that tick:
 //   [t, 0, x, y]  move to (x, y)              (PC: right-click)
@@ -178,27 +176,4 @@ export function step(g, events) {
   updateSkills(g);
   g.tick++;
   if (g.tick >= MAX_TICKS) g.over = true;
-}
-
-// The server's check: play the recorded inputs again from the same seed.
-// Returns the ticks survived, or null if the inputs aren't well-formed.
-export function replay(seed, events) {
-  if (!Array.isArray(events) || events.length > MAX_TICKS * 3) return null;
-  const g = newGame(seed);
-  let i = 0;
-  while (!g.over) {
-    const now = [];
-    while (i < events.length && events[i][0] === g.tick) now.push(events[i++]);
-    if (i < events.length && !(events[i][0] > g.tick)) return null; // out of order or not a number
-    for (const e of now) if (!validEvent(e)) return null;
-    step(g, now);
-  }
-  return { ticks: g.tick, by: g.by };
-}
-const int = v => Number.isInteger(v);
-function validEvent(e) {
-  if (!Array.isArray(e) || !int(e[0]) || !int(e[1])) return false;
-  if (e[1] === 0) return int(e[2]) && int(e[3]) && e[2] >= 0 && e[2] <= W && e[3] >= 0 && e[3] <= H;
-  if (e[1] === 1 || e[1] === 2) return int(e[2]) && e[2] >= -1 && e[2] < DIRS;
-  return false;
 }

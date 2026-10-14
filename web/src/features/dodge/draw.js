@@ -1,7 +1,7 @@
 // Drawing the arena on a canvas. All our own simple art (no game assets):
 // 鲁班七号 is a little wooden puppet with big eyes, an orange tuft and a
 // backpack; every enemy skill shows a warning on the ground first.
-import { W, H, HERO, SKILLS, headOf } from '../../../../worker/dodge/sim.js';
+import { W, H, HERO, SKILLS, headOf } from './sim.js';
 
 const TAU = Math.PI * 2;
 
