@@ -83,18 +83,21 @@ async function handleExclude(req, env) {
   return j(view(users, a, key));
 }
 
-// Admin: draw (or redraw) once everyone who's in has saved their preferences.
+// Admin: draw (or redraw). The pool is whoever is in AND has saved
+// preferences — no need to wait for stragglers: anyone who hasn't
+// filled theirs in yet sits this round out, and a redraw after they
+// submit pools them in. A redraw only replaces the pairings; saved
+// preferences are never touched here.
 async function handleDraw(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
   if (key !== ADMIN) return j({ ok: false, error: '只有管理员可以抽签' });
   const a = await getAngel(env);
-  const people = roster(users, a);
-  const waiting = people.filter(p => !a.prefs[p.key]);
-  if (waiting.length) return j({ ok: false, error: '还有人没选好：' + waiting.map(p => p.name).join('、') });
+  const pool = roster(users, a).filter(p => a.prefs[p.key]);
+  if (pool.length < 2) return j({ ok: false, error: '至少要有两个人选好愿望才能抽（现在 ' + pool.length + ' 人）' });
   const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
-  const pairs = drawCycle(people.map(p => p.key), rand);
+  const pairs = drawCycle(pool.map(p => p.key), rand);
   if (!pairs) return j({ ok: false, error: '至少要两个人才能抽' });
   a.draw = { at: Date.now(), pairs };
   await saveAngel(env, a);
