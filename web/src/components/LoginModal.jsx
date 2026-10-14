@@ -18,7 +18,7 @@ export default function LoginModal() {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+      <div className="glass-sheet rounded-3xl p-6 w-full max-w-sm">
         <h3 className="font-bold text-lg mb-1">👋 你是谁？</h3>
         <p className="text-sm text-slate-500 mb-4">选一下你的名字就能登录，投票和记账都会记在你名下</p>
         {users.length > 0 && (

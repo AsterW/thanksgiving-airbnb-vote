@@ -49,3 +49,50 @@ body {
 @media (prefers-reduced-transparency: reduce) {
   .glass { background: rgba(247,249,255,.96); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
+
+/* ==== Liquid Glass · 阶段 2/3：卡片、控件、浮层 ====
+   长列表里的卡片用「实色玻璃」：半透明白渐变 + 亮边 + 柔和阴影，但不挂
+   backdrop-filter（几十张卡一起模糊会拖垮手机滚动）；真正的模糊只留给
+   外壳、弹窗、地图浮层这类数量少的表面（.glass / .glass-sheet）。 */
+.glass-card {
+  background: linear-gradient(150deg, rgba(255,255,255,.85), rgba(255,255,255,.64) 58%, rgba(255,255,255,.74));
+  border: 1px solid rgba(255,255,255,.7);
+  box-shadow: 0 10px 28px -10px rgba(30,50,110,.22), inset 0 1px 0 rgba(255,255,255,.9);
+}
+/* 小控件（筛选片、切换钮、下拉）：轻玻璃药丸 */
+.glass-pill {
+  background: linear-gradient(135deg, rgba(255,255,255,.78), rgba(255,255,255,.52));
+  border: 1px solid rgba(255,255,255,.65);
+  box-shadow: 0 4px 14px -4px rgba(30,50,110,.2), inset 0 1px 0 rgba(255,255,255,.85);
+}
+/* 主按钮：带色的玻璃（品牌靛蓝→紫→粉），是页面上饱和度最高的控件 */
+.btn-primary {
+  background: linear-gradient(135deg, rgba(79,70,229,.94), rgba(147,51,234,.9) 55%, rgba(219,39,119,.88));
+  border: 1px solid rgba(255,255,255,.35);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 8px 20px -6px rgba(99,60,235,.55);
+  color: #fff;
+  transition: filter .2s, transform .15s;
+}
+.btn-primary:hover { filter: brightness(1.07); }
+.btn-primary:active { transform: scale(.98); }
+.btn-primary:disabled { opacity: .55; }
+/* 浮层表单（登录、选地点）：真模糊玻璃，比卡片再实一点保证可读性 */
+.glass-sheet {
+  background: linear-gradient(150deg, rgba(255,255,255,.88), rgba(255,255,255,.78));
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(255,255,255,.7);
+  box-shadow: 0 24px 60px -12px rgba(15,23,64,.4), inset 0 1px 0 rgba(255,255,255,.95);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-sheet { background: rgba(248,250,255,.97); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass-sheet { background: rgba(248,250,255,.98); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+/* 提醒条（航班还没填全）：暖琥珀色的实色玻璃，语义色保留 */
+.glass-warn {
+  background: linear-gradient(150deg, rgba(255,251,235,.9), rgba(254,243,199,.72));
+  border: 1px solid rgba(255,255,255,.7);
+  box-shadow: 0 10px 28px -10px rgba(120,80,10,.25), inset 0 1px 0 rgba(255,255,255,.9);
+}

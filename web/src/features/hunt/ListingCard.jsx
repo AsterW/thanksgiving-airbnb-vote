@@ -14,7 +14,7 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
   const pics = l.images && l.images.length ? l.images : l.image ? [l.image] : [];
   return (
     <article ref={cardRef} data-id={l.id}
-      className={'bg-white rounded-2xl shadow overflow-hidden flex flex-col' + (chosen ? ' ring-4 ring-amber-400' : '') + (isBooked(l, T) ? ' opacity-60 grayscale-[40%] hover:opacity-100 hover:grayscale-0 transition' : '') + (glow ? ' just-voted' : '')}>
+      className={'glass-card rounded-2xl overflow-hidden flex flex-col' + (chosen ? ' ring-4 ring-amber-400' : '') + (isBooked(l, T) ? ' opacity-60 grayscale-[40%] hover:opacity-100 hover:grayscale-0 transition' : '') + (glow ? ' just-voted' : '')}>
       <div className="relative car-wrap">
         <Carousel pics={pics} />
         <AreaBadge area={l.area} zones={zones} onChange={a => onSetArea(l, a)} />

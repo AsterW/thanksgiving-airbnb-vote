@@ -55,9 +55,9 @@ export default function SwipeDeck({ cards, onPick, onDone }) {
         </div>
       </div>
       <div className="flex items-center gap-4 mt-6">
-        <button onClick={() => decide('nope')} className="angel-round bg-white text-2xl" aria-label="不要">🙅</button>
+        <button onClick={() => decide('nope')} className="angel-round glass-pill text-2xl" aria-label="不要">🙅</button>
         <button onClick={() => decide(null)} className="angel-round small bg-white text-sm font-bold text-slate-500" aria-label="随便">随便</button>
-        <button onClick={() => decide('love')} className="angel-round bg-white text-2xl" aria-label="想要">💖</button>
+        <button onClick={() => decide('love')} className="angel-round glass-pill text-2xl" aria-label="想要">💖</button>
       </div>
     </div>
   );

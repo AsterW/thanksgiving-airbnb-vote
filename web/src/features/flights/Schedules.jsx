@@ -7,7 +7,7 @@ const leg = (f, tz, field) => localTime(f[field], tz, false);
 export function Pickups({ runs, onClaim }) {
   const { name } = useSession();
   return (
-    <section className="bg-white rounded-2xl shadow p-5">
+    <section className="glass-card rounded-2xl p-5">
       <h2 className="font-bold text-lg">🛬 接机提醒</h2>
       <p className="text-xs text-slate-500 mb-3">建议时间 = 落地后到路边（国内约 {CURB_MIN.domestic} 分钟拿行李，国际约 {CURB_MIN.international} 分钟过海关）；同一机场一小时内陆续到的人合成一趟</p>
       {!runs.length && <p className="text-sm text-slate-400">还没有人填到达航班</p>}
@@ -21,7 +21,7 @@ export function Pickups({ runs, onClaim }) {
                 <span className="font-black text-lg tabular-nums">{localTime(r.pickupAt, r.airport.tz)}</span>
                 <span className="text-sm">到 <b>{r.airport.iata}</b> {r.airport.city} 接 {r.items.length} 人</span>
                 <span className="ml-auto text-sm">{drivers.length ? '🚗 ' + drivers.join('、') : '⚠️ 还没人认领'}</span>
-                {name && <button onClick={() => onClaim(r.items.map(i => i.name), !mine)} className={'text-sm font-bold rounded-full px-3 py-1 ' + (mine ? 'bg-white border text-slate-600' : 'bg-emerald-600 text-white')}>{mine ? '取消认领' : '我来接'}</button>}
+                {name && <button onClick={() => onClaim(r.items.map(i => i.name), !mine)} className={'text-sm font-bold rounded-full px-3 py-1 ' + (mine ? 'glass-pill text-slate-600' : 'bg-emerald-600 text-white')}>{mine ? '取消认领' : '我来接'}</button>}
               </div>
               <ul className="mt-2 text-sm space-y-1">
                 {r.items.map(i => (
@@ -43,7 +43,7 @@ export function Pickups({ runs, onClaim }) {
 // 🛫 离开：全员一起去机场还租的车，按最早起飞的那班倒推整组的时间
 export function Departures({ runs }) {
   return (
-    <section className="bg-white rounded-2xl shadow p-5">
+    <section className="glass-card rounded-2xl p-5">
       <h2 className="font-bold text-lg">🛫 离开：全员到机场时间</h2>
       <p className="text-xs text-slate-500 mb-3">大家一起去机场还车，所以按最早起飞的那班算：国内航班起飞前 {AIRPORT_EARLY_MIN.domestic / 60} 小时、国际 {AIRPORT_EARLY_MIN.international / 60} 小时到航站楼（DEN 安检常常排长队），再提前 {CAR_RETURN_MIN} 分钟到租车点还车、坐摆渡车。从住的地方出发还要加上开车时间</p>
       {!runs.length && <p className="text-sm text-slate-400">还没有人填离开航班</p>}

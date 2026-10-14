@@ -1,7 +1,7 @@
 // 斗地主自己的豆子榜（和 21 点的筹码榜分开）
 export default function DdzBoard({ rows }) {
   return (
-    <aside className="bg-white rounded-2xl shadow p-5 self-start">
+    <aside className="glass-card rounded-2xl p-5 self-start">
       <h2 className="font-bold text-lg mb-1">🏆 斗地主豆子榜</h2>
       <p className="text-xs text-slate-500 mb-3">站起来时才保存豆子 · 初始 1000，输光了自动补给</p>
       {rows.length ? rows.map((r, i) => (

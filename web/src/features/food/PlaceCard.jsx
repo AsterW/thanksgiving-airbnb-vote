@@ -8,7 +8,7 @@ export default function PlaceCard({ p, token, cardRef, pop, onVote, onRemove }) 
   const votes = p.votes || [];
   const voted = votes.some(v => v.token === token);
   return (
-    <article ref={cardRef} data-id={p.id} className="bg-white rounded-2xl shadow overflow-hidden flex flex-col">
+    <article ref={cardRef} data-id={p.id} className="glass-card rounded-2xl overflow-hidden flex flex-col">
       <div className="relative car-wrap">
         <Carousel pics={p.images || []} placeholder="🍜" />
         <button onClick={() => onRemove(p)} title="删除这家" className="absolute top-3 right-3 bg-black/60 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>

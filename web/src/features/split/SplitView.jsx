@@ -33,7 +33,7 @@ export default function SplitView({ active }) {
   useEffect(() => { if (active) load(); }, [active, load]); // 每次进来拿最新的账，别人可能刚记了
 
   return (
-    <section className="bg-white rounded-2xl shadow p-5">
+    <section className="glass-card rounded-2xl p-5">
       <Members names={names} onAdded={apply} />
       <ExpenseForm names={names} me={name} onSaved={apply} />
       <Balances balances={ledger.balances} settlements={ledger.settlements} />

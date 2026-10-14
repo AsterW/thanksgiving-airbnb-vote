@@ -83,7 +83,7 @@ export default function ListingMap({ items, T, token, fitKey, visible, hotId, on
 
   const missing = items.filter(l => l.lat == null || l.lng == null).length;
   return (
-    <section id="mapBox" className="bg-white rounded-2xl shadow overflow-hidden mb-5">
+    <section id="mapBox" className="glass-card rounded-2xl overflow-hidden mb-5">
       <div id="map" ref={box}></div>
       {missing > 0 && <div className="absolute left-3 bottom-3 z-[1000] bg-white/90 backdrop-blur text-xs text-slate-600 rounded-full px-3 py-1 shadow">{missing} 间还在获取位置…</div>}
     </section>

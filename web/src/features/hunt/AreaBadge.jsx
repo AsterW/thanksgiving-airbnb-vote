@@ -23,7 +23,7 @@ export default function AreaBadge({ area, zones, onChange }) {
         {area || '📍 设置区域'} <span className="opacity-70">▾</span>
       </button>
       {open && (
-        <div className="mt-1 w-56 bg-white rounded-xl shadow-xl p-2 text-sm text-slate-700">
+        <div className="mt-1 w-56 glass-sheet rounded-xl p-2 text-sm text-slate-700">
           <div className="max-h-48 overflow-auto">
             {zones.map(z => (
               <button key={z} onClick={() => pick(z)} className={'block w-full text-left px-2 py-1.5 rounded-lg hover:bg-indigo-50 ' + (z === area ? 'font-bold text-indigo-600' : '')}>

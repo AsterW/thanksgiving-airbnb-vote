@@ -93,7 +93,7 @@ export default function LocationPicker({ initial, onSave, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="glass-sheet w-full max-w-2xl rounded-t-3xl sm:rounded-3xl overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <p className="font-bold">📍 选地点</p>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none px-2">✕</button>
