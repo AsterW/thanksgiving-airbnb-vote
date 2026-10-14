@@ -5,7 +5,7 @@
 import { j } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
-import { getState, saveState } from './state.js';
+import { updateState } from './state.js';
 
 const ADMIN = 'aster';
 
@@ -50,11 +50,13 @@ async function handleDecision(req, env) {
   const user = await caller(env, body.name, body.token);
   if (!user || user.name.toLowerCase() !== ADMIN) return j({ ok: false, error: '只有管理员可以改选' });
   if (votingOpen(trip)) return j({ ok: false, error: '投票还没截止' });
-  const state = await getState(env, trip);
-  if (body.listingId && !state.listings.some(l => l.id === body.listingId)) return j({ ok: false, error: '房源不存在' });
-  state.decision = body.listingId ? { listingId: body.listingId, by: user.name, at: Date.now() } : null;
-  await saveState(env, trip, state);
-  return j({ ok: true, vote: voteView(state, trip) });
+  const out = await updateState(env, trip, state => {
+    if (body.listingId && !state.listings.some(l => l.id === body.listingId)) return { error: '房源不存在' };
+    state.decision = body.listingId ? { listingId: body.listingId, by: user.name, at: Date.now() } : null;
+    return { vote: voteView(state, trip) };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, vote: out.vote });
 }
 
 // Booking the pick: claim ("I'll book it"), release, or mark booked with details.
@@ -64,25 +66,27 @@ async function handleBooking(req, env) {
   const trip = tripOf(body.trip);
   const user = await caller(env, body.name, body.token);
   if (!user) return j({ ok: false, error: '先登录' });
-  const state = await getState(env, trip);
-  const view = voteView(state, trip);
-  if (!view.chosenId) return j({ ok: false, error: '还没有选定的房源' });
-  const cur = view.booking;
-  const mayEdit = !cur || sameName(cur.by, user.name) || user.name.toLowerCase() === ADMIN;
-  if (body.action === 'claim') {
-    if (cur && !sameName(cur.by, user.name)) return j({ ok: false, error: cur.by + ' 已经在负责订了' });
-    state.booking = { listingId: view.chosenId, by: user.name, status: 'claimed', at: Date.now() };
-  } else if (body.action === 'release') {
-    if (!mayEdit) return j({ ok: false, error: '只有负责的人或管理员可以取消' });
-    state.booking = null;
-  } else if (body.action === 'booked') {
-    if (!mayEdit) return j({ ok: false, error: '只有负责的人或管理员可以标记已订' });
-    const total = Number(body.totalUSD);
-    state.booking = { listingId: view.chosenId, by: cur ? cur.by : user.name, status: 'booked', at: Date.now(),
-      confirmation: String(body.confirmation || '').trim().slice(0, 40), totalUSD: isFinite(total) && total > 0 ? Math.round(total) : null };
-  } else return j({ ok: false, error: '不认识的操作' });
-  await saveState(env, trip, state);
-  return j({ ok: true, vote: voteView(state, trip) });
+  const out = await updateState(env, trip, state => {
+    const view = voteView(state, trip);
+    if (!view.chosenId) return { error: '还没有选定的房源' };
+    const cur = view.booking;
+    const mayEdit = !cur || sameName(cur.by, user.name) || user.name.toLowerCase() === ADMIN;
+    if (body.action === 'claim') {
+      if (cur && !sameName(cur.by, user.name)) return { error: cur.by + ' 已经在负责订了' };
+      state.booking = { listingId: view.chosenId, by: user.name, status: 'claimed', at: Date.now() };
+    } else if (body.action === 'release') {
+      if (!mayEdit) return { error: '只有负责的人或管理员可以取消' };
+      state.booking = null;
+    } else if (body.action === 'booked') {
+      if (!mayEdit) return { error: '只有负责的人或管理员可以标记已订' };
+      const total = Number(body.totalUSD);
+      state.booking = { listingId: view.chosenId, by: cur ? cur.by : user.name, status: 'booked', at: Date.now(),
+        confirmation: String(body.confirmation || '').trim().slice(0, 40), totalUSD: isFinite(total) && total > 0 ? Math.round(total) : null };
+    } else return { error: '不认识的操作' };
+    return { vote: voteView(state, trip) };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, vote: out.vote });
 }
 
 export const routes = {

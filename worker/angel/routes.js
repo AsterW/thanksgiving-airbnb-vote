@@ -1,7 +1,9 @@
 // Secret Angel: everyone saves gift preferences; once they're all in, the
 // admin draws who gives a gift to whom. Each person is only ever sent their
-// own match. Stored in KV under angel:v1, keyed by lower-cased user name.
+// own match. Stored in the store (worker/store) under angel:v1 — its old
+// KV key, imported on first read — keyed by lower-cased user name.
 import { j } from '../lib/http.js';
+import { readDoc, transact } from '../lib/store.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
 import { drawCycle } from './draw.js';
 
@@ -13,13 +15,31 @@ const ANGEL_KEY = 'angel:v1';
 const DEFAULT_ADMIN = 'aster';
 const PICK_VALUES = ['love', 'nope'];
 
-async function getAngel(env) {
-  const raw = await env.VOTES_KV.get(ANGEL_KEY);
-  const a = raw ? JSON.parse(raw) : { prefs: {}, excluded: [], draw: null };
+const emptyAngel = () => ({ prefs: {}, excluded: [], draw: null });
+const normalizeAngel = a => {
+  if (!a || typeof a !== 'object') a = emptyAngel();
+  if (!a.prefs) a.prefs = {};
+  if (!Array.isArray(a.excluded)) a.excluded = [];
+  if (!('draw' in a)) a.draw = null;
   if (!a.admin) a.admin = DEFAULT_ADMIN;
   return a;
+};
+
+async function getAngel(env) {
+  const { doc } = await readDoc(env, ANGEL_KEY);
+  return normalizeAngel(doc);
 }
-const saveAngel = (env, a) => env.VOTES_KV.put(ANGEL_KEY, JSON.stringify(a));
+
+// fn(a) mutates the freshest angel document and returns the handler's
+// result; the commit is version-checked (see lib/store.js), so two
+// people saving wishes in the same second can't erase each other.
+async function updateAngel(env, fn) {
+  return transact(env, ANGEL_KEY, async doc => {
+    const a = normalizeAngel(doc);
+    const result = await fn(a);
+    return { doc: a, result };
+  });
+}
 
 // The caller, if their name and token match the user list (same check as
 // sitting down at Blackjack).
@@ -70,9 +90,10 @@ async function handlePrefs(req, env) {
     if (/^[a-z_]{1,24}$/.test(cat) && PICK_VALUES.includes(v)) picks[cat] = v;
   }
   if (!Object.values(picks).includes('love')) return j({ ok: false, error: '至少选一样想要的 💖' });
-  const a = await getAngel(env);
-  a.prefs[key] = { picks, note: String(body.note || '').trim().slice(0, 200), updatedAt: Date.now() };
-  await saveAngel(env, a);
+  const a = await updateAngel(env, a => {
+    a.prefs[key] = { picks, note: String(body.note || '').trim().slice(0, 200), updatedAt: Date.now() };
+    return a;
+  });
   return j(view(users, a, key));
 }
 
@@ -81,14 +102,16 @@ async function handleExclude(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
-  const a = await getAngel(env);
-  if (!key || key !== a.admin) return j({ ok: false, error: '只有管理员可以操作' });
   const target = cleanName(body.target).toLowerCase();
-  if (!users.some(u => u.name.toLowerCase() === target)) return j({ ok: false, error: '没有这个人' });
-  a.excluded = a.excluded.filter(k => k !== target);
-  if (body.excluded) a.excluded.push(target);
-  await saveAngel(env, a);
-  return j(view(users, a, key));
+  const out = await updateAngel(env, a => {
+    if (!key || key !== a.admin) return { error: '只有管理员可以操作' };
+    if (!users.some(u => u.name.toLowerCase() === target)) return { error: '没有这个人' };
+    a.excluded = a.excluded.filter(k => k !== target);
+    if (body.excluded) a.excluded.push(target);
+    return { a };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j(view(users, out.a, key));
 }
 
 // Admin: draw (or redraw / reshuffle). The pool is whoever is in AND
@@ -100,16 +123,18 @@ async function handleDraw(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
-  const a = await getAngel(env);
-  if (!key || key !== a.admin) return j({ ok: false, error: '只有管理员可以抽签' });
-  const pool = roster(users, a).filter(p => a.prefs[p.key]);
-  if (pool.length < 2) return j({ ok: false, error: '至少要有两个人选好愿望才能抽（现在 ' + pool.length + ' 人）' });
-  const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
-  const pairs = drawCycle(pool.map(p => p.key), rand);
-  if (!pairs) return j({ ok: false, error: '至少要两个人才能抽' });
-  a.draw = { at: Date.now(), pairs };
-  await saveAngel(env, a);
-  return j(view(users, a, key));
+  const out = await updateAngel(env, a => {
+    if (!key || key !== a.admin) return { error: '只有管理员可以抽签' };
+    const pool = roster(users, a).filter(p => a.prefs[p.key]);
+    if (pool.length < 2) return { error: '至少要有两个人选好愿望才能抽（现在 ' + pool.length + ' 人）' };
+    const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
+    const pairs = drawCycle(pool.map(p => p.key), rand);
+    if (!pairs) return { error: '至少要两个人才能抽' };
+    a.draw = { at: Date.now(), pairs };
+    return { a };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j(view(users, out.a, key));
 }
 
 // Admin: hand the admin role to another member. This is what makes
@@ -119,13 +144,15 @@ async function handleAdmin(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const { users, key } = await caller(env, body.name, body.token);
-  const a = await getAngel(env);
-  if (!key || key !== a.admin) return j({ ok: false, error: '只有当前管理员可以转让管理员' });
   const target = cleanName(body.target).toLowerCase();
-  if (!users.some(u => u.name.toLowerCase() === target)) return j({ ok: false, error: '没有这个人' });
-  a.admin = target;
-  await saveAngel(env, a);
-  return j(view(users, a, key));
+  const out = await updateAngel(env, a => {
+    if (!key || key !== a.admin) return { error: '只有当前管理员可以转让管理员' };
+    if (!users.some(u => u.name.toLowerCase() === target)) return { error: '没有这个人' };
+    a.admin = target;
+    return { a };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j(view(users, out.a, key));
 }
 
 export const routes = {

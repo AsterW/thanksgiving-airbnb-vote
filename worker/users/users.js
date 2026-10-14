@@ -1,8 +1,11 @@
 // The group's user list: one list shared by every trip and feature, so
 // people pick their name from a dropdown instead of typing it again.
+// Stored in the store (worker/store) under its old KV key; the store
+// imports the legacy KV value on first read.
 import { j, uid } from '../lib/http.js';
+import { readDoc, transact } from '../lib/store.js';
 import { TRIPS } from '../config/trips.js';
-import { getState, saveState } from '../listings/state.js';
+import { getState, updateState } from '../listings/state.js';
 
 export const cleanName = v => String(v || '').trim().slice(0, 20);
 
@@ -13,11 +16,9 @@ export const cleanName = v => String(v || '').trim().slice(0, 20);
 const USERS_KEY = 'users:v1';
 export const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
 
-export async function getUsers(env) {
-  const raw = await env.VOTES_KV.get(USERS_KEY);
-  if (raw) return JSON.parse(raw);
-  // First run: build the list from everyone who already voted or was added
-  // as a splitwise member, reusing the token from their votes.
+// First run: build the list from everyone who already voted or was added
+// as a splitwise member, reusing the token from their votes.
+async function buildUsers(env) {
   const users = [];
   const add = (name, token) => {
     name = cleanName(name);
@@ -28,8 +29,29 @@ export async function getUsers(env) {
     state.listings.forEach(l => (l.votes || []).forEach(v => add(v.name, v.token)));
     state.members.forEach(m => add(m));
   }
-  await env.VOTES_KV.put(USERS_KEY, JSON.stringify(users));
   return users;
+}
+
+export async function getUsers(env) {
+  const { doc } = await readDoc(env, USERS_KEY);
+  if (doc) return doc;
+  // Persist the built list once, through the versioned write path.
+  return transact(env, USERS_KEY, async current => {
+    if (current) return { result: current };
+    const users = await buildUsers(env);
+    return { doc: users, result: users };
+  });
+}
+
+// fn(users) mutates the freshest list and returns the caller's result;
+// the commit is version-checked (see lib/store.js), so two people
+// logging in or being added in the same second can't erase each other.
+async function updateUsers(env, fn) {
+  return transact(env, USERS_KEY, async doc => {
+    const users = doc || await buildUsers(env);
+    const result = await fn(users);
+    return { doc: users, result };
+  });
 }
 export const publicUsers = users => users.map(u => ({ name: u.name, token: u.token }))
   .sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
@@ -38,17 +60,18 @@ export const canonName = (users, name) => (users.find(u => sameName(u.name, name
 
 // Add any names that aren't in the user list yet; returns the list.
 export async function addUsers(env, names) {
-  const users = await getUsers(env);
-  let changed = false;
-  for (const raw of names) {
-    const name = cleanName(raw);
-    if (name && !users.some(u => sameName(u.name, name))) {
-      users.push({ name, token: uid(), createdAt: Date.now() });
-      changed = true;
+  return transact(env, USERS_KEY, async doc => {
+    const users = doc || await buildUsers(env);
+    let changed = !doc; // a freshly built list needs persisting even if no name is new
+    for (const raw of names) {
+      const name = cleanName(raw);
+      if (name && !users.some(u => sameName(u.name, name))) {
+        users.push({ name, token: uid(), createdAt: Date.now() });
+        changed = true;
+      }
     }
-  }
-  if (changed) await env.VOTES_KV.put(USERS_KEY, JSON.stringify(users));
-  return users;
+    return changed ? { doc: users, result: users } : { result: users };
+  });
 }
 
 // Log in as an existing name, or create it. Names are unique (case-insensitive).
@@ -57,32 +80,32 @@ async function handleLogin(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const name = cleanName(body.name);
   if (!name) return j({ ok: false, error: '名字是必填的' });
-  const users = await getUsers(env);
-  let user = users.find(u => sameName(u.name, name));
-  if (!user) {
-    const token = String(body.token || '').slice(0, 80) || uid();
-    user = { name, token: users.some(u => u.token === token) ? uid() : token, createdAt: Date.now() };
-    users.push(user);
-    await env.VOTES_KV.put(USERS_KEY, JSON.stringify(users));
-  }
+  await getUsers(env); // make sure the list (and its first-run build) exists
+  const { user, users } = await updateUsers(env, users => {
+    let user = users.find(u => sameName(u.name, name));
+    if (!user) {
+      const token = String(body.token || '').slice(0, 80) || uid();
+      user = { name, token: users.some(u => u.token === token) ? uid() : token, createdAt: Date.now() };
+      users.push(user);
+    }
+    return { user, users };
+  });
   // This device may have voted under its own token before logging in as an
   // existing user: move those votes (same name only) onto the user's token.
   const oldToken = String(body.token || '');
   if (oldToken && oldToken !== user.token) {
     for (const key of Object.keys(TRIPS)) {
-      const state = await getState(env, TRIPS[key]);
-      let changed = false;
-      for (const l of state.listings) {
-        const votes = l.votes || [];
-        if (!votes.some(v => v.token === oldToken && sameName(v.name || '', user.name))) continue;
-        const hasUserVote = votes.some(v => v.token === user.token);
-        l.votes = votes.flatMap(v => {
-          if (v.token !== oldToken || !sameName(v.name || '', user.name)) return [v];
-          return hasUserVote ? [] : [{ ...v, token: user.token }];
-        });
-        changed = true;
-      }
-      if (changed) await saveState(env, TRIPS[key], state);
+      await updateState(env, TRIPS[key], state => {
+        for (const l of state.listings) {
+          const votes = l.votes || [];
+          if (!votes.some(v => v.token === oldToken && sameName(v.name || '', user.name))) continue;
+          const hasUserVote = votes.some(v => v.token === user.token);
+          l.votes = votes.flatMap(v => {
+            if (v.token !== oldToken || !sameName(v.name || '', user.name)) return [v];
+            return hasUserVote ? [] : [{ ...v, token: user.token }];
+          });
+        }
+      });
     }
   }
   return j({ ok: true, user: { name: user.name, token: user.token }, users: publicUsers(users) });

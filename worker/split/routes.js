@@ -2,7 +2,7 @@
 import { j, uid } from '../lib/http.js';
 import { addUsers, canonName, cleanName, publicUsers } from '../users/users.js';
 import { splitView } from './ledger.js';
-import { getSplit, saveSplit } from './store.js';
+import { getSplit, updateSplit } from './store.js';
 
 // Validates the fields of an expense being added or edited.
 // Returns { error } or { fields, users }.
@@ -26,11 +26,12 @@ async function handleExpenseAdd(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const { error, fields, users } = await readExpense(body, env);
   if (error) return j({ ok: false, error });
-  const split = await getSplit(env);
   const expense = { id: uid(), ...fields, createdAt: Date.now() };
-  split.expenses.unshift(expense);
-  await saveSplit(env, split);
-  return j({ ok: true, expense, users: publicUsers(users), ...splitView(split) });
+  const view = await updateSplit(env, split => {
+    split.expenses.unshift(expense);
+    return splitView(split);
+  });
+  return j({ ok: true, expense, users: publicUsers(users), ...view });
 }
 
 // Fix a wrong description, amount, payer or set of people. The expense keeps
@@ -38,25 +39,33 @@ async function handleExpenseAdd(req, env) {
 async function handleExpenseUpdate(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
-  const split = await getSplit(env);
-  const expense = split.expenses.find(e => e.id === body.id);
-  if (!expense) return j({ ok: false, error: '支出不存在' });
+  // Existence first (as before), then field validation; the check runs
+  // again inside the transaction against the freshest ledger.
+  const before = await getSplit(env);
+  if (!before.expenses.some(e => e.id === body.id)) return j({ ok: false, error: '支出不存在' });
   const { error, fields, users } = await readExpense(body, env);
   if (error) return j({ ok: false, error });
-  Object.assign(expense, fields, { updatedAt: Date.now() });
-  await saveSplit(env, split);
-  return j({ ok: true, expense, users: publicUsers(users), ...splitView(split) });
+  const out = await updateSplit(env, split => {
+    const expense = split.expenses.find(e => e.id === body.id);
+    if (!expense) return { error: '支出不存在' };
+    Object.assign(expense, fields, { updatedAt: Date.now() });
+    return { expense, view: splitView(split) };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, expense: out.expense, users: publicUsers(users), ...out.view });
 }
 
 async function handleExpenseRemove(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
-  const split = await getSplit(env);
-  const i = split.expenses.findIndex(e => e.id === body.id);
-  if (i < 0) return j({ ok: false, error: '支出不存在' });
-  split.expenses.splice(i, 1);
-  await saveSplit(env, split);
-  return j({ ok: true, ...splitView(split) });
+  const out = await updateSplit(env, split => {
+    const i = split.expenses.findIndex(e => e.id === body.id);
+    if (i < 0) return { error: '支出不存在' };
+    split.expenses.splice(i, 1);
+    return { view: splitView(split) };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, ...out.view });
 }
 
 export const routes = {

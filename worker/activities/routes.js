@@ -6,7 +6,7 @@
 import { j, uid } from '../lib/http.js';
 import { cleanName } from '../users/users.js';
 import { fetchLinkInfo } from './parse.js';
-import { getActivities, saveActivities, isSeedId } from './store.js';
+import { getActivities, updateActivities, isSeedId } from './store.js';
 import { isMapsLink, expandLink, readLink } from '../food/maps.js';
 
 // Cards members add themselves land in this area group, after the seeded ones.
@@ -27,17 +27,19 @@ async function handleActivityVote(req, env) {
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const { id, token, name } = body;
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
-  const doc = await getActivities(env);
-  const act = doc.items.find(a => a.id === id);
-  if (!act) return j({ ok: false, error: '活动不存在' });
-  act.votes = (act.votes || []).filter(v => v.token !== token);
-  let voted = false;
-  if (name) {
-    act.votes.push({ token: String(token).slice(0, 80), name: String(name).slice(0, 20), at: Date.now() });
-    voted = true;
-  }
-  await saveActivities(env, doc);
-  return j({ ok: true, votes: act.votes, voted });
+  const out = await updateActivities(env, doc => {
+    const act = doc.items.find(a => a.id === id);
+    if (!act) return { error: '活动不存在' };
+    act.votes = (act.votes || []).filter(v => v.token !== token);
+    let voted = false;
+    if (name) {
+      act.votes.push({ token: String(token).slice(0, 80), name: String(name).slice(0, 20), at: Date.now() });
+      voted = true;
+    }
+    return { votes: act.votes, voted };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, votes: out.votes, voted: out.voted });
 }
 
 async function handleActivityAdd(req, env) {
@@ -65,8 +67,6 @@ async function handleActivityAdd(req, env) {
     }
   }
   const info = linkName ? { ok: true, title: '', blurb: '', img: '' } : await fetchLinkInfo(url);
-  const doc = await getActivities(env);
-  if (doc.items.some(a => a.url === url)) return j({ ok: false, error: '这个链接已经在列表里了' });
   const givenTitle = String(body.title || '').trim().slice(0, 120);
   const by = cleanName(body.name);
   const act = {
@@ -85,21 +85,29 @@ async function handleActivityAdd(req, env) {
     lng: place ? place.lng : null,
     votes: [],
   };
-  doc.items.push(act);
-  await saveActivities(env, doc);
-  return j({ ok: true, activity: act, parsed: info.ok });
+  // Insert in a transaction with the dedupe check re-run inside: the
+  // fetch above was slow, and the fast-path check is not authoritative.
+  const out = await updateActivities(env, doc => {
+    if (doc.items.some(a => a.url === url)) return { error: '这个链接已经在列表里了' };
+    doc.items.push(act);
+    return { activity: act };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, activity: out.activity, parsed: info.ok });
 }
 
 async function handleActivityRemove(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
-  const doc = await getActivities(env);
-  const i = doc.items.findIndex(a => a.id === body.id);
-  if (i < 0) return j({ ok: false, error: '活动不存在' });
-  doc.items.splice(i, 1);
-  // A deleted seed card must not come back on the next seed refresh.
-  if (isSeedId(body.id) && !doc.removedIds.includes(body.id)) doc.removedIds.push(body.id);
-  await saveActivities(env, doc);
+  const out = await updateActivities(env, doc => {
+    const i = doc.items.findIndex(a => a.id === body.id);
+    if (i < 0) return { error: '活动不存在' };
+    doc.items.splice(i, 1);
+    // A deleted seed card must not come back on the next seed refresh.
+    if (isSeedId(body.id) && !doc.removedIds.includes(body.id)) doc.removedIds.push(body.id);
+    return {};
+  });
+  if (out.error) return j({ ok: false, error: out.error });
   return j({ ok: true });
 }
 
@@ -109,15 +117,17 @@ async function handleActivityRemove(req, env) {
 async function handleActivityPlace(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
-  const doc = await getActivities(env);
-  const act = doc.items.find(a => a.id === body.id);
-  if (!act) return j({ ok: false, error: '活动不存在' });
   const place = cleanPlace(body.place);
-  act.place = place ? place.place : '';
-  act.lat = place ? place.lat : null;
-  act.lng = place ? place.lng : null;
-  await saveActivities(env, doc);
-  return j({ ok: true, activity: act });
+  const out = await updateActivities(env, doc => {
+    const act = doc.items.find(a => a.id === body.id);
+    if (!act) return { error: '活动不存在' };
+    act.place = place ? place.place : '';
+    act.lat = place ? place.lat : null;
+    act.lng = place ? place.lng : null;
+    return { activity: act };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, activity: out.activity });
 }
 
 // Set or clear a card's banner picture. Cards added before the parser
@@ -127,13 +137,15 @@ async function handleActivityPlace(req, env) {
 async function handleActivityImage(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
-  const doc = await getActivities(env);
-  const act = doc.items.find(a => a.id === body.id);
-  if (!act) return j({ ok: false, error: '活动不存在' });
   const img = String(body.img || '').trim().slice(0, 1000);
-  act.img = /^https?:\/\//i.test(img) ? img : '';
-  await saveActivities(env, doc);
-  return j({ ok: true, activity: act });
+  const out = await updateActivities(env, doc => {
+    const act = doc.items.find(a => a.id === body.id);
+    if (!act) return { error: '活动不存在' };
+    act.img = /^https?:\/\//i.test(img) ? img : '';
+    return { activity: act };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, activity: out.activity });
 }
 
 export const routes = {
