@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { addLightGray } from '../../lib/tiles.js';
+import { cooperativeGestures, addHomeButton } from '../../lib/mapTools.js';
 import { esc, statsLine } from '../../lib/format.js';
 import { effPrice, isBooked } from './price.js';
 
@@ -27,19 +28,34 @@ function popupEl(l, onFocus) {
 export default function ListingMap({ items, T, token, fitKey, visible, hotId, onFocus }) {
   const box = useRef(null);
   const map = useRef(null), layer = useRef(null), pins = useRef(new Map()), fitted = useRef('');
+  const ptsRef = useRef([]);
   const focus = useRef(onFocus);
   focus.current = onFocus;
+
+  // 回到默认视角：和下面取景同一套规则（钉子全景 / 单钉放大 / 没钉看科州中部）
+  const goHome = () => {
+    const m = map.current;
+    if (!m) return;
+    const pts = ptsRef.current;
+    m.invalidateSize();
+    if (pts.length === 1) m.setView(pts[0], 12);
+    else if (pts.length) m.fitBounds(pts, { padding: [40, 40], maxZoom: 13 });
+    else m.setView([39.2, -105.3], 7);
+  };
 
   // 第一次看得见的时候才建地图（藏着的时候量不到尺寸）
   useEffect(() => {
     if (!visible || map.current) return;
-    const m = L.map(box.current, { scrollWheelZoom: false, zoomControl: true, attributionControl: true, zoomSnap: 0.25 });
+    const m = L.map(box.current, { scrollWheelZoom: false, zoomControl: true, attributionControl: true, zoomSnap: 0.25, dragging: false });
     addLightGray(m);
     m.setView([39.2, -105.3], 7); // 科罗拉多中部，等房源坐标来了再缩放
     m.on('click', () => m.scrollWheelZoom.enable()); // 点一下地图之后才允许滚轮缩放，免得滚页面时误缩放
     m.on('mouseout', () => m.scrollWheelZoom.disable());
+    cooperativeGestures(m); // 单指划过不抢滚动，双指才拖动
+    addHomeButton(m, goHome);
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
   useEffect(() => () => { map.current?.remove(); map.current = null; }, []);
 
@@ -60,6 +76,7 @@ export default function ListingMap({ items, T, token, fitKey, visible, hotId, on
       pins.current.set(l.id, mk);
       pts.push([l.lat, l.lng]);
     }
+    ptsRef.current = pts;
     // 只有房源集合变了（换行程/筛选/新加房源）才重新取景，投票重排不动地图。
     // 不做动画：坐标是一间间陆续到的，连续的缩放动画会互相打断，停在半路
     if (fitKey !== fitted.current) {

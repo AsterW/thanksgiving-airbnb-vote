@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { addLightGray, GRAY_ATTR } from '../../lib/tiles.js';
+import { addHomeButton } from '../../lib/mapTools.js';
 import { esc } from '../../lib/format.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { duration, localTime } from './plan.js';
@@ -119,6 +120,7 @@ export default function FlightMap({ people, mode }) {
   const phases = useRef(new Map()); // 每条航线的飞机进度，跨重画保留
   const latest = useRef({ people, mode });
   latest.current = { people, mode };
+  const homeBounds = useRef([]); // 最近一次取景的范围，「默认视角」按钮回到这里
   // 内容签名：上层每次渲染都给新数组（travelers 是现 filter 的），只认对象身份的话
   // 任何一次重渲染都会把地图推倒重来——线重画、飞机回起点、视图重新 fit。
   // 改成只看内容：航班没变，地图一个像素都不许动。
@@ -135,6 +137,8 @@ export default function FlightMap({ people, mode }) {
     m.setView([39.86, -104.67], 4);
     m.on('click', () => m.scrollWheelZoom.enable());
     m.on('mouseout', () => m.scrollWheelZoom.disable());
+    // 地图保持锁死（不加手势协作），但给一个回默认视角：缩放漂了能一键回到航线全景
+    addHomeButton(m, () => { if (homeBounds.current.length) m.fitBounds(homeBounds.current, { padding: [30, 30], maxZoom: 6 }); });
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
     return () => { m.remove(); map.current = null; };
@@ -185,6 +189,7 @@ export default function FlightMap({ people, mode }) {
         .bindTooltip('<b>' + esc(ap.iata) + '</b> ' + esc(ap.city) + '<br>' + [...names].map(esc).join('、'), { direction: 'top' }).addTo(layer.current);
     }
     m.invalidateSize();
+    homeBounds.current = bounds;
     if (bounds.length) m.fitBounds(bounds, { padding: [30, 30], maxZoom: 6, animate: false });
     if (reduceMotion) { drawn.forEach(d => d.flow.addTo(layer.current)); return; }
     const instant = shownMode.current === mode;

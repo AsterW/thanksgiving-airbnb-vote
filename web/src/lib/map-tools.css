@@ -1,0 +1,10 @@
+/* lib/mapTools.js 的样式：单指划到地图时的一闪提示 + 回默认视角按钮 */
+.map-gesture-hint { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:1000;
+  background:rgba(15,23,42,.75); color:#fff; font-size:13px; font-weight:600; letter-spacing:.02em;
+  padding:8px 16px; border-radius:999px; pointer-events:none; white-space:nowrap;
+  opacity:0; transition:opacity .25s ease; }
+.map-gesture-hint.show { opacity:1; }
+.map-home button { background:rgba(255,255,255,.94); border:1px solid rgba(255,255,255,.7);
+  box-shadow:0 4px 14px rgba(15,23,42,.28), inset 0 1px 0 #fff; color:#334155;
+  font-weight:700; font-size:12px; border-radius:999px; padding:6px 12px; cursor:pointer; }
+.map-home button:active { transform:scale(.96); }

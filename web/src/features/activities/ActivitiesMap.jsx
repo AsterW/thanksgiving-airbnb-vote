@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { addSatellite } from '../../lib/tiles.js';
+import { cooperativeGestures, addHomeButton } from '../../lib/mapTools.js';
 import { esc } from '../../lib/format.js';
 
 // 活动地图：有地点的卡都钉上，钉子是活动的 emoji + 短标题。点钉子可以
@@ -26,20 +27,35 @@ function popupEl(a, onFocus) {
 export default function ActivitiesMap({ items, token, visible, onFocus }) {
   const box = useRef(null);
   const map = useRef(null), layer = useRef(null), fitted = useRef('');
+  const ptsRef = useRef([]);
   const focus = useRef(onFocus);
   focus.current = onFocus;
 
   const fitKey = items.filter(a => a.lat != null).map(a => a.id).sort().join(',');
 
+  // 回到默认视角：和下面取景同一套规则
+  const goHome = () => {
+    const m = map.current;
+    if (!m) return;
+    const pts = ptsRef.current;
+    m.invalidateSize();
+    if (pts.length === 1) m.setView(pts[0], 13);
+    else if (pts.length) m.fitBounds(pts, { padding: [40, 40], maxZoom: 12 });
+    else m.setView([39.2, -105.3], 7);
+  };
+
   useEffect(() => {
     if (!visible || map.current) return;
-    const m = L.map(box.current, { scrollWheelZoom: false, zoomSnap: 0.25 });
+    const m = L.map(box.current, { scrollWheelZoom: false, zoomSnap: 0.25, dragging: false });
     addSatellite(m);
     m.setView([39.2, -105.3], 7);
     m.on('click', () => m.scrollWheelZoom.enable());
     m.on('mouseout', () => m.scrollWheelZoom.disable());
+    cooperativeGestures(m); // 单指划过不抢滚动，双指才拖动
+    addHomeButton(m, goHome);
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
   useEffect(() => () => { map.current?.remove(); map.current = null; }, []);
   useEffect(() => { if (visible) fitted.current = ''; }, [visible]);
@@ -55,6 +71,7 @@ export default function ActivitiesMap({ items, token, visible, onFocus }) {
         .addTo(layer.current);
       pts.push([a.lat, a.lng]);
     }
+    ptsRef.current = pts;
     if (fitKey !== fitted.current) {
       fitted.current = fitKey;
       map.current.invalidateSize();
