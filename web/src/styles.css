@@ -13,22 +13,25 @@ body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   to { opacity:1; transform:none; filter: blur(0); }
 }
 @media (prefers-reduced-motion: reduce) { .view-enter { animation:none; } }
-/* 切换行程（25–26 ↔ 26–29）的转场：iOS 式交叉淡入 + 微缩放回稳，
-   外加一层动态模糊（实验中）：内容从 6px 虚化里浮现、落定前化开，
-   切标签页的 view-in 同样带 5px。虚化逐帧重绘整块面板，之前两回都
-   卡（见 git 历史）；这回是用户明确要再看一眼真机效果才加的 ——
-   若真机还是卡，把两个 @keyframes 里的 filter 删掉即回到纯合成版。 */
-.trip-enter { animation: trip-in .45s cubic-bezier(.32,.72,0,1); }
+/* 切换行程（25–26 ↔ 26–29）的转场总开关在下面（按块分工版）；
+   切标签页的 view-in 是整块一起的交叉淡入 + 5px 模糊，那边内容
+   切换时是静止的，真机验证流畅，不用分工。 */
+/* 切行程的转场不再整块面板一起动：.trip-enter 只是挂在面板根上的
+   开关，动画按「块」分工 —— 顶部小块（倒计时横幅、加房源表单、
+   工具条）走带模糊的 trip-in，它们面积小、没有图片，重绘便宜；
+   地图和房源网格这种大块只走纯透明度的 trip-fade，完全不参与模糊
+   渲染。所有块从第一帧就占住自己的位置（布局先行），动的只是画法，
+   所以切行程时页面不跳、也不用整屏重绘。 */
+.trip-enter .trip-blur { animation: trip-in .45s cubic-bezier(.32,.72,0,1) both; }
 @keyframes trip-in {
   0% { opacity:0; transform: scale(.984) translateY(10px); filter: blur(6px); }
   45% { opacity:1; filter: blur(0); }
   78% { transform: scale(1.0015) translateY(0); }
   100% { opacity:1; transform: scale(1) translateY(0); filter: blur(0); }
 }
-/* 切行程时动画推迟两帧的占位（见 App.jsx 的 Pane）：新内容画完之前
-   面板先藏着，避免「新清单闪现一下又跳回虚化重播」的回弹感 */
-.trip-pre { opacity:0; }
-@media (prefers-reduced-motion: reduce) { .trip-enter { animation:none; } }
+.trip-enter .trip-fade { animation: trip-fade .35s ease .05s both; }
+@keyframes trip-fade { from { opacity:0; } to { opacity:1; } }
+@media (prefers-reduced-motion: reduce) { .trip-enter .trip-blur, .trip-enter .trip-fade { animation:none; } }
 
 /* ==== Liquid Glass · 阶段 1：外壳（侧栏 / 底部栏 / 页头）====
    材质变量集中放这里，后续卡片、控件、弹窗阶段直接复用同一套 token。 */

@@ -72,8 +72,9 @@ export default function FoodView({ trip, active }) {
   const fitKey = trip + '|' + list.map(p => p.id).sort().join(',');
   return (
     <>
-      <AddPlaceForm trip={trip} onAdded={r => { if (tripRef.current === trip) setPlaces(r.places); }} />
-      <section className="flex flex-wrap items-center gap-2 mb-4">
+      {/* 切行程转场的分工（见 styles.css）：顶部小块带模糊，地图和列表只淡入 */}
+      <div className="trip-blur"><AddPlaceForm trip={trip} onAdded={r => { if (tripRef.current === trip) setPlaces(r.places); }} /></div>
+      <section className="trip-blur flex flex-wrap items-center gap-2 mb-4">
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="glass-pill rounded-full px-4 py-1.5 text-sm">
           <option value="votes">按想去的人数</option>
           <option value="added">按添加时间（最新在前）</option>
@@ -82,8 +83,8 @@ export default function FoodView({ trip, active }) {
           className="glass-pill rounded-full px-4 py-1.5 text-sm hover:brightness-110">{showMap ? '🗺️ 隐藏地图' : '🗺️ 显示地图'}</button>
         <span className="text-sm text-slate-500 ml-auto">{places && places.length ? '共 ' + places.length + ' 家' : ''}</span>
       </section>
-      {showMap && <FoodMap items={list} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} />}
-      <div ref={grid} className="grid md:grid-cols-2 lg:grid-cols-3 gap-5"
+      {showMap && <div className="trip-fade"><FoodMap items={list} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} /></div>}
+      <div ref={grid} className="trip-fade grid md:grid-cols-2 lg:grid-cols-3 gap-5"
         onMouseOver={e => setHotId(e.target.closest('article[data-id]')?.dataset.id || null)} onMouseLeave={() => setHotId(null)}>
         {places === null
           ? <p className="text-slate-400 col-span-full text-center py-10">加载中…</p>
