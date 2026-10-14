@@ -6,7 +6,7 @@
 // Areas people set by hand (areaManual) are never changed.
 import { j } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
-import { getState, saveState } from './state.js';
+import { getState, updateState } from './state.js';
 
 const NEIGHBOR_KM = 25;
 const MAX_PER_CALL = 8;
@@ -81,11 +81,11 @@ async function handleZones(req, env) {
     if (geocoded) lastGeo = Date.now();
     if (area) { l.area = area; found[l.id] = area; }
   }
-  const state = await getState(env, trip);
-  let changed = false;
-  for (const l of state.listings) if (found[l.id] && !l.area && !l.areaManual) { l.area = found[l.id]; changed = true; }
-  if (changed) await saveState(env, trip, state);
-  return j({ ok: true, areas: Object.fromEntries(state.listings.map(l => [l.id, l.area || ''])) });
+  const areas = await updateState(env, trip, state => {
+    for (const l of state.listings) if (found[l.id] && !l.area && !l.areaManual) l.area = found[l.id];
+    return Object.fromEntries(state.listings.map(l => [l.id, l.area || '']));
+  });
+  return j({ ok: true, areas });
 }
 
 // Set (or clear) a listing's area by hand. It won't be auto-assigned after that.
@@ -93,13 +93,15 @@ async function handleSetArea(req, env) {
   let body = {};
   try { body = await req.json(); } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
-  const state = await getState(env, trip);
-  const listing = state.listings.find(l => l.id === body.id);
-  if (!listing) return j({ ok: false, error: '房源不存在' });
-  listing.area = String(body.area || '').trim().slice(0, 30);
-  listing.areaManual = true;
-  await saveState(env, trip, state);
-  return j({ ok: true, listing });
+  const out = await updateState(env, trip, state => {
+    const listing = state.listings.find(l => l.id === body.id);
+    if (!listing) return { error: '房源不存在' };
+    listing.area = String(body.area || '').trim().slice(0, 30);
+    listing.areaManual = true;
+    return { listing };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, listing: out.listing });
 }
 
 export const routes = {

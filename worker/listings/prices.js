@@ -1,7 +1,7 @@
 import { j } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
 import { SCRAPE_UA } from './scrape.js';
-import { getState, saveState } from './state.js';
+import { getState, updateState } from './state.js';
 
 // ---------- live prices ----------
 // Airbnb's listing page fetches its price box from this persisted GraphQL
@@ -75,10 +75,11 @@ export async function handlePrices(req, env) {
   for (let i = 0; i < todo.length; i += 4) { // a few at a time, to be gentle with Airbnb
     await Promise.all(todo.slice(i, i + 4).map(async l => { const p = await fetchLivePrice(l, trip); if (p) results[l.id] = p; }));
   }
-  const state = await getState(env, trip);
-  let changed = false;
-  for (const l of state.listings) if (results[l.id]) { l.live = results[l.id]; changed = true; }
-  if (changed) await saveState(env, trip, state);
-  return j({ ok: true, updated: Object.keys(results).length, tried: todo.length,
-    live: Object.fromEntries(state.listings.filter(l => l.live).map(l => [l.id, l.live])) });
+  // Apply the fetched prices onto the freshest state in a transaction —
+  // only the `live` field is written, so concurrent votes/adds survive.
+  const live = await updateState(env, trip, state => {
+    for (const l of state.listings) if (results[l.id]) l.live = results[l.id];
+    return Object.fromEntries(state.listings.filter(l => l.live).map(l => [l.id, l.live]));
+  });
+  return j({ ok: true, updated: Object.keys(results).length, tried: todo.length, live });
 }
