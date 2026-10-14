@@ -15,7 +15,7 @@ export default function GamesView({ active }) {
       <div className="flex flex-wrap gap-2 mb-5">
         {GAMES.map(g => (
           <button key={g.key} onClick={() => pick(g.key)}
-            className={'rounded-full px-5 py-2 font-bold ' + (g.key === game ? 'bg-indigo-600 text-white shadow' : 'bg-white text-slate-600 hover:bg-indigo-50')}>{g.label}</button>
+            className={'rounded-full px-5 py-2 font-bold ' + (g.key === game ? 'bg-indigo-600 text-white shadow' : 'glass-pill text-slate-600')}>{g.label}</button>
         ))}
       </div>
       <div hidden={game !== 'bj'}><BlackjackView active={active && game === 'bj'} /></div>

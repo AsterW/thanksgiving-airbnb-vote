@@ -16,7 +16,7 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={show}>
       {children}
       <div role="status" aria-live="polite" style={{ transition: 'opacity .3s ease, transform .45s cubic-bezier(.2,1.6,.4,1)' }}
-        className={'fixed left-1/2 top-6 z-[70] pointer-events-none bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white font-bold rounded-full px-6 py-3 shadow-xl max-w-[90vw] truncate '
+        className={'fixed left-1/2 top-6 z-[70] pointer-events-none bg-slate-900/70 backdrop-blur-xl border border-white/25 text-white font-bold rounded-full px-6 py-3 shadow-2xl max-w-[90vw] truncate '
           + (toast.show ? 'opacity-100 -translate-x-1/2 translate-y-0 scale-100' : 'opacity-0 -translate-x-1/2 -translate-y-4 scale-90')}>
         {toast.text}
       </div>

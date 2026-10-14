@@ -8,7 +8,7 @@ export default function ActivityCard({ a, token, banner, pop, onVote, onRemove, 
   const hasPin = a.lat != null && a.lng != null;
   const gmaps = hasPin ? 'https://www.google.com/maps/search/?api=1&query=' + a.lat + ',' + a.lng : null;
   return (
-    <article data-id={a.id} className="bg-white rounded-2xl shadow overflow-hidden flex flex-col">
+    <article data-id={a.id} className="glass-card rounded-2xl overflow-hidden flex flex-col">
       <div className="relative h-20 flex items-center justify-center text-4xl" style={{ background: banner }}>
         <span aria-hidden="true">{a.emoji}</span>
         <button onClick={() => onRemove(a)} title="删除这个活动" className="absolute top-2 right-2 bg-black/40 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>

@@ -66,7 +66,7 @@ export default function ActivitiesMap({ items, token, visible, onFocus }) {
 
   const missing = items.filter(a => a.lat == null).length;
   return (
-    <section className="act-map-box bg-white rounded-2xl shadow overflow-hidden mb-5">
+    <section className="act-map-box glass-card rounded-2xl overflow-hidden mb-5">
       <div className="act-map" ref={box}></div>
       {missing > 0 && <div className="absolute left-3 bottom-3 z-[1000] bg-white/90 backdrop-blur text-xs text-slate-600 rounded-full px-3 py-1 shadow">{missing} 个活动还没加地点，点卡片上的「📍 加地点」就能钉上来</div>}
     </section>

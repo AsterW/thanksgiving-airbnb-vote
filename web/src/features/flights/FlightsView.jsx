@@ -41,11 +41,11 @@ export default function FlightsView({ active }) {
     <div className="space-y-5">
       <FlightForm people={people} onSaved={r => setPeople(r.people)} />
 
-      <section className="bg-white rounded-2xl shadow overflow-hidden">
+      <section className="glass-card rounded-2xl overflow-hidden">
         <div className="flex flex-wrap items-center gap-2 p-4">
           <h2 className="font-bold text-lg mr-2">🗺️ 大家的航线</h2>
           {[['arrival', '🛬 到达'], ['departure', '🛫 离开']].map(([k, label]) => (
-            <button key={k} onClick={() => setMode(k)} className={'filter-chip border rounded-full px-4 py-1.5 text-sm bg-white' + (mode === k ? ' active' : '')}>{label}</button>
+            <button key={k} onClick={() => setMode(k)} className={'filter-chip glass-pill rounded-full px-4 py-1.5 text-sm' + (mode === k ? ' active' : '')}>{label}</button>
           ))}
           <span className="text-sm text-slate-500">{legs} 人 · 鼠标放在航线上看航班和时间</span>
           {(pickups.length > 0 || departures.length > 0) && <button onClick={copy} className="ml-auto text-sm border-2 border-slate-200 hover:border-indigo-400 rounded-full px-4 py-1.5">📋 复制接送机安排</button>}
@@ -61,7 +61,7 @@ export default function FlightsView({ active }) {
       </section>
 
       {missing.length > 0 && (
-        <section className="bg-amber-50 rounded-2xl p-4 text-sm">
+        <section className="glass-warn rounded-2xl p-4 text-sm">
           <b>还没填全（{missing.length}）：</b>
           {missing.map(p => <span key={p.name} className="chip">{p.name}{!p.arrival && !p.departure ? '' : !p.arrival ? ' · 缺到达' : ' · 缺离开'}</span>)}
           <span className="text-slate-500 ml-1">不坐飞机的人在上面勾「不坐飞机」就不会出现在这里</span>

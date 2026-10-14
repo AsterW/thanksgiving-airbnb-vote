@@ -30,14 +30,14 @@ export default function AddPlaceForm({ trip, onAdded }) {
   const onEnter = e => { if (e.key === 'Enter') add(); };
   const input = 'border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500';
   return (
-    <section className="bg-white rounded-2xl shadow p-5 mb-6">
+    <section className="glass-card rounded-2xl p-5 mb-6">
       <h2 className="font-bold text-lg mb-3">➕ 添加餐厅</h2>
       <input type="url" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={onEnter} className={input + ' w-full'}
         placeholder="粘贴 Google 地图链接：在店铺页点“分享”→ 复制链接（maps.app.goo.gl/… 或 google.com/maps/place/…）" />
       <div className="flex flex-col md:flex-row gap-3 mt-3">
         <input value={note} onChange={e => setNote(e.target.value)} onKeyDown={onEnter} maxLength={120} className={input + ' flex-1'}
           placeholder="一句话：吃什么、为什么想去（可选）" />
-        <button onClick={add} disabled={busy || !url.trim()} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold rounded-xl px-6 py-3">
+        <button onClick={add} disabled={busy || !url.trim()} className="btn-primary font-bold rounded-xl px-6 py-3">
           {busy ? '读取中…' : '加入清单'}
         </button>
       </div>

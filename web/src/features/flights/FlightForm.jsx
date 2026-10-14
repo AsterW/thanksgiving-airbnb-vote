@@ -13,7 +13,7 @@ function Leg({ title, kind, f, set }) {
   const field = k => ({ value: f[k], onChange: e => set({ ...f, [k]: k === 'flight' ? e.target.value.toUpperCase() : e.target.value }) });
   const input = 'w-full border rounded-lg px-3 py-2';
   return (
-    <div className="rounded-2xl border-2 border-slate-100 p-4">
+    <div className="rounded-2xl border border-white/70 bg-white/50 p-4">
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-bold">{title}</h3>
         {f.flight && f.date && <a href={lookup(f)} target="_blank" rel="noopener" className="text-xs text-indigo-600 underline">查航班时间 ↗</a>}
@@ -46,7 +46,7 @@ export default function FlightForm({ people, onSaved }) {
   }, [who, mine?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!name) return (
-    <section className="bg-white rounded-2xl shadow p-6 text-center">
+    <section className="glass-card rounded-2xl p-6 text-center">
       <p className="text-slate-600 mb-3">登录后填你的航班</p>
       <button onClick={() => openLogin()} className="bg-indigo-600 text-white font-bold rounded-xl px-6 py-2">登录</button>
     </section>
@@ -59,7 +59,7 @@ export default function FlightForm({ people, onSaved }) {
   }
 
   return (
-    <section className="bg-white rounded-2xl shadow p-5">
+    <section className="glass-card rounded-2xl p-5">
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <h2 className="font-bold text-lg">🧳 填航班</h2>
         <select value={who} onChange={e => setWho(e.target.value)} className="border rounded-full px-3 py-1 text-sm">

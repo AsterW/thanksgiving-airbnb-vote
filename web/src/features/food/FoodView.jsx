@@ -74,12 +74,12 @@ export default function FoodView({ trip, active }) {
     <>
       <AddPlaceForm trip={trip} onAdded={r => { if (tripRef.current === trip) setPlaces(r.places); }} />
       <section className="flex flex-wrap items-center gap-2 mb-4">
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded-full px-4 py-1.5 text-sm bg-white">
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="glass-pill rounded-full px-4 py-1.5 text-sm">
           <option value="votes">按想去的人数</option>
           <option value="added">按添加时间（最新在前）</option>
         </select>
         <button onClick={() => { save('showFoodMap', showMap ? '0' : '1'); setShowMap(!showMap); }}
-          className="border rounded-full px-4 py-1.5 text-sm bg-white hover:border-indigo-400">{showMap ? '🗺️ 隐藏地图' : '🗺️ 显示地图'}</button>
+          className="glass-pill rounded-full px-4 py-1.5 text-sm hover:brightness-110">{showMap ? '🗺️ 隐藏地图' : '🗺️ 显示地图'}</button>
         <span className="text-sm text-slate-500 ml-auto">{places && places.length ? '共 ' + places.length + ' 家' : ''}</span>
       </section>
       {showMap && <FoodMap items={list} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} />}

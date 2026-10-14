@@ -53,13 +53,13 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
   const input = 'border rounded-lg px-3 py-2';
   if (closed) return null; // 投票截止后不能再加房源（上面的结果面板会说明）
   return (
-    <section className="bg-white rounded-2xl shadow p-5 mb-6">
+    <section className="glass-card rounded-2xl p-5 mb-6">
       <h2 className="font-bold text-lg mb-3">➕ 添加候选房源</h2>
       <div className="flex flex-col md:flex-row gap-3">
         <input type="url" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
           placeholder="粘贴 Airbnb 房源链接，例如 https://www.airbnb.com/rooms/123456…"
           className="flex-1 border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <button onClick={add} disabled={busy} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-6 py-3">{busy ? '抓取中…' : '加入清单'}</button>
+        <button onClick={add} disabled={busy} className="btn-primary font-bold rounded-xl px-6 py-3">{busy ? '抓取中…' : '加入清单'}</button>
       </div>
       <p className={'text-sm mt-2 ' + msg.tone}>{msg.text}</p>
       <details open={manualOpen} onToggle={e => setManualOpen(e.currentTarget.open)} className="mt-3 text-sm">

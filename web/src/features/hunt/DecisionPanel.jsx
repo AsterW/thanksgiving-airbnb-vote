@@ -26,7 +26,7 @@ export default function DecisionPanel({ trip, T, vote, listings, onVote }) {
   });
 
   if (!pick) return (
-    <section className="bg-white rounded-2xl shadow p-5 mb-5">
+    <section className="glass-card rounded-2xl p-5 mb-5">
       <h2 className="font-black text-lg">🔒 投票已截止（{deadlineText(vote.voteEndsAt)}）</h2>
       <p className="text-sm text-slate-500 mt-1">没有能订的房子拿到票。{isAdmin ? '可以在下面的卡片上点「改选这间」直接定一间。' : '等管理员定一间吧。'}</p>
     </section>
@@ -39,7 +39,7 @@ export default function DecisionPanel({ trip, T, vote, listings, onVote }) {
   const runnersUp = vote.ranking.filter(id => id !== pick.id).map(id => byId.get(id)).filter(Boolean).slice(0, 3);
 
   return (
-    <section className="bg-white rounded-2xl shadow mb-5 overflow-hidden">
+    <section className="glass-card rounded-2xl mb-5 overflow-hidden">
       <div className="bg-gradient-to-r from-amber-400 to-orange-500 text-white px-5 py-3 flex flex-wrap items-center gap-2">
         <span className="text-lg font-black">🏆 {T.date} 我们住这间</span>
         <span className="text-xs opacity-90">投票已于 {deadlineText(vote.voteEndsAt)} 截止{vote.override ? ' · 管理员 ' + vote.override.by + ' 改选的' : ' · 票数最高'}</span>
@@ -57,7 +57,7 @@ export default function DecisionPanel({ trip, T, vote, listings, onVote }) {
           {/* 订房：认领 → 订好 */}
           <div className="mt-4 rounded-xl border-2 border-dashed border-slate-200 p-3 text-sm">
             {!b && <div className="flex flex-wrap items-center gap-2"><span>📋 还没人负责订</span>
-              <button onClick={() => post('/api/booking', { action: 'claim' })} className="bg-indigo-600 text-white font-bold rounded-lg px-3 py-1">我来订</button></div>}
+              <button onClick={() => post('/api/booking', { action: 'claim' })} className="btn-primary font-bold rounded-lg px-3 py-1">我来订</button></div>}
             {b && b.status === 'claimed' && (
               <div>
                 <div className="flex flex-wrap items-center gap-2">📋 <b>{b.by}</b> 负责订

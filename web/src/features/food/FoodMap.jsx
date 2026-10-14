@@ -74,7 +74,7 @@ export default function FoodMap({ items, token, fitKey, visible, hotId, onFocus 
 
   const missing = items.filter(p => p.lat == null).length;
   return (
-    <section className="food-map-box bg-white rounded-2xl shadow overflow-hidden mb-5">
+    <section className="food-map-box glass-card rounded-2xl overflow-hidden mb-5">
       <div className="food-map" ref={box}></div>
       {missing > 0 && <div className="absolute left-3 bottom-3 z-[1000] bg-white/90 backdrop-blur text-xs text-slate-600 rounded-full px-3 py-1 shadow">{missing} 家的链接没带位置，没钉在地图上</div>}
     </section>

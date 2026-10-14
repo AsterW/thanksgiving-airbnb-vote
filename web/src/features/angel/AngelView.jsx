@@ -51,7 +51,7 @@ export default function AngelView({ active }) {
   }
 
   if (!name) return (
-    <section className="bg-white rounded-2xl shadow p-8 text-center">
+    <section className="glass-card rounded-2xl p-8 text-center">
       <div className="text-5xl mb-3">😇</div>
       <p className="text-slate-600 mb-4">先登录，才知道你是谁的天使</p>
       <button onClick={() => openLogin()} className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-6 py-2">登录</button>
@@ -66,9 +66,9 @@ export default function AngelView({ active }) {
     <div className="space-y-5">
       {data.drawn && (data.master
         ? <RevealCard master={data.master} drawnAt={data.drawnAt} me={name} />
-        : <section className="bg-white rounded-2xl shadow p-5 text-sm text-slate-600">已经抽过签了，但这次没有你（你是抽签之后才加入的）。找 Aster 重新抽一下吧。</section>)}
+        : <section className="glass-card rounded-2xl p-5 text-sm text-slate-600">已经抽过签了，但这次没有你（你是抽签之后才加入的）。找 Aster 重新抽一下吧。</section>)}
 
-      <section className="bg-white rounded-2xl shadow p-5">
+      <section className="glass-card rounded-2xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div>
             <h2 className="font-bold text-lg">🎁 我的礼物愿望</h2>

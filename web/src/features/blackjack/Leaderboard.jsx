@@ -1,6 +1,6 @@
 export default function Leaderboard({ rows }) {
   return (
-    <aside className="bg-white rounded-2xl shadow p-5 self-start">
+    <aside className="glass-card rounded-2xl p-5 self-start">
       <h2 className="font-bold text-lg mb-1">🏆 筹码榜</h2>
       <p className="text-xs text-slate-500 mb-3">站起来时才保存筹码 · 初始 1000，输光了自动补给</p>
       {rows.length ? rows.map((r, i) => (

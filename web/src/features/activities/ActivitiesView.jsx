@@ -103,17 +103,17 @@ export default function ActivitiesView({ active }) {
       <AddActivityForm onAdded={act => { setActivities(prev => [...prev, act]); setArea('all'); }} />
       <div className="flex flex-wrap gap-2 mb-5">
         <button onClick={() => setArea('all')}
-          className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (area === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200')}>
+          className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (area === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'glass-pill text-slate-600')}>
           全部 · {activities.length}
         </button>
         {areas.map(x => (
           <button key={x} onClick={() => setArea(x)}
-            className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (area === x ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200')}>
+            className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (area === x ? 'bg-indigo-600 text-white border-indigo-600' : 'glass-pill text-slate-600')}>
             {x} · {activities.filter(a => a.area === x).length}
           </button>
         ))}
         <button onClick={() => setMapOpen(o => !o)}
-          className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (mapOpen ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200')}>
+          className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (mapOpen ? 'bg-emerald-600 text-white border-emerald-600' : 'glass-pill text-slate-600')}>
           🗺️ 活动地图
         </button>
       </div>

@@ -3,7 +3,7 @@ export default function People({ people, isAdmin, onExclude }) {
   const inPeople = people.filter(p => !p.excluded);
   const done = inPeople.filter(p => p.submitted).length;
   return (
-    <section className="bg-white rounded-2xl shadow p-5">
+    <section className="glass-card rounded-2xl p-5">
       <div className="flex items-center justify-between mb-2">
         <h2 className="font-bold text-lg">👼 大家的进度</h2>
         <span className="text-sm font-bold text-indigo-600">{done} / {inPeople.length}</span>

@@ -13,7 +13,7 @@ const TONE = {
 
 function Event({ e }) {
   const body = (
-    <div className={'flex gap-3 items-start border rounded-xl px-3 py-2 ' + (TONE[e.tone] || 'bg-white border-slate-200')}>
+    <div className={'flex gap-3 items-start border rounded-xl px-3 py-2 ' + (TONE[e.tone] || 'glass-card border-white/60')}>
       <span className="text-xl leading-6">{e.icon}</span>
       <div className="min-w-0 flex-1">
         <div className="font-bold text-sm">{e.title}</div>
@@ -53,7 +53,7 @@ export default function CalendarView({ active }) {
 
   return (
     <div className="space-y-4">
-      <section className="bg-white rounded-2xl shadow p-4 flex flex-wrap items-center gap-3">
+      <section className="glass-card rounded-2xl p-4 flex flex-wrap items-center gap-3">
         <label className="text-sm font-bold">看谁的日程</label>
         <select value={me} onChange={e => setWho(e.target.value)} className="border rounded-full px-3 py-1.5 text-sm">
           <option value={ALL}>👥 所有人</option>
@@ -68,7 +68,7 @@ export default function CalendarView({ active }) {
           const { md, wd } = dayLabel(d.date);
           const n = d.allDay.length + d.timed.length;
           return (
-            <button key={d.date} onClick={() => jump(d.date)} className="shrink-0 bg-white rounded-xl shadow px-3 py-2 text-center hover:ring-2 hover:ring-indigo-300">
+            <button key={d.date} onClick={() => jump(d.date)} className="shrink-0 glass-card rounded-xl px-3 py-2 text-center hover:ring-2 hover:ring-indigo-300">
               <div className="text-xs text-slate-500">{wd}</div>
               <div className="font-black">{md}</div>
               <div className="text-[10px] text-indigo-600 h-3">{n ? '●'.repeat(Math.min(n, 4)) : ''}</div>
@@ -85,7 +85,7 @@ export default function CalendarView({ active }) {
         {days.map(d => {
           const { md, wd } = dayLabel(d.date);
           return (
-            <section key={d.date} ref={el => { dayRefs.current[d.date] = el; }} className="bg-white rounded-2xl shadow p-4 scroll-mt-4">
+            <section key={d.date} ref={el => { dayRefs.current[d.date] = el; }} className="glass-card rounded-2xl p-4 scroll-mt-4">
               <h3 className="font-black text-lg mb-2">{md} <span className="text-sm font-medium text-slate-500">{wd}</span></h3>
               <div className="space-y-2">
                 {d.allDay.map(e => <Event key={e.id} e={e} />)}
