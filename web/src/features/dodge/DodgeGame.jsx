@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { newGame, step, HZ, W, H, HERO, DIRS, SKILLS } from '../../../../worker/dodge/sim.js';
+import { newGame, step, HZ, W, H, HERO, DIRS, SKILLS } from './sim.js';
 import { draw } from './draw.js';
 
-// One run. The simulation steps 60 times a second; every input is stamped
-// with the tick it applies to and recorded, so the server can replay it.
+// One run. The simulation steps 60 times a second; inputs between steps are
+// queued and applied on the next one.
 // PC: right-click (or hold it) to move, F / D for 闪现 toward the mouse.
 // Phone: joystick on the left, 闪现 button on the right.
 const dirOf = (dx, dy) => ((Math.round(Math.atan2(dy, dx) / (2 * Math.PI) * DIRS) % DIRS) + DIRS) % DIRS;
@@ -11,7 +11,7 @@ const ASPECT = W / H;
 
 export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, children }) {
   const wrap = useRef(null), canvas = useRef(null), hud = useRef(null), cdBtn = useRef(null), joyEl = useRef(null);
-  const g = useRef(null), events = useRef([]), pending = useRef({}), mouse = useRef(null), joy = useRef(null);
+  const g = useRef(null), pending = useRef({}), mouse = useRef(null), joy = useRef(null);
   const [count, setCount] = useState(3); // 3, 2, 1, then go
   const [size, setSize] = useState({ w: 0, h: 0 });
   const doneRef = useRef(false);
@@ -60,7 +60,6 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
           if (p.dir !== undefined) ev.push([sim.tick, 1, p.dir]);
           if (p.flash !== undefined) ev.push([sim.tick, 2, p.flash]);
           pending.current = {};
-          for (const e of ev) events.current.push(e);
           step(sim, ev);
           acc -= 1000 / HZ;
         }
@@ -73,7 +72,7 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
         cdBtn.current.style.setProperty('--p', String(left));
         cdBtn.current.dataset.left = left > 0 ? Math.ceil(sim.hero.cd / HZ) : '';
       }
-      if (sim.over && !doneRef.current) { doneRef.current = true; onDead(sim, events.current.slice()); }
+      if (sim.over && !doneRef.current) { doneRef.current = true; onDead(sim); }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);

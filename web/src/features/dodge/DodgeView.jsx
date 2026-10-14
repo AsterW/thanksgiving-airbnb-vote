@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../../lib/api.js';
+import { load, save } from '../../lib/storage.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
-import { HZ } from '../../../../worker/dodge/sim.js';
+import { HZ } from './sim.js';
 import DodgeGame, { killedBy } from './DodgeGame.jsx';
 import './dodge.css';
 
@@ -23,11 +24,29 @@ function leaveFull() {
   if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 }
 
+// 交成绩：浏览器算的存活时间就是成绩。网络不通时先存在这台设备上（只留最好的那次），
+// 点「重新提交」或者下次打开这页时再交，好不容易活很久的一局不会丢。
+const PENDING = 'dodgePending';
+const pendingScore = () => { try { return JSON.parse(load(PENDING) || 'null'); } catch (e) { return null; } };
+async function sendScore(s) {
+  let r = null;
+  try { r = await api('/api/dodge/score', 'POST', s); } catch (e) { /* offline */ }
+  if (r && r.ok) {
+    const p = pendingScore();
+    if (p && p.name === s.name && p.ticks <= s.ticks) save(PENDING, '');
+    return r;
+  }
+  if (r) return r; // a real refusal (not logged in…): nothing to retry
+  const p = pendingScore();
+  if (!p || p.name !== s.name || p.ticks < s.ticks) save(PENDING, JSON.stringify(s));
+  return { ok: false, retry: true, error: '网络有点问题，成绩先存在这台设备上' };
+}
+
 export default function DodgeView({ active }) {
   const { name, ensureName } = useSession();
   const [board, setBoard] = useState([]);
-  const [run, setRun] = useState(null);      // { run, seed, n } while playing
-  const [result, setResult] = useState(null); // { ticks, by, server?, error? }
+  const [run, setRun] = useState(null);      // { me: { name, token }, seed, n } while playing
+  const [result, setResult] = useState(null); // { ticks, by, server?, error?, retry? }
   const [msg, setMsg] = useState('');
   const [touch] = useState(isTouch);
   const [portrait, setPortrait] = useState(() => window.matchMedia(PORTRAIT).matches);
@@ -35,7 +54,13 @@ export default function DodgeView({ active }) {
   const [started, setStarted] = useState(false); // the 3-2-1 is over and the run is going
 
   const loadBoard = useCallback(() => api('/api/dodge/board').then(r => r.ok && setBoard(r.board)).catch(() => {}), []);
-  useEffect(() => { if (active) loadBoard(); }, [active, loadBoard]);
+  // opening the page also sends a score that couldn't be sent last time
+  useEffect(() => {
+    if (!active) return;
+    const p = pendingScore();
+    if (p) sendScore(p).then(r => (r.ok ? setBoard(r.board) : loadBoard()));
+    else loadBoard();
+  }, [active, loadBoard]);
   useEffect(() => {
     const q = window.matchMedia(PORTRAIT), f = () => setPortrait(q.matches);
     q.addEventListener('change', f);
@@ -61,23 +86,27 @@ export default function DodgeView({ active }) {
   function start() {
     if (touch) enterFull(); // must happen right on the tap
     setMsg('');
-    ensureName(async me => {
-      let r;
-      try { r = await api('/api/dodge/start', 'POST', { name: me.name, token: me.token }); } catch (e) { r = { ok: false, error: '网络有点问题，稍后再试' }; }
-      if (!r.ok) { setMsg(r.error); return; }
+    ensureName(me => {
       setResult(null); setPaused(false); setStarted(false);
-      setRun(x => ({ run: r.run, seed: r.seed, n: (x?.n || 0) + 1 }));
+      setRun(x => ({ me: { name: me.name, token: me.token }, seed: Math.floor(Math.random() * 4294967296), n: (x?.n || 0) + 1 }));
     });
   }
-  async function dead(sim, events) {
-    setResult({ ticks: sim.tick, by: sim.by });
-    let r;
-    try { r = await api('/api/dodge/finish', 'POST', { run: run.run, events }); } catch (e) { r = { ok: false, error: '网络有点问题，这局没记上' }; }
-    setResult(x => ({ ...x, server: r.ok ? r : null, error: r.ok ? '' : r.error }));
+  async function submit(score) {
+    const r = await sendScore(score);
+    setResult(x => ({ ...x, server: r.ok ? r : null, error: r.ok ? '' : r.error, retry: !!r.retry }));
     if (r.ok) {
       setBoard(r.board);
       if (r.newBest && !reduceMotion) confetti({ particleCount: 140, spread: 90, origin: { y: 0.5 }, colors: CONFETTI_COLORS });
     }
+  }
+  function dead(sim) {
+    setResult({ ticks: sim.tick, by: sim.by });
+    submit({ ...run.me, ticks: sim.tick });
+  }
+  function retry() {
+    const p = pendingScore();
+    setResult(x => ({ ...x, error: '', retry: false }));
+    if (p) submit(p);
   }
   function quit() { setRun(null); setResult(null); setPaused(false); if (touch) leaveFull(); loadBoard(); }
 
@@ -91,6 +120,7 @@ export default function DodgeView({ active }) {
           : result.error || '记分中…'}
       </div>
       <div className="flex gap-2 justify-center mt-3">
+        {result.retry && <button onClick={retry} className="dg-btn bg-sky-400 text-slate-900">重新提交</button>}
         <button onClick={start} className="dg-btn bg-amber-400 text-slate-900">再来一局</button>
         <button onClick={quit} className="dg-btn bg-white/15 text-white">{touch ? '退出' : '看排行榜'}</button>
       </div>
@@ -134,7 +164,7 @@ export default function DodgeView({ active }) {
         </section>
         <aside className="glass-card rounded-2xl p-5 self-start">
           <h2 className="font-bold text-lg mb-1">🏆 躲技能排行榜</h2>
-          <p className="text-xs text-slate-500 mb-3">每人最好的一次 · 成绩由服务器重放验证</p>
+          <p className="text-xs text-slate-500 mb-3">每人最好的一次 · 活多久就记多久</p>
           {board.length ? board.map((r, i) => (
             <div key={r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (mine && r.name === mine.name ? ' font-bold text-indigo-700' : '')}>
               <span className="truncate">{i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.'} {r.name}</span>
