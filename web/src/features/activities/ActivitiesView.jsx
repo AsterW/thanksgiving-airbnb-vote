@@ -4,6 +4,8 @@ import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import ActivityCard from './ActivityCard.jsx';
 import AddActivityForm from './AddActivityForm.jsx';
+import ActivitiesMap from './ActivitiesMap.jsx';
+import LocationPicker from './LocationPicker.jsx';
 import { AREA_ORDER } from './areas.js';
 import './activities.css';
 
@@ -25,6 +27,8 @@ export default function ActivitiesView({ active }) {
   const toast = useToast();
   const [activities, setActivities] = useState([]);
   const [area, setArea] = useState('all');
+  const [mapOpen, setMapOpen] = useState(false);
+  const [pickerFor, setPickerFor] = useState(null);
 
   const load = useCallback(async () => {
     try { const r = await api('/api/activities'); if (r.ok) setActivities(r.activities || []); } catch (e) {}
@@ -63,6 +67,25 @@ export default function ActivitiesView({ active }) {
     else alert('删除失败，稍后再试');
   }
 
+  async function savePlace(place) {
+    const a = pickerFor;
+    setPickerFor(null);
+    if (!a) return;
+    const r = await api('/api/activity-place', 'POST', { id: a.id, place });
+    if (r.ok) {
+      setActivities(prev => prev.map(x => x.id === a.id ? r.activity : x));
+      toast(place ? '📍 地点已保存' : '📍 地点已清除');
+    } else alert('地点保存失败，稍后再试');
+  }
+
+  function focusCard(id) {
+    setArea('all');
+    requestAnimationFrame(() => {
+      const el = document.querySelector('[data-id="' + id + '"]');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+
   return (
     <div>
       <AddActivityForm onAdded={act => { setActivities(prev => [...prev, act]); setArea('all'); }} />
@@ -77,16 +100,22 @@ export default function ActivitiesView({ active }) {
             {x} · {activities.filter(a => a.area === x).length}
           </button>
         ))}
+        <button onClick={() => setMapOpen(o => !o)}
+          className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (mapOpen ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200')}>
+          🗺️ 活动地图
+        </button>
       </div>
+      {mapOpen && <ActivitiesMap items={activities} token={token} visible={mapOpen} onFocus={focusCard} />}
       {groups.map(g => (
         <section key={g.area} className="mb-8">
           <h2 className="font-bold text-lg mb-3">{g.area}</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {g.items.map(a => <ActivityCard key={a.id} a={a} token={token} banner={bannerOf(a.area)} onVote={vote} onRemove={remove} />)}
+            {g.items.map(a => <ActivityCard key={a.id} a={a} token={token} banner={bannerOf(a.area)} onVote={vote} onRemove={remove} onSetPlace={setPickerFor} />)}
           </div>
         </section>
       ))}
       {!activities.length && <p className="text-slate-400 text-sm">活动加载中…</p>}
+      {pickerFor && <LocationPicker initial={pickerFor} onSave={savePlace} onClose={() => setPickerFor(null)} />}
     </div>
   );
 }

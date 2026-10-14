@@ -30,6 +30,9 @@ works for any group picking a place together.
   tables of 3, bots fill empty seats, 叫地主 / 抢地主 bidding), joined from
   everyone's own phone. Each game has its own leaderboard (chips / 豆子), play
   points only
+- Flights: everyone enters their arrival and departure flights; a route map
+  (arrivals and departures separately), an airport pickup list people can
+  claim, and suggested times to be at the airport for departures
 - Secret Angel: swipe through gift categories to say what you'd love (or
   not), then the admin draws who secretly gives a gift to whom; everyone only
   sees their own match

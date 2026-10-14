@@ -5,7 +5,8 @@ import { SEED } from './seed.js';
 const ACTIVITIES_KEY = 'activities:v1';
 // Changes whenever the seed list changes, so a deploy with new/edited
 // cards refreshes their text on next read without touching anyone's votes.
-const SEED_STAMP = SEED.map(s => s.id).join(',');
+// The v2 prefix marks the seed gaining place/lat/lng pins.
+const SEED_STAMP = 'v2|' + SEED.map(s => s.id).join(',');
 
 export async function getActivities(env) {
   let doc = null;
