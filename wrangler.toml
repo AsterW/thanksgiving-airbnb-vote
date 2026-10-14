@@ -1,0 +1,12 @@
+name = "denver-thanksgiving-airbnb-vote"
+main = "worker.js"
+compatibility_date = "2026-10-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[[kv_namespaces]]
+binding = "VOTES_KV"
+id = "0c1964118e4c427aa9698fa13a5dcadf"

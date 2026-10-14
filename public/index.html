@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Denver 感恩节之旅 · Airbnb 一起选房</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .card-img { aspect-ratio: 16/10; object-fit: cover; }
+  .chip { display:inline-block; background:#eef2ff; color:#4f46e5; font-size:12px; padding:2px 8px; border-radius:9999px; margin:2px 2px 0 0; }
+  .filter-chip { cursor:pointer; }
+  .filter-chip.active { background:#4f46e5; color:#fff; }
+  #nameModal { display:none; }
+  #nameModal.open { display:flex; }
+  .vote-btn.voted { background:#e11d48 !important; color:#fff !important; border-color:#e11d48 !important; }
+</style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+<header class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white px-6 py-8">
+  <div class="max-w-6xl mx-auto">
+    <h1 class="text-2xl md:text-3xl font-bold">🏔️ Denver 感恩节之旅 · Airbnb 一起选房</h1>
+    <p class="mt-2 text-indigo-100">11月25–29 · 10–15人 · 看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它</p>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+  <!-- 加房源 -->
+  <section class="bg-white rounded-2xl shadow p-5 mb-6">
+    <h2 class="font-bold text-lg mb-3">➕ 添加候选房源</h2>
+    <div class="flex flex-col md:flex-row gap-3">
+      <input id="urlInput" type="url" placeholder="粘贴 Airbnb 房源链接，例如 https://www.airbnb.com/rooms/123456…"
+        class="flex-1 border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+      <button id="addBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl px-6 py-3">加入清单</button>
+    </div>
+    <p id="addMsg" class="text-sm mt-2 text-slate-500"></p>
+    <details id="manualBox" class="mt-3 text-sm">
+      <summary class="cursor-pointer text-indigo-600 font-medium">自动抓取失败？点这里手动添加</summary>
+      <div class="grid md:grid-cols-2 gap-3 mt-3">
+        <input id="mUrl" class="border rounded-lg px-3 py-2" placeholder="房源链接 *">
+        <input id="mTitle" class="border rounded-lg px-3 py-2" placeholder="房源标题 *">
+        <input id="mImage" class="border rounded-lg px-3 py-2" placeholder="照片链接（可选）">
+        <input id="mPrice" class="border rounded-lg px-3 py-2" type="number" placeholder="4晚总价 USD（可选）">
+        <input id="mBedrooms" class="border rounded-lg px-3 py-2" type="number" placeholder="卧室数">
+        <input id="mBeds" class="border rounded-lg px-3 py-2" type="number" placeholder="床位数">
+        <input id="mBaths" class="border rounded-lg px-3 py-2" placeholder="浴室数（可填 2.5）">
+        <input id="mSleeps" class="border rounded-lg px-3 py-2" type="number" placeholder="可住人数">
+        <select id="mArea" class="border rounded-lg px-3 py-2">
+          <option value="">区域（可选）</option>
+          <option>大沙丘区域</option>
+          <option>落基山 · Estes Park</option>
+          <option>其他</option>
+        </select>
+        <input id="mNote" class="border rounded-lg px-3 py-2" placeholder="一句话亮点（可选）">
+      </div>
+      <button id="manualBtn" class="mt-3 bg-slate-800 hover:bg-slate-900 text-white rounded-xl px-5 py-2">手动加入</button>
+    </details>
+  </section>
+
+  <!-- 工具条 -->
+  <section class="flex flex-wrap items-center gap-2 mb-4">
+    <button data-f="all" class="filter-chip active border rounded-full px-4 py-1.5 text-sm bg-white">全部</button>
+    <button data-f="大沙丘区域" class="filter-chip border rounded-full px-4 py-1.5 text-sm bg-white">大沙丘区域</button>
+    <button data-f="落基山 · Estes Park" class="filter-chip border rounded-full px-4 py-1.5 text-sm bg-white">落基山 · Estes Park</button>
+    <select id="sortSel" class="ml-auto border rounded-full px-4 py-1.5 text-sm bg-white">
+      <option value="votes">按票数排序</option>
+      <option value="price">按价格从低到高</option>
+    </select>
+    <span id="countLbl" class="text-sm text-slate-500 w-full md:w-auto"></span>
+  </section>
+
+  <!-- 列表 -->
+  <section id="grid" class="grid md:grid-cols-2 lg:grid-cols-3 gap-5"></section>
+  <p class="text-center text-slate-400 text-sm mt-10 mb-6">有链接的人都能加房源、投票 · 数据实时共享</p>
+</main>
+
+<!-- 名字弹窗 -->
+<div id="nameModal" class="fixed inset-0 bg-black/50 items-center justify-center z-50">
+  <div class="bg-white rounded-2xl p-6 w-80">
+    <h3 class="font-bold mb-2">怎么称呼你？</h3>
+    <p class="text-sm text-slate-500 mb-3">投票会显示名字，方便大家知道是谁投的（只问一次）</p>
+    <input id="nameInput" class="border rounded-lg px-3 py-2 w-full mb-3" placeholder="比如 Ken" maxlength="20">
+    <button id="nameOk" class="bg-indigo-600 text-white rounded-xl px-5 py-2 w-full font-bold">确定</button>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let STATE = { listings: [] };
+let myToken = localStorage.getItem('vt');
+if (!myToken) { myToken = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random()); localStorage.setItem('vt', myToken); }
+let myName = localStorage.getItem('vn') || '';
+let filter = 'all', sortBy = 'votes';
+let pendingVoteId = null;
+
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+async function api(path, method, body){
+  const r = await fetch(path, { method: method || 'GET', headers: {'Content-Type':'application/json'}, body: body ? JSON.stringify(body) : undefined });
+  return r.json();
+}
+
+function statsLine(l){
+  const parts = [];
+  if (l.bedrooms) parts.push(l.bedrooms + '卧');
+  if (l.beds) parts.push(l.beds + '床');
+  if (l.bathrooms) parts.push(l.bathrooms + '卫');
+  if (l.sleeps) parts.push('可住' + l.sleeps + '人');
+  return parts.length ? parts.join(' · ') : '户型信息待补充';
+}
+
+function card(l){
+  const voted = (l.votes || []).some(v => v.token === myToken);
+  const n = (l.votes || []).length;
+  const voters = (l.votes || []).map(v => '<span class="chip">' + esc(v.name || '匿名') + '</span>').join('');
+  const price = l.priceUSD ? '<div class="text-lg font-bold text-slate-800">约 $' + Number(l.priceUSD).toLocaleString() + ' <span class="text-xs font-normal text-slate-500">/ 4晚含税费</span></div>'
+    : '<div class="text-sm text-slate-500">价格以 Airbnb 页面为准</div>';
+  const rating = l.rating ? '<span class="text-sm">⭐ ' + l.rating + (l.reviews ? '（' + l.reviews + '条评价）' : '') + '</span>' : '';
+  const area = l.area ? '<span class="absolute top-3 left-3 bg-black/60 text-white text-xs px-2 py-1 rounded-full">' + esc(l.area) + '</span>' : '';
+  const del = '<button onclick="removeListing(\'' + l.id + '\')" title="删除这个房源" class="absolute top-3 right-3 bg-black/60 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>';
+  const img = l.image
+    ? '<img src="' + esc(l.image) + '" class="card-img w-full rounded-t-2xl" loading="lazy" alt="">'
+    : '<div class="card-img w-full rounded-t-2xl bg-slate-200 flex items-center justify-center text-slate-400 text-4xl">🏠</div>';
+  return '<article class="bg-white rounded-2xl shadow overflow-hidden flex flex-col">'
+    + '<div class="relative">' + img + area + del + '</div>'
+    + '<div class="p-4 flex flex-col flex-1">'
+    + '<h3 class="font-bold leading-snug mb-1">' + esc(l.title || '未命名房源') + '</h3>'
+    + '<p class="text-sm text-slate-500 mb-2">' + esc(statsLine(l)) + '</p>'
+    + '<div class="mb-1">' + price + '</div>'
+    + '<div class="mb-2">' + rating + '</div>'
+    + (l.note ? '<p class="text-sm text-slate-600 mb-2">💡 ' + esc(l.note) + '</p>' : '')
+    + (voters ? '<div class="mb-3">' + voters + '</div>' : '<div class="mb-3 text-xs text-slate-400">还没有人投票，来当第一个吧</div>')
+    + '<div class="mt-auto flex gap-2">'
+    + '<button onclick="doVote(\'' + l.id + '\')" class="vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2 ' + (voted ? 'voted' : '') + '">' + (voted ? '❤️ 已投 · ' : '🤍 投票 · ') + n + '</button>'
+    + '<a href="' + esc(l.url) + '" target="_blank" rel="noopener" class="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>'
+    + '</div></div></article>';
+}
+
+function render(){
+  let list = STATE.listings.slice();
+  if (filter !== 'all') list = list.filter(l => l.area === filter);
+  if (sortBy === 'votes') list.sort((a,b) => (b.votes||[]).length - (a.votes||[]).length || (a.priceUSD||1e9) - (b.priceUSD||1e9));
+  else list.sort((a,b) => (a.priceUSD||1e9) - (b.priceUSD||1e9));
+  $('#grid').innerHTML = list.length ? list.map(card).join('') : '<p class="text-slate-400 col-span-full text-center py-10">这个区域还没有候选，贴个链接进来吧 👆</p>';
+  $('#countLbl').textContent = '共 ' + STATE.listings.length + ' 间候选';
+}
+
+async function refresh(){ const s = await api('/api/state'); STATE = s; render(); enrichMissing(); }
+
+async function enrichMissing(){
+  for (const l of STATE.listings) {
+    if (!l.image || l.rating == null) {
+      try { const r = await api('/api/enrich', 'POST', { id: l.id }); if (r.ok && r.listing && r.listing.image) { const i = STATE.listings.findIndex(x => x.id === l.id); if (i >= 0) STATE.listings[i] = r.listing; render(); } } catch(e){}
+    }
+  }
+}
+
+function ensureNameThen(fn){
+  if (myName) { fn(); return; }
+  pendingVoteId = true; pendingFn = fn;
+  $('#nameModal').classList.add('open');
+  $('#nameInput').focus();
+}
+let pendingFn = null;
+$('#nameOk').onclick = () => {
+  const v = $('#nameInput').value.trim();
+  if (!v) return;
+  myName = v; localStorage.setItem('vn', v);
+  $('#nameModal').classList.remove('open');
+  if (pendingFn) { const f = pendingFn; pendingFn = null; f(); }
+};
+
+async function doVote(id){
+  const l = STATE.listings.find(x => x.id === id);
+  const voted = (l.votes || []).some(v => v.token === myToken);
+  if (voted) {
+    const r = await api('/api/vote', 'POST', { id, token: myToken, name: null });
+    if (r.ok) { const i = STATE.listings.findIndex(x => x.id === id); STATE.listings[i].votes = r.votes; render(); }
+  } else {
+    ensureNameThen(async () => {
+      const r = await api('/api/vote', 'POST', { id, token: myToken, name: myName });
+      if (r.ok) { const i = STATE.listings.findIndex(x => x.id === id); STATE.listings[i].votes = r.votes; render(); }
+    });
+  }
+}
+
+async function removeListing(id){
+  const l = STATE.listings.find(x => x.id === id);
+  if (!l) return;
+  if (!confirm('确定要删除「' + (l.title || '未命名房源') + '」吗？删掉后大家就看不到了。')) return;
+  const r = await api('/api/remove', 'POST', { id });
+  if (r.ok) await refresh(); else alert('删除失败，稍后再试');
+}
+
+async function addListing(){
+  const url = $('#urlInput').value.trim();
+  if (!url) return;
+  const btn = $('#addBtn'); btn.disabled = true; btn.textContent = '抓取中…';
+  $('#addMsg').textContent = '正在读取 Airbnb 房源信息…';
+  try {
+    const r = await api('/api/add', 'POST', { url });
+    if (r.ok) {
+      $('#urlInput').value = '';
+      $('#addMsg').textContent = r.deduped ? '这间已经在清单里了' : '已加入清单 🎉';
+      $('#addMsg').className = 'text-sm mt-2 text-green-600';
+      await refresh();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      $('#addMsg').textContent = '自动抓取失败：' + (r.error || '未知错误') + '，可以用下面的手动添加';
+      $('#addMsg').className = 'text-sm mt-2 text-amber-600';
+      $('#mUrl').value = url;
+      $('#manualBox').open = true;
+    }
+  } catch(e) {
+    $('#addMsg').textContent = '网络有点问题，稍后再试';
+    $('#addMsg').className = 'text-sm mt-2 text-red-500';
+  }
+  btn.disabled = false; btn.textContent = '加入清单';
+}
+$('#addBtn').onclick = addListing;
+$('#urlInput').addEventListener('keydown', e => { if (e.key === 'Enter') addListing(); });
+
+$('#manualBtn').onclick = async () => {
+  const body = { url: $('#mUrl').value.trim(), title: $('#mTitle').value.trim(), image: $('#mImage').value.trim(),
+    priceUSD: $('#mPrice').value ? Number($('#mPrice').value) : null,
+    bedrooms: $('#mBedrooms').value ? Number($('#mBedrooms').value) : null,
+    beds: $('#mBeds').value ? Number($('#mBeds').value) : null,
+    bathrooms: $('#mBaths').value ? Number($('#mBaths').value) : null,
+    sleeps: $('#mSleeps').value ? Number($('#mSleeps').value) : null,
+    area: $('#mArea').value, note: $('#mNote').value.trim() };
+  if (!body.url || !body.title) { alert('链接和标题是必填的'); return; }
+  const r = await api('/api/add-manual', 'POST', body);
+  if (r.ok) { ['mUrl','mTitle','mImage','mPrice','mBedrooms','mBeds','mBaths','mSleeps','mNote'].forEach(id => $('#'+id).value=''); $('#manualBox').open = false; await refresh(); }
+  else alert('添加失败：' + (r.error || ''));
+};
+
+document.querySelectorAll('.filter-chip').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.filter-chip').forEach(x => x.classList.remove('active'));
+  b.classList.add('active'); filter = b.dataset.f; render();
+});
+$('#sortSel').onchange = e => { sortBy = e.target.value; render(); };
+
+refresh();
+</script>
+</body>
+</html>
