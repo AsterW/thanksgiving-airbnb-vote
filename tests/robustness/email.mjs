@@ -67,5 +67,31 @@ ck('login code for unbound user rejected', noMail.ok === false, JSON.stringify(n
 const unboundLogin = await J('POST', '/api/login', { name: OTHER, token: 'whatever' });
 ck('unbound user login unchanged', unboundLogin.ok && !!unboundLogin.user.token && !unboundLogin.needCode, JSON.stringify(unboundLogin));
 
+// Duplicate-vote regression: a vote belongs to the account, not the token.
+// Binding rotates the token; voting again must not stack a second vote,
+// and unvoting with the new token (no name sent) must still clear it.
+const V = 'Voter' + tag;
+const vLogin = await J('POST', '/api/login', { name: V, token: 'voter-tok-a' });
+const vTokA = vLogin.user.token;
+await J('POST', '/api/add', { url: 'https://www.airbnb.com/rooms/24714506', addedBy: V, token: vTokA, trip: 'nov26' });
+const st0 = await J('GET', '/api/state?trip=nov26');
+const lid = st0.listings.find(l => String(l.roomId) === '24714506')?.id;
+ck('voter listing present', !!lid);
+await J('POST', '/api/vote', { id: lid, token: vTokA, name: V, trip: 'nov26' });
+const acts = await J('GET', '/api/activities');
+const aid = acts.activities?.[0]?.id;
+await J('POST', '/api/activity-vote', { id: aid, token: vTokA, name: V });
+const vSend = await J('POST', '/api/auth/send-code', { name: V, token: vTokA, email: `voter+${tag}@example.com`, purpose: 'bind' });
+const vVer = await J('POST', '/api/auth/verify', { name: V, code: vSend.devCode, purpose: 'bind' });
+const vTokB = vVer.user.token;
+ck('voter bind rotated token', !!vTokB && vTokB !== vTokA);
+const reVote = await J('POST', '/api/vote', { id: lid, token: vTokB, name: V, trip: 'nov26' });
+const mine = (reVote.votes || []).filter(v => v.name === V);
+ck('re-vote after rotation stays one vote', mine.length === 1 && mine[0].token === vTokB, JSON.stringify(reVote.votes));
+const reAct = await J('POST', '/api/activity-vote', { id: aid, token: vTokB, name: V });
+ck('activity re-vote after rotation stays one vote', (reAct.votes || []).filter(v => v.name === V).length === 1, JSON.stringify(reAct.votes));
+const un = await J('POST', '/api/vote', { id: lid, token: vTokB, trip: 'nov26' });
+ck('unvote with rotated token clears the vote', (un.votes || []).filter(v => v.name === V).length === 0, JSON.stringify(un.votes));
+
 console.log(`EMAIL: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

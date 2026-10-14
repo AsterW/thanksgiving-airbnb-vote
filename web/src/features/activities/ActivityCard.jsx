@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSession } from '../../session/SessionContext.jsx';
 
 // One activity candidate: banner — the source page's own picture when
 // the card has one, a gradient with its emoji otherwise — what/where
@@ -8,7 +9,8 @@ import { useState } from 'react';
 // offers to add it.
 export default function ActivityCard({ a, token, banner, pop, onVote, onRemove, onSetPlace }) {
   const votes = a.votes || [];
-  const voted = votes.some(v => v.token === token);
+  const { name: myName } = useSession();
+  const voted = votes.some(v => v.token === token || (!!myName && String(v.name || '').toLowerCase() === myName.toLowerCase()));
   const hasPin = a.lat != null && a.lng != null;
   const gmaps = hasPin ? 'https://www.google.com/maps/search/?api=1&query=' + a.lat + ',' + a.lng : null;
   // Some CDNs refuse hotlinked images; if the picture won't load, drop

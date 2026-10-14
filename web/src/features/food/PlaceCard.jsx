@@ -1,12 +1,14 @@
 import Carousel from '../../components/Carousel.jsx';
 import { ago } from '../../lib/format.js';
+import { useSession } from '../../session/SessionContext.jsx';
 
 // 导航到链接里的位置（链接没带位置的店不显示导航，直接用 Google 地图链接）
 const directionsLink = p => 'https://www.google.com/maps/dir/?api=1&destination=' + p.lat + ',' + p.lng;
 
 export default function PlaceCard({ p, token, cardRef, pop, onVote, onRemove }) {
   const votes = p.votes || [];
-  const voted = votes.some(v => v.token === token);
+  const { name: myName } = useSession();
+  const voted = votes.some(v => v.token === token || (!!myName && String(v.name || '').toLowerCase() === myName.toLowerCase()));
   return (
     <article ref={cardRef} data-id={p.id} className="glass-card rounded-2xl overflow-hidden flex flex-col">
       <div className="relative car-wrap">

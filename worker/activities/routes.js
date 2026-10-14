@@ -4,7 +4,8 @@
 // member-added cards — paste a link and the card is built from the
 // page's own title/description — and removing cards.
 import { j, uid } from '../lib/http.js';
-import { cleanName } from '../users/users.js';
+import { cleanName, getUsers } from '../users/users.js';
+import { dedupeVotes, isVoteBy } from '../lib/votes.js';
 import { fetchLinkInfo } from './parse.js';
 import { getActivities, updateActivities, isSeedId } from './store.js';
 import { isMapsLink, expandLink, readLink } from '../food/maps.js';
@@ -27,10 +28,12 @@ async function handleActivityVote(req, env) {
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { id, token, name } = body;
   if (!id || !token) return j({ ok: false, error: '缺少参数' });
+  const me = (await getUsers(env).catch(() => [])).find(u => u.token === token);
+  const voterName = name || (me && me.name) || null;
   const out = await updateActivities(env, doc => {
     const act = doc.items.find(a => a.id === id);
     if (!act) return { error: '活动不存在' };
-    act.votes = (act.votes || []).filter(v => v.token !== token);
+    act.votes = dedupeVotes((act.votes || []).filter(v => !isVoteBy(v, token, voterName)));
     let voted = false;
     if (name) {
       act.votes.push({ token: String(token).slice(0, 80), name: String(name).slice(0, 20), at: Date.now() });
@@ -149,7 +152,7 @@ async function handleActivityImage(req, env) {
 }
 
 export const routes = {
-  'GET /api/activities': async (req, env) => j({ ok: true, activities: (await getActivities(env)).items }),
+  'GET /api/activities': async (req, env) => j({ ok: true, activities: (await getActivities(env)).items.map(a => ({ ...a, votes: dedupeVotes(a.votes) })) }),
   'POST /api/activity-vote': handleActivityVote,
   'POST /api/activity-add': handleActivityAdd,
   'POST /api/activity-remove': handleActivityRemove,
