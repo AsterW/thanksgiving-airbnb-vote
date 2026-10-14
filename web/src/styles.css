@@ -7,21 +7,23 @@
 body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
 .chip { display:inline-block; background:#eef2ff; color:#4f46e5; font-size:12px; padding:2px 8px; border-radius:9999px; margin:2px 2px 0 0; }
 .avatar { display:grid; place-items:center; border-radius:9999px; font-weight:800; color:#fff; background:linear-gradient(135deg,#6366f1,#ec4899); }
-.view-enter { animation: view-in .35s ease; }
-@keyframes view-in { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
+.view-enter { animation: view-in .38s ease; }
+@keyframes view-in {
+  from { opacity:0; transform: translateY(8px); filter: blur(5px); }
+  to { opacity:1; transform:none; filter: blur(0); }
+}
 @media (prefers-reduced-motion: reduce) { .view-enter { animation:none; } }
-/* 切换行程（25–26 ↔ 26–29）的转场，定稿：iOS 式交叉淡入 + 微缩放
-   回稳，全程只动 opacity 和 transform，合成器 60fps。
-   试过两回虚化都卡（真机验证）：① 给内容加 filter: blur —— 整块面板
-   逐帧重绘；② 盖一层 backdrop-filter 磨砂面纱 —— 全屏毛玻璃动画在
-   这台手机 GPU 上同样扛不住。所以这段动画里不要再出现任何形式的
-   blur/filter/backdrop 动画；iOS 的顺滑靠的是曲线和交叉淡入，不是糊。 */
+/* 切换行程（25–26 ↔ 26–29）的转场：iOS 式交叉淡入 + 微缩放回稳，
+   外加一层动态模糊（实验中）：内容从 6px 虚化里浮现、落定前化开，
+   切标签页的 view-in 同样带 5px。虚化逐帧重绘整块面板，之前两回都
+   卡（见 git 历史）；这回是用户明确要再看一眼真机效果才加的 ——
+   若真机还是卡，把两个 @keyframes 里的 filter 删掉即回到纯合成版。 */
 .trip-enter { animation: trip-in .45s cubic-bezier(.32,.72,0,1); }
 @keyframes trip-in {
-  0% { opacity:0; transform: scale(.984) translateY(10px); }
-  55% { opacity:1; }
+  0% { opacity:0; transform: scale(.984) translateY(10px); filter: blur(6px); }
+  55% { opacity:1; filter: blur(0); }
   78% { transform: scale(1.0015) translateY(0); }
-  100% { opacity:1; transform: scale(1) translateY(0); }
+  100% { opacity:1; transform: scale(1) translateY(0); filter: blur(0); }
 }
 @media (prefers-reduced-motion: reduce) { .trip-enter { animation:none; } }
 
