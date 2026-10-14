@@ -22,5 +22,10 @@ export default [
     // JSX usage of a component doesn't count as "used" without the react plugin, so skip capitalized names.
     rules: { ...reactHooks.configs.recommended.rules, 'no-unused-vars': ['error', { args: 'none', caughtErrors: 'none', ignoreRestSiblings: true, varsIgnorePattern: '^[A-Z]' }] },
   },
+  {
+    // Node test scripts (tests/robustness): plain Node globals, plus fetch.
+    files: ['tests/**/*.mjs'],
+    languageOptions: { ecmaVersion: 2022, sourceType: 'module', globals: { ...globals.node, fetch: 'readonly' } },
+  },
   { files: ['*.config.js'], languageOptions: { globals: globals.node } },
 ];

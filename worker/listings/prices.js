@@ -66,7 +66,7 @@ async function fetchLivePrice(listing, trip) {
 // field is written, so concurrent votes/adds aren't clobbered.
 export async function handlePrices(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const trip = tripOf(body.trip);
   const peek = await getState(env, trip);
   const fresh = l => l.live && l.live.at > Date.now() - PRICE_TTL_MS && l.live.checkIn === trip.checkIn && l.live.checkOut === trip.checkOut;

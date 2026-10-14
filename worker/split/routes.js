@@ -23,7 +23,7 @@ async function readExpense(body, env) {
 
 async function handleExpenseAdd(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const { error, fields, users } = await readExpense(body, env);
   if (error) return j({ ok: false, error });
   const expense = { id: uid(), ...fields, createdAt: Date.now() };
@@ -38,7 +38,7 @@ async function handleExpenseAdd(req, env) {
 // its id and its place in the list.
 async function handleExpenseUpdate(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   // Existence first (as before), then field validation; the check runs
   // again inside the transaction against the freshest ledger.
   const before = await getSplit(env);
@@ -57,7 +57,7 @@ async function handleExpenseUpdate(req, env) {
 
 async function handleExpenseRemove(req, env) {
   let body = {};
-  try { body = await req.json(); } catch (e) { /* ignore */ }
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const out = await updateSplit(env, split => {
     const i = split.expenses.findIndex(e => e.id === body.id);
     if (i < 0) return { error: '支出不存在' };
