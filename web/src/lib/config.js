@@ -1,4 +1,6 @@
 // 两段行程，各自一份候选清单（后端按 trip 分开存）
+// areas：固定显示的区域标签页（按这个顺序）。每个区域的中心和范围在 worker/config/trips.js 的 zones 里，名字要一致；
+// 不在这些范围里的房源，后端会按位置自动起新区域，标签页也会自动多出来（features/hunt/zones.js）
 export const TRIPS = {
   nov25: { date: '11月25–26', people: 9, nights: 1, checkIn: '2026-11-25', checkOut: '2026-11-26', areas: ['Denver 市区', 'Denver 周边'] },
   nov26: { date: '11月26–29', people: 14, nights: 3, checkIn: '2026-11-26', checkOut: '2026-11-29', areas: ['大沙丘区域', '落基山 · Estes Park'] },
@@ -15,4 +17,6 @@ export const VIEWS = {
     nav: 'Split that bill', navSub: '分账 · 谁该给谁', icon: '💰' },
   blackjack: { title: '🃏 Blackjack · 21 点', sub: '大家同一桌，轮流跟庄家玩 · 筹码只是好玩，不跟分账挂钩',
     nav: 'Blackjack', navSub: '21 点 · 大家同一桌', icon: '🃏' },
+  angel: { title: '😇 Secret Angel · 神秘天使', sub: '刷卡片选你想要的礼物 · 大家选好后抽签，偷偷给分到的人准备惊喜',
+    nav: 'Secret Angel', navSub: '选礼物 · 抽天使', icon: '😇' },
 };
