@@ -24,7 +24,7 @@ export default function HuntView({ trip, active }) {
   const T = TRIPS[trip];
   const { token, name, ensureName } = useSession();
   const toast = useToast();
-  const { listings, refresh, patch, vote: voteInfo, setVote } = useListings(trip, token);
+  const { listings, refresh, patch, vote: voteInfo, setVote, loaded } = useListings(trip, token);
   const closed = !!voteInfo && !voteInfo.open;
   const isAdmin = String(name).toLowerCase() === 'aster';
   // 页面开着的时候到了截止时间：重新拉一次，切到结果面板
@@ -137,9 +137,23 @@ export default function HuntView({ trip, active }) {
   return (
     <>
       {/* 切行程转场的分工（见 styles.css）：顶部小块 .trip-blur 带模糊，
-          地图和房源网格 .trip-fade 只淡入，不参与模糊渲染 */}
-      {voteInfo && voteInfo.open && voteInfo.voteEndsAt && <div className="trip-blur"><VoteBanner vote={voteInfo} listings={listings} T={T} /></div>}
-      {closed && <div className="trip-blur"><DecisionPanel trip={trip} T={T} vote={voteInfo} listings={listings} onVote={setVote} /></div>}
+          地图和房源网格 .trip-fade 只淡入，不参与模糊渲染。
+          横幅是一个常驻的「槽」：投票数据要等 /api/state 回来才能知道
+          显示倒计时还是结果面板，要是等数据到了才把整块挂上去，它会
+          比不依赖数据的表单/工具条晚一拍单独动画着插进来（就是那种
+          「别人都渲染好了它才出现」的感觉）。所以加载中先放一块同高
+          的占位，槽从第一帧就在、动画只跑一次，数据到了原地换内容。 */}
+      <div className="trip-blur">
+        {!loaded ? (
+          <section className="rounded-2xl p-4 mb-5 min-h-[104px] flex items-center bg-white/40 border border-white/50 text-slate-400 text-sm" aria-hidden="true">
+            🗳️ 投票倒计时加载中…
+          </section>
+        ) : voteInfo && voteInfo.open && voteInfo.voteEndsAt ? (
+          <VoteBanner vote={voteInfo} listings={listings} T={T} />
+        ) : closed ? (
+          <DecisionPanel trip={trip} T={T} vote={voteInfo} listings={listings} onVote={setVote} />
+        ) : null}
+      </div>
       <div className="trip-blur"><AddListingForm trip={trip} T={T} zones={zoneNames} closed={closed} onAdded={refresh} /></div>
       <div className="trip-blur">
         <Toolbar tabs={tabs} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}

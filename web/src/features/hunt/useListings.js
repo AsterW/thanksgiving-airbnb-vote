@@ -5,6 +5,7 @@ import { api } from '../../lib/api.js';
 export function useListings(trip, token) {
   const [listings, setListings] = useState([]);
   const [vote, setVote] = useState(null); // 投票截止时间、选定的房子、订房状态（后端算好的）
+  const [loaded, setLoaded] = useState(false); // 本行程的 state 回来过没有（横幅占位要分清「没数据」和「还在加载」）
   const tripRef = useRef(trip);
   tripRef.current = trip;
 
@@ -17,6 +18,7 @@ export function useListings(trip, token) {
     if (t !== tripRef.current) return;
     setListings(s.listings || []);
     setVote(s.vote || null);
+    setLoaded(true);
     refreshPrices(t);
     await assignZones(t, s.listings || []); // 先按位置分好区域，再去补抓（补抓到位置的那间后端会顺手分区）
     enrichMissing(t, s.listings || []);
@@ -50,10 +52,10 @@ export function useListings(trip, token) {
   }
 
   // 换行程：清空重新加载
-  useEffect(() => { setListings([]); setVote(null); refresh(); }, [refresh]);
+  useEffect(() => { setListings([]); setVote(null); setLoaded(false); refresh(); }, [refresh]);
   // 换了登录的人：重新加载（登录时后端可能把这台设备的票合并过去了）
   const firstToken = useRef(token);
   useEffect(() => { if (token !== firstToken.current) { firstToken.current = token; refresh(); } }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { listings, refresh, patch, vote, setVote };
+  return { listings, refresh, patch, vote, setVote, loaded };
 }
