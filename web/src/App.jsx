@@ -11,6 +11,7 @@ import SplitView from './features/split/SplitView.jsx';
 import BlackjackView from './features/blackjack/BlackjackView.jsx';
 import FoodView from './features/food/FoodView.jsx';
 import AngelView from './features/angel/AngelView.jsx';
+import FlightsView from './features/flights/FlightsView.jsx';
 import ActivitiesView from './features/activities/ActivitiesView.jsx';
 import { useHashRoute } from './lib/useHashRoute.js';
 
@@ -54,6 +55,7 @@ function Shell() {
           <Pane active={view === 'split'}><SplitView active={view === 'split'} /></Pane>
           <Pane active={view === 'blackjack'}><BlackjackView active={view === 'blackjack'} /></Pane>
           <Pane active={view === 'angel'}><AngelView active={view === 'angel'} /></Pane>
+          <Pane active={view === 'flights'}><FlightsView active={view === 'flights'} /></Pane>
           <Pane active={view === 'activities'}><ActivitiesView active={view === 'activities'} /></Pane>
           <p className="md:hidden text-center text-slate-400 text-sm mt-10 mb-6">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
         </main>
