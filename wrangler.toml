@@ -23,3 +23,12 @@ class_name = "BlackjackTable"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["BlackjackTable"]
+
+# 斗地主 room: one Durable Object (DdzHall) holding three tables.
+[[durable_objects.bindings]]
+name = "DDZ_HALL"
+class_name = "DdzHall"
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["DdzHall"]

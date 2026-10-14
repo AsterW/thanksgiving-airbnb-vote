@@ -4,7 +4,8 @@ import { DEFAULT_TRIP, TRIPS, VIEWS } from './config.js';
 // The current trip and page live in the URL hash (#nov26 or #nov26/split), so
 // a link opens the same tab and page.
 function parse() {
-  const [t, v] = location.hash.slice(1).split('/');
+  const [t, raw] = location.hash.slice(1).split('/');
+  const v = raw === 'blackjack' ? 'games' : raw; // old links to the Blackjack tab open the Gameroom
   return { trip: TRIPS[t] ? t : DEFAULT_TRIP, view: VIEWS[v] ? v : 'hunt' };
 }
 
