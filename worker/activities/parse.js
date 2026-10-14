@@ -17,7 +17,10 @@ const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleW
 // Site slogans that show up as the "title" of login walls and home
 // shells. A card wearing one of these says nothing, so treat it as no
 // title at all (the caller falls back to the hostname).
-const GENERIC_TITLES = new Set(['小红书 - 你的生活兴趣社区', '小红书']);
+const GENERIC_TITLES = new Set(['小红书 - 你的生活兴趣社区', '小红书', 'Reddit', 'Reddit - Prove your humanity']);
+// Titles of bot-check walls (Reddit's "Prove your humanity", Cloudflare's
+// "Just a moment…", …) — the page behind them was never actually read.
+const WALL_RE = /prove your humanity|are you a robot|verify you are human|just a moment/i;
 
 function getMeta(html, attr, key) {
   const m = html.match(new RegExp('<meta[^>]+' + attr + '=["\']' + key + '["\'][^>]*content=["\']([^"\']*)["\']', 'i'))
@@ -87,13 +90,53 @@ function stateInfo(html) {
            blurb: stateField(region, 'desc') || stateField(seg, 'desc') };
 }
 
-const usable = title => !!title && !GENERIC_TITLES.has(title);
+const usable = title => !!title && !GENERIC_TITLES.has(title) && !WALL_RE.test(title);
+
+async function fetchJson(url, ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': SCRAPE_UA, 'Accept': 'application/json' } });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) { return null; }
+  finally { clearTimeout(t); }
+}
+
+// Reddit walls off its post pages to non-browser fetches (the card ends
+// up titled "Reddit - Prove your humanity") and its .json API 403s, but
+// the oEmbed endpoint — built for third-party embeds — answers with the
+// post's title and author. It only accepts canonical post URLs, so
+// resolve share links (/r/<sub>/s/<code>, redd.it) to the post first.
+async function redditInfo(url) {
+  let post = url;
+  if (!/\/comments\//.test(post)) {
+    const got = await fetchHtml(url, 10000, SCRAPE_UA);
+    if (got && /\/comments\//.test(got.finalUrl)) post = got.finalUrl;
+  }
+  const m = post.match(/(https?:\/\/(?:www\.)?reddit\.com\/r\/[^/]+\/comments\/[a-z0-9]+(?:\/[^?#]*)?)/i);
+  if (!m) return null;
+  const clean = m[1];
+  const sub = (clean.match(/\/r\/([^/]+)/) || [])[1] || '';
+  const data = await fetchJson('https://www.reddit.com/oembed?url=' + encodeURIComponent(clean), 10000);
+  if (!data || !data.title) return null;
+  const bits = ['Reddit' + (sub ? ' r/' + sub : ''), data.author_name ? '作者 u/' + data.author_name : ''];
+  return { title: decode(String(data.title)), blurb: decode(bits.filter(Boolean).join(' · ')) };
+}
 
 // { ok, title, blurb } — ok:false when the page could not be read at all
 // (blocked, not HTML, timed out). A generic site slogan never counts as
 // a title; when a fetch lands on a login wall or finds nothing, retry
 // once with a mobile UA and look in the embedded page state as well.
 export async function fetchLinkInfo(url) {
+  // Reddit gets its own route (see redditInfo); the generic scrape below
+  // only ever sees its bot wall.
+  let host = '';
+  try { host = new URL(url).hostname; } catch (e) { /* unusable URL: caller validates */ }
+  if (/(^|\.)reddit\.com$/.test(host) || /(^|\.)redd\.it$/.test(host)) {
+    const ri = await redditInfo(url);
+    if (ri && usable(ri.title)) return { ok: true, title: ri.title.slice(0, 120), blurb: ri.blurb.slice(0, 220) };
+  }
   let title = '', blurb = '', read = false;
   const first = await fetchHtml(url, 10000, SCRAPE_UA);
   if (first) {
