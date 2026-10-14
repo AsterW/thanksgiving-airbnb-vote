@@ -145,9 +145,7 @@ export default function HuntView({ trip, active }) {
           的占位，槽从第一帧就在、动画只跑一次，数据到了原地换内容。 */}
       <div className="trip-blur">
         {!loaded ? (
-          <section className="rounded-2xl p-4 mb-5 min-h-[104px] flex items-center bg-white/40 border border-white/50 text-slate-400 text-sm" aria-hidden="true">
-            🗳️ 投票倒计时加载中…
-          </section>
+          <VoteBanner vote={null} listings={listings} T={T} />
         ) : voteInfo && voteInfo.open && voteInfo.voteEndsAt ? (
           <VoteBanner vote={voteInfo} listings={listings} T={T} />
         ) : closed ? (
