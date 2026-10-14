@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { addSatellite } from '../../lib/tiles.js';
+import { cooperativeGestures, addHomeButton } from '../../lib/mapTools.js';
 
 // Pick a card's location on a map: search a place name (OpenStreetMap's
 // Nominatim, the same source the worker uses for listing zones), click
@@ -55,11 +56,16 @@ export default function LocationPicker({ initial, onSave, onClose }) {
   }
 
   useEffect(() => {
-    const m = L.map(box.current, { scrollWheelZoom: true, zoomSnap: 0.25 });
+    const m = L.map(box.current, { scrollWheelZoom: true, zoomSnap: 0.25, dragging: false });
     addSatellite(m);
     map.current = m;
     if (initial && initial.lat != null) m.setView([initial.lat, initial.lng], 13);
     else m.setView(DENVER, 9);
+    cooperativeGestures(m); // 弹窗里单指划过不抢滚动，双指才拖动
+    addHomeButton(m, () => { // 回到打开时的视角（已有地点看地点，没有看丹佛）
+      if (initial && initial.lat != null) m.setView([initial.lat, initial.lng], 13);
+      else m.setView(DENVER, 9);
+    });
     m.on('click', e => { dropPin(e.latlng.lat, e.latlng.lng); reverseName(e.latlng.lat, e.latlng.lng); });
     if (initial && initial.lat != null) dropPin(initial.lat, initial.lng);
     return () => { m.remove(); map.current = null; marker.current = null; };

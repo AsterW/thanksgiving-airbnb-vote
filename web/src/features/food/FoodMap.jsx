@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { addLightGray } from '../../lib/tiles.js';
+import { cooperativeGestures, addHomeButton } from '../../lib/mapTools.js';
 import { esc } from '../../lib/format.js';
 
 // 餐厅地图：链接里带坐标的店都钉上。Leaflet 是命令式的，这里用 effect 同步。
@@ -23,19 +24,34 @@ function popupEl(p, onFocus) {
 export default function FoodMap({ items, token, fitKey, visible, hotId, onFocus }) {
   const box = useRef(null);
   const map = useRef(null), layer = useRef(null), pins = useRef(new Map()), fitted = useRef('');
+  const ptsRef = useRef([]);
   const focus = useRef(onFocus);
   focus.current = onFocus;
+
+  // 回到默认视角：和下面取景同一套规则
+  const goHome = () => {
+    const m = map.current;
+    if (!m) return;
+    const pts = ptsRef.current;
+    m.invalidateSize();
+    if (pts.length === 1) m.setView(pts[0], 14);
+    else if (pts.length) m.fitBounds(pts, { padding: [40, 40], maxZoom: 14 });
+    else m.setView([39.2, -105.3], 7);
+  };
 
   // 第一次看得见的时候才建地图（藏着的时候量不到尺寸）
   useEffect(() => {
     if (!visible || map.current) return;
-    const m = L.map(box.current, { scrollWheelZoom: false, zoomSnap: 0.25 });
+    const m = L.map(box.current, { scrollWheelZoom: false, zoomSnap: 0.25, dragging: false });
     addLightGray(m);
     m.setView([39.2, -105.3], 7);
     m.on('click', () => m.scrollWheelZoom.enable()); // 点一下地图之后才允许滚轮缩放
     m.on('mouseout', () => m.scrollWheelZoom.disable());
+    cooperativeGestures(m); // 单指划过不抢滚动，双指才拖动
+    addHomeButton(m, goHome);
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
   useEffect(() => () => { map.current?.remove(); map.current = null; }, []);
   useEffect(() => { if (visible) fitted.current = ''; }, [visible]);
@@ -53,6 +69,7 @@ export default function FoodMap({ items, token, fitKey, visible, hotId, onFocus 
       pins.current.set(p.id, mk);
       pts.push([p.lat, p.lng]);
     }
+    ptsRef.current = pts;
     // 只有店的集合变了（换行程、加/删店）才重新取景，投票不动地图
     if (fitKey !== fitted.current) {
       fitted.current = fitKey;
