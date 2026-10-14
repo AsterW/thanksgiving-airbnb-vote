@@ -9,6 +9,7 @@ import LoginModal from './components/LoginModal.jsx';
 import HuntView from './features/hunt/HuntView.jsx';
 import SplitView from './features/split/SplitView.jsx';
 import BlackjackView from './features/blackjack/BlackjackView.jsx';
+import AngelView from './features/angel/AngelView.jsx';
 import { useHashRoute } from './lib/useHashRoute.js';
 
 // 每个页面一直挂着（切走只是藏起来），回来时房源、地图、牌桌都还在；切回来时淡入一下
@@ -49,6 +50,7 @@ function Shell() {
           <Pane active={view === 'hunt'}><HuntView trip={trip} active={view === 'hunt'} /></Pane>
           <Pane active={view === 'split'}><SplitView active={view === 'split'} /></Pane>
           <Pane active={view === 'blackjack'}><BlackjackView active={view === 'blackjack'} /></Pane>
+          <Pane active={view === 'angel'}><AngelView active={view === 'angel'} /></Pane>
           <p className="md:hidden text-center text-slate-400 text-sm mt-10 mb-6">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
         </main>
       </div>

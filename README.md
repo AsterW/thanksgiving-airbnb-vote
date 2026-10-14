@@ -23,6 +23,9 @@ works for any group picking a place together.
 - Manual-add fallback when auto-scrape fails
 - Blackjack: one live table (up to 6 seats) everyone joins from their own
   phone, play chips only
+- Secret Angel: swipe through gift categories to say what you'd love (or
+  not), then the admin draws who secretly gives a gift to whom; everyone only
+  sees their own match
 - No passwords, no database server
 
 ## How it works
