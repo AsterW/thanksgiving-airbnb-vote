@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../lib/api.js';
 
 const EMPTY = { url: '', title: '', image: '', price: '', bedrooms: '', beds: '', baths: '', sleeps: '', area: '', note: '' };
@@ -12,6 +12,9 @@ export default function AddListingForm({ trip, T, zones, onAdded }) {
   const [manualOpen, setManualOpen] = useState(false);
   const [m, setM] = useState(EMPTY);
   const field = k => ({ value: m[k], onChange: e => setM({ ...m, [k]: e.target.value }) });
+
+  // 换行程：区域选项不一样了，别把上一段行程选的区域带过去；上一段的提示也清掉
+  useEffect(() => { setM(m => ({ ...m, area: '' })); setMsg({ text: '', tone: 'text-slate-500' }); }, [trip]);
 
   async function add() {
     const u = url.trim();

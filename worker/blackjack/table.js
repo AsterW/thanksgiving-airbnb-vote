@@ -66,6 +66,9 @@ export class BlackjackTable {
   }
   onClose(ws) {
     if (!this.sockets.has(ws)) return;
+    // Answer the client's close so the connection actually ends; without this
+    // the browser's socket hangs half-closed (and keeps this object busy).
+    try { ws.close(1000, 'bye'); } catch (e) { /* already closed */ }
     const key = this.sockets.get(ws);
     this.sockets.delete(ws);
     if (key && ![...this.sockets.values()].includes(key)) this.game.disconnect(key);

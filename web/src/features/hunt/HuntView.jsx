@@ -29,8 +29,11 @@ export default function HuntView({ trip, active }) {
   const [frozen, setFrozen] = useState(null); // 投票后暂时保持的顺序
   const [anchorId, setAnchorId] = useState(null);
   const [glowId, setGlowId] = useState(null);
+  const [popId, setPopId] = useState(null); // 刚投票的按钮弹一下
   const timers = useRef([]);
   const gridBox = useRef(null);
+  const tripRef = useRef(trip); // 投票请求回来时用来判断是不是已经切到别的行程了
+  tripRef.current = trip;
 
   useEffect(() => { setFilter('all'); setFrozen(null); timers.current.forEach(clearTimeout); }, [trip]);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
@@ -73,14 +76,15 @@ export default function HuntView({ trip, active }) {
     const t = trip;
     if ((l.votes || []).some(v => v.token === token)) {
       const r = await api('/api/vote', 'POST', { trip: t, id: l.id, token, name: null });
-      if (r.ok && t === trip) afterVote(l.id, r.votes);
+      if (r.ok && t === tripRef.current) afterVote(l.id, r.votes);
       return;
     }
     ensureName(async me => {
       const r = await api('/api/vote', 'POST', { trip: t, id: l.id, token: me.token, name: me.name });
-      if (!r.ok || t !== trip) return;
+      if (!r.ok || t !== tripRef.current) return; // 等待期间切了行程：这间已经不在页面上了
       afterVote(l.id, r.votes);
       toast('🎉 投票成功！给「' + (l.title || '未命名房源') + '」+1');
+      if (!reduceMotion) { setPopId(l.id); timers.current.push(setTimeout(() => setPopId(null), 450)); }
       celebrateVote(btn);
     });
   }
@@ -106,7 +110,7 @@ export default function HuntView({ trip, active }) {
         showMap={showMap} onToggleMap={() => { save('showMap', showMap ? '0' : '1'); setShowMap(!showMap); }} />
       {showMap && <ListingMap items={visible} T={T} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} />}
       <div ref={gridBox}>
-        <ListingGrid items={items} T={T} token={token} glowId={glowId} anchorId={anchorId}
+        <ListingGrid items={items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
           emptyText={(filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 链接进来吧 👆'}
           zones={zoneNames} onVote={vote} onRemove={remove} onSetArea={setArea} onHover={setHotId} />
       </div>
