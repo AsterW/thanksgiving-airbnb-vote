@@ -3,6 +3,7 @@
 import { j, uid } from '../lib/http.js';
 import { cleanName } from '../users/users.js';
 import { expandLink, isMapsLink, readLink } from './maps.js';
+import { placePhotos } from './photos.js';
 import { getFood, saveFood } from './store.js';
 
 const readBody = async req => { try { return await req.json(); } catch (e) { return {}; } };
@@ -22,11 +23,16 @@ async function handleAdd(req, env) {
   const mapsUrl = await expandLink(link);
   const { name, lat, lng } = mapsUrl ? readLink(mapsUrl) : { name: '' };
   if (!name) return j({ ok: false, error: '找不到这家餐厅。在 Google 地图里打开店铺页，点“分享”复制链接再试' });
-  const food = await getFood(env, body.trip);
-  const existing = food.places.find(p => p.name.toLowerCase() === name.toLowerCase());
+  let food = await getFood(env, body.trip);
+  let existing = food.places.find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (existing) return j({ ok: true, deduped: true, place: existing, places: food.places });
+  const images = await placePhotos(mapsUrl);
+  // Fetching photos took a while: re-read so concurrent votes and adds aren't lost.
+  food = await getFood(env, body.trip);
+  existing = food.places.find(p => p.name.toLowerCase() === name.toLowerCase());
   if (existing) return j({ ok: true, deduped: true, place: existing, places: food.places });
   const place = {
-    id: uid(), name, url: mapsUrl, lat, lng,
+    id: uid(), name, url: mapsUrl, lat, lng, images,
     note: String(body.note || '').trim().slice(0, 120), addedBy: cleanName(body.addedBy),
     createdAt: Date.now(), votes: [],
   };
@@ -48,6 +54,22 @@ async function handleVote(req, env) {
   return j({ ok: true, votes: place.votes });
 }
 
+// Photos for a place added before photos existed (no `images` field yet).
+// Tried once: a failure stores [] so the page doesn't keep asking.
+async function handlePhotos(req, env) {
+  const { trip, id } = await readBody(req);
+  const peek = (await getFood(env, trip)).places.find(p => p.id === id);
+  if (!peek) return j({ ok: false, error: '这家已经被删掉了' });
+  if (Array.isArray(peek.images)) return j({ ok: true, images: peek.images });
+  const images = await placePhotos(peek.url);
+  const food = await getFood(env, trip); // re-read after the slow fetch
+  const place = food.places.find(p => p.id === id);
+  if (!place) return j({ ok: false, error: '这家已经被删掉了' });
+  place.images = images;
+  await saveFood(env, trip, food);
+  return j({ ok: true, images });
+}
+
 async function handleRemove(req, env) {
   const { trip, id } = await readBody(req);
   const food = await getFood(env, trip);
@@ -62,5 +84,6 @@ export const routes = {
   'GET /api/food': handleList,
   'POST /api/food/add': handleAdd,
   'POST /api/food/vote': handleVote,
+  'POST /api/food/photos': handlePhotos,
   'POST /api/food/remove': handleRemove,
 };

@@ -23,7 +23,8 @@ works for any group picking a place together.
 - Manual-add fallback when auto-scrape fails
 - Restaurants: paste a link copied from Google Maps to add a place to the
   trip's list (name and pin come from the link; if it doesn't point to one
-  place, you get "not found"), vote for the ones you want to try, open each in
+  place, you get "not found"); each card shows up to 10 photos from the place
+  page, like the Airbnb cards. Vote for the ones you want to try, open each in
   Google Maps or get directions
 - Blackjack: one live table (up to 6 seats) everyone joins from their own
   phone, play chips only

@@ -26,7 +26,7 @@
 | `web/src/features/split/` | 分账：成员、记一笔、余额和结清方案、支出记录（行内修改） |
 | `web/src/features/blackjack/` | 21 点：`useBlackjack`（WebSocket 连线、坐下/站起）、牌桌各部分组件 |
 | `web/src/session/` | 登录：从用户列表选名字，名字和 token 存在 `localStorage`（`vn` / `vt`） |
-| `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅 |
+| `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅、照片轮播 `Carousel`（选房和餐厅卡片都用） |
 | `web/src/lib/` | 共用：`api()`、行程和页面配置（`TRIPS`、`VIEWS`）、URL hash 路由（`#nov26/split`） |
 
 - 投票后先在原位更新，700ms 后再按新票数重排，卡片滑到新位置，投的那间在屏幕上不动
@@ -42,7 +42,7 @@
 | `POST /api/add` | 正则从链接提 roomId（`/rooms/(\d+)`）→ 查重（重复返回 `deduped`）→ 调抓取 → 新房源 `unshift` 到数组头 → 写回 KV |
 | `POST /api/add-manual` | 手动表单，走同样入库 |
 | `POST /api/vote` / `/api/remove` / `/api/enrich` | 投票、删除、补抓 |
-| `GET /api/food?trip=…`、`POST /api/food/add` / `vote` / `remove` | 餐厅（`worker/food/`）。只接受从 Google 地图复制的链接：店名和坐标从链接本身读（`/maps/place/<店名>/…!3d<纬度>!4d<经度>`，或带店铺 id 的 `?q=` 链接），`maps.app.goo.gl` 短链接只跟着跳转展开，不抓 Google 的页面、不按店名搜索；读不出店名就回“找不到这家餐厅” |
+| `GET /api/food?trip=…`、`POST /api/food/add` / `vote` / `remove` | 餐厅（`worker/food/`）。只接受从 Google 地图复制的链接：店名和坐标从链接本身读（`/maps/place/<店名>/…!3d<纬度>!4d<经度>`，或带店铺 id 的 `?q=` 链接），`maps.app.goo.gl` 短链接只跟着跳转展开，不抓 Google 的页面、不按店名搜索；读不出店名就回“找不到这家餐厅”。加店时顺便取最多 10 张照片（`worker/food/photos.js`）：打开链接指向的店铺页，找到 Google 地图自己用的店铺详情请求（`/maps/preview/place?…`），只留类型是照片的（不要街景全景、视频和头像）；取不到就没有照片，店照样加上。之前加的店，页面打开时会补取一次（`POST /api/food/photos`） |
 | 其他路径 | `env.ASSETS.fetch(request)` 返回构建好的页面（`dist/`） |
 
 ⚠️ 踩过的坑：`wrangler.toml` 的 `[assets]` 必须声明 `binding = "ASSETS"`，否则 `env.ASSETS` 是 `undefined`，首页报 Error 1101 而 `/api/*` 还正常。

@@ -12,7 +12,16 @@ export function useFood(trip, active) {
     const t = trip;
     let r;
     try { r = await api('/api/food?trip=' + t); } catch (e) { return; }
-    if (t === tripRef.current && r.ok) setPlaces(r.places);
+    if (t !== tripRef.current || !r.ok) return;
+    setPlaces(r.places);
+    // 照片功能之前加的店还没有 images：一家家去补一次
+    for (const p of r.places) {
+      if (Array.isArray(p.images)) continue;
+      let x;
+      try { x = await api('/api/food/photos', 'POST', { trip: t, id: p.id }); } catch (e) { continue; }
+      if (t !== tripRef.current) return;
+      if (x.ok) setPlaces(ps => ps && ps.map(q => (q.id === p.id ? { ...q, images: x.images } : q)));
+    }
   }, [trip]);
 
   useEffect(() => { setPlaces(null); }, [trip]);
