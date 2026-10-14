@@ -10,3 +10,12 @@ run_worker_first = true
 [[kv_namespaces]]
 binding = "VOTES_KV"
 id = "0c1964118e4c427aa9698fa13a5dcadf"
+
+# Blackjack table: one Durable Object (SQLite storage, required on the free plan).
+[[durable_objects.bindings]]
+name = "BJ_TABLE"
+class_name = "BlackjackTable"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BlackjackTable"]
