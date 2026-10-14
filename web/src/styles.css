@@ -10,3 +10,42 @@ body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
 .view-enter { animation: view-in .35s ease; }
 @keyframes view-in { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
 @media (prefers-reduced-motion: reduce) { .view-enter { animation:none; } }
+
+/* ==== Liquid Glass · 阶段 1：外壳（侧栏 / 底部栏 / 页头）====
+   材质变量集中放这里，后续卡片、控件、弹窗阶段直接复用同一套 token。 */
+:root {
+  --ink: #12233b;
+  --ink-2: #40597a;
+  --glass-bg: linear-gradient(135deg, rgba(255,255,255,.58), rgba(255,255,255,.3) 55%, rgba(255,255,255,.4));
+  --glass-border: rgba(255,255,255,.65);
+  --glass-shadow: 0 12px 32px rgba(30,50,110,.16), inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 0 rgba(255,255,255,.25);
+  --glass-blur: blur(18px) saturate(180%);
+}
+/* 页面底色换成固定的极光渐变：玻璃得有颜色在底下才有东西可折射，
+   不然磨砂只是灰蒙蒙。内容卡片这一阶段不动，白色卡片浮在极光上也成立。 */
+body {
+  color: var(--ink);
+  background:
+    radial-gradient(60% 50% at 10% 0%, rgba(125,211,252,.55), rgba(125,211,252,0) 60%),
+    radial-gradient(50% 42% at 90% 8%, rgba(240,171,252,.42), rgba(240,171,252,0) 60%),
+    radial-gradient(65% 55% at 80% 105%, rgba(253,186,116,.5), rgba(253,186,116,0) 62%),
+    radial-gradient(45% 40% at 15% 100%, rgba(165,180,252,.4), rgba(165,180,252,0) 60%),
+    linear-gradient(160deg, #dceeff 0%, #e9e4ff 46%, #ffeeda 100%);
+  background-attachment: fixed;
+}
+/* 通用玻璃面：半透渐变 + 背景模糊饱和 + 顶部高光线 + 底部微光 + 悬浮阴影 */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+/* 不支持背景模糊的浏览器退成近不透明的浅色，不能透出底下乱字 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: rgba(247,249,255,.94); }
+}
+/* 系统开了「降低透明度」就给实色，尊重无障碍设置 */
+@media (prefers-reduced-transparency: reduce) {
+  .glass { background: rgba(247,249,255,.96); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}

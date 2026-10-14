@@ -5,10 +5,10 @@ import './header.css';
 export default function Header({ view, trip, onTrip }) {
   const V = VIEWS[view], T = TRIPS[trip];
   return (
-    <header className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500 text-white px-6 py-8">
+    <header className="app-header px-6 py-7 md:py-8">
       <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl md:text-3xl font-bold">{V.title}</h1>
-        <p className="mt-2 text-indigo-100">{(V.tripScoped ? T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · ' : '') + V.sub}</p>
+        <p className="mt-2 text-slate-600">{(V.tripScoped ? T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · ' : '') + V.sub}</p>
         {V.tripScoped && (
           <nav className="mt-5 flex flex-wrap gap-2">
             {Object.entries(TRIPS).map(([k, t]) => (
