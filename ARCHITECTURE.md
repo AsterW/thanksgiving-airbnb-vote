@@ -13,6 +13,7 @@
   - 餐厅：每段行程一份，`food:nov25:v1` / `food:nov26:v1`（`{ places: [...] }`，每家有名字、Google 地图链接、坐标、备注、想去的人）
 - **Secret Angel**：`angel:v1`（全员一份）。`prefs` 按名字（小写）存每人的礼物偏好（分类 id → `love` / `nope`，加一句备注）；`excluded` 是管理员排除的人；`draw` 是抽签结果（天使 → 要送礼的人）。管理员是名字为 Aster 的用户（`worker/angel/routes.js` 的 `ADMIN`）。抽签把所有参加的人随机排成一个圈，每人送给下一个（`worker/angel/draw.js`），所以不会抽到自己、也不会两人互送。接口只返回调用者自己的那一对。和投票一样，身份靠用户列表里的名字 + token，不是真正的密码登录
 - **21 点**：不走 KV，是一个 Durable Object（`BlackjackTable`，SQLite 存储，免费计划只能用这种）。整张桌子的状态在它的内存里，玩家用 WebSocket（`/api/bj`）连上来，每次有变化就把整桌推给所有人。规则和流程在 `BlackjackGame` 里（6 副牌、庄家软 17 停、Blackjack 3:2、头两张可加倍、不分牌不保险；15 秒下注、30 秒一手）。筹码只在玩家站起来或断线时存进它自己的存储（`p:<名字>`），不按局存。坐下要用登录名单里的名字和 token。不在 21 点页面又没坐下的人会断开连接，10 分钟没下注会被站起来，免得白占免费的运行时长
+- **斗地主**：和 21 点一样是 Durable Object（`DdzHall`，WebSocket `/api/ddz`），一个对象管 3 张桌（`ROOMS`），每桌 3 个座位，一个人同时只能坐一张桌。规则在 `worker/ddz/cards.js`（牌型识别、比大小：单、对、三带、顺子、连对、飞机带翅膀、四带二、炸弹、王炸），机器人在 `bot.js`（按牌力叫/抢地主，出牌先出小的、不拆王炸、不压队友、对手快走完了才炸），一桌的流程在 `game.js`（`DdzGame`：叫地主 → 抢地主（每抢一次 ×2，叫的人最后还能抢回来；三家都不叫就重发）→ 地主拿 3 张底牌 → 出牌 → 结算，7 秒后自动下一局）。空位开局时由机器人补上；叫地主 15 秒、出牌 30 秒，超时由机器人代打一手，连续超时两次或掉线就托管，局中站起来也是托管打完这局再走；局中来的人排队，下一局坐下。底分 10 豆，倍数 = 叫抢倍数 × 2^炸弹数（春天 / 反春再 ×2），地主一人对两家。豆子和 21 点筹码分开，存在 `DdzHall` 自己的存储里（`p:<名字>`，豆子、局数、胜局、补豆次数），同样只在站起来或断线时写；输光了下一局自动补到 1000。每个人只收到自己的牌，结算时才亮所有人的牌。没人连着时这局直接让机器人打完、记分，桌子空出来
 - **域名**：`denver-thanksgiving-airbnb-vote.thanksgiving-vote.workers.dev`（免费子域名）
 
 ## 前端（`web/`，React + Vite + Tailwind）
@@ -25,7 +26,9 @@
 | `web/src/features/hunt/` | 选房：`HuntView`（数据和投票）、`ListingGrid`（卡片换位动画 FLIP + 投票后锚定位置）、`ListingCard`、`Carousel`（照片轮播）、`ListingMap`（Leaflet 地图）、`AddListingForm`、`price.js`（实时价/排序） |
 | `web/src/features/food/` | 找餐厅：贴 Google 地图链接加店（`AddPlaceForm`）、店铺卡片（想去 / 在 Google 地图打开 / 导航）、`FoodMap`（Leaflet 钉子） |
 | `web/src/features/split/` | 分账：成员、记一笔、余额和结清方案、支出记录（行内修改） |
+| `web/src/features/games/` | Gameroom 页：`GamesView` 在 Blackjack 和斗地主之间切（记在 `localStorage` 的 `game`）；两个游戏都一直挂着，只有看着的那个连服务器。旧链接 `#…/blackjack` 会跳到 `#…/games` |
 | `web/src/features/blackjack/` | 21 点：`useBlackjack`（WebSocket 连线、坐下/站起）、牌桌各部分组件 |
+| `web/src/features/ddz/` | 斗地主：`useDdz`（WebSocket、选桌、坐下/站起、提示）、`DdzView`（桌子、手牌点选、叫抢/出牌按钮）、`SeatBox`、`DdzCard`、`DdzBoard`（豆子榜） |
 | `web/src/session/` | 登录：从用户列表选名字，名字和 token 存在 `localStorage`（`vn` / `vt`） |
 | `web/src/components/` | 共用：开场动画、导航、标题、登录框、顶部横幅、照片轮播 `Carousel`（选房和餐厅卡片都用） |
 | `web/src/lib/` | 共用：`api()`、行程和页面配置（`TRIPS`、`VIEWS`）、URL hash 路由（`#nov26/split`） |
@@ -35,7 +38,7 @@
 
 ## 后端（`worker/`，跑在 Worker 里）
 
-入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`food/`（餐厅：读 Google 地图链接）、`users/`（用户列表、登录）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
+入口 `worker/index.js` 只做一件事：把各功能目录导出的路由表（`routes`）合并起来按「方法 + 路径」分发，其他路径交给 `env.ASSETS` 返回构建好的页面。功能目录：`listings/`（房源、抓取、实时价）、`food/`（餐厅：读 Google 地图链接）、`users/`（用户列表、登录）、`split/`（账本计算和存储）、`blackjack/`（规则 `game.js` 和 Durable Object `table.js`）、`ddz/`（斗地主：牌型 `cards.js`、机器人 `bot.js`、一桌 `game.js`、Durable Object `hall.js`）、`config/`（行程和预置房源）。每个接口都按 `trip`（GET 用 `?trip=`，POST 放在 body 里）选 KV key；不带 `trip` 的请求（比如还开着旧页面的人）默认走 `nov26`，也就是原来那份清单：
 
 | 路由 | 作用 |
 |---|---|
@@ -75,7 +78,7 @@ Airbnb 房源页的价格框是浏览器单独请求的（GraphQL 持久化查�
 
 ## 部署（`wrangler.toml`）
 
-声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、21 点的 Durable Object。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
+声明 worker 名、入口 `worker/index.js`、构建命令（`[build]`：`npm run build` 把前端构建到 `./dist`）、静态目录 `./dist`、KV 绑定（`VOTES_KV` → namespace id）、21 点和斗地主的两个 Durable Object（`BlackjackTable`、`DdzHall`，各自一条 migration）。推到 `main` 由 GitHub Action 自动 `npm ci` + `wrangler deploy`；每个 PR 都会跑 `npm run check`（lint + 构建 + 打包 worker）。KV namespace 用 `wrangler kv namespace create` 先建好再把 id 写进 toml。
 
 **部署踩坑清单（2026-10-10）：**
 
