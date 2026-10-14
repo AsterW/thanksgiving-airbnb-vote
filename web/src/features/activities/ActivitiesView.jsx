@@ -3,6 +3,7 @@ import { api } from '../../lib/api.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
 import ActivityCard from './ActivityCard.jsx';
+import AddActivityForm from './AddActivityForm.jsx';
 import { AREA_ORDER } from './areas.js';
 import './activities.css';
 
@@ -55,8 +56,16 @@ export default function ActivitiesView({ active }) {
     });
   }
 
+  async function remove(a) {
+    if (!confirm('确定要删除「' + a.title + '」吗？删掉后大家就看不到了。')) return;
+    const r = await api('/api/activity-remove', 'POST', { id: a.id });
+    if (r.ok) setActivities(prev => prev.filter(x => x.id !== a.id));
+    else alert('删除失败，稍后再试');
+  }
+
   return (
     <div>
+      <AddActivityForm onAdded={act => { setActivities(prev => [...prev, act]); setArea('all'); }} />
       <div className="flex flex-wrap gap-2 mb-5">
         <button onClick={() => setArea('all')}
           className={'px-3 py-1.5 rounded-full text-sm font-medium border ' + (area === 'all' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200')}>
@@ -73,7 +82,7 @@ export default function ActivitiesView({ active }) {
         <section key={g.area} className="mb-8">
           <h2 className="font-bold text-lg mb-3">{g.area}</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {g.items.map(a => <ActivityCard key={a.id} a={a} token={token} banner={bannerOf(a.area)} onVote={vote} />)}
+            {g.items.map(a => <ActivityCard key={a.id} a={a} token={token} banner={bannerOf(a.area)} onVote={vote} onRemove={remove} />)}
           </div>
         </section>
       ))}

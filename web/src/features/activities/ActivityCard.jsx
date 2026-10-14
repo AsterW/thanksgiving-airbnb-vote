@@ -1,11 +1,14 @@
 // One activity candidate: banner with its emoji, what/where blurb, who
 // voted, a vote toggle and a link out to the venue's own website.
-export default function ActivityCard({ a, token, banner, onVote }) {
+export default function ActivityCard({ a, token, banner, onVote, onRemove }) {
   const votes = a.votes || [];
   const voted = votes.some(v => v.token === token);
   return (
     <article data-id={a.id} className="bg-white rounded-2xl shadow overflow-hidden flex flex-col">
-      <div className="h-20 flex items-center justify-center text-4xl" style={{ background: banner }} aria-hidden="true">{a.emoji}</div>
+      <div className="relative h-20 flex items-center justify-center text-4xl" style={{ background: banner }}>
+        <span aria-hidden="true">{a.emoji}</span>
+        <button onClick={() => onRemove(a)} title="删除这个活动" className="absolute top-2 right-2 bg-black/40 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>
+      </div>
       <div className="p-4 flex flex-col flex-1">
         <h3 className="font-bold leading-snug mb-1">{a.title}</h3>
         <p className="text-xs text-slate-400 mb-2">{a.area} · 推荐来源：{a.source}</p>
