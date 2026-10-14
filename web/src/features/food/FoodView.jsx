@@ -4,6 +4,7 @@ import { load, save } from '../../lib/storage.js';
 import { reduceMotion } from '../../lib/motion.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { celebrateVote } from '../../lib/celebrate.js';
 import AddPlaceForm from './AddPlaceForm.jsx';
 import PlaceCard from './PlaceCard.jsx';
@@ -16,6 +17,7 @@ import './food.css';
 export default function FoodView({ trip, active }) {
   const { token, ensureName } = useSession();
   const toast = useToast();
+  const confirm = useConfirm();
   const { places, setPlaces, patch, tripRef } = useFood(trip, active);
   const [sortBy, setSortBy] = useState('votes');
   const [showMap, setShowMap] = useState(() => load('showFoodMap') !== '0');
@@ -39,7 +41,7 @@ export default function FoodView({ trip, active }) {
       let r;
       try { r = await api('/api/food/vote', 'POST', { trip: t, id: p.id, token: me.token, name: mine ? null : me.name }); } catch (e) { return; }
       if (t !== tripRef.current) return; // 等待期间切了行程
-      if (!r.ok) { alert(r.error || '没投上，稍后再试'); return; }
+      if (!r.ok) { toast(r.error || '没投上，稍后再试'); return; }
       patch(p.id, x => ({ ...x, votes: r.votes }));
       if (mine) return;
       toast('🎉 投票成功！给「' + p.name + '」+1');
@@ -54,12 +56,12 @@ export default function FoodView({ trip, active }) {
   }
 
   async function remove(p) {
-    if (!confirm('确定要删除「' + p.name + '」吗？')) return;
+    if (!await confirm({ title: '删除这家餐厅？', message: '确定要删除「' + p.name + '」吗？删掉后大家就看不到了。', confirmText: '删除', danger: true })) return;
     const t = trip;
     let r;
     try { r = await api('/api/food/remove', 'POST', { trip: t, id: p.id }); } catch (e) { r = { ok: false }; }
     if (t !== tripRef.current) return;
-    if (r.ok) setPlaces(r.places); else alert(r.error || '删除失败，稍后再试');
+    if (r.ok) setPlaces(r.places); else toast(r.error || '删除失败，稍后再试');
   }
 
   function focusCard(id) {

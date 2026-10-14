@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../../lib/api.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { useToast } from '../../components/Toast.jsx';
+import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import { CATEGORIES } from './categories.js';
 import SwipeDeck from './SwipeDeck.jsx';
 import WishGrid from './WishGrid.jsx';
@@ -15,6 +16,7 @@ import './angel.css';
 export default function AngelView({ active }) {
   const { name, token, users, openLogin } = useSession();
   const toast = useToast();
+  const confirm = useConfirm();
   const [data, setData] = useState(null);
   const [picks, setPicks] = useState({});
   const [note, setNote] = useState('');
@@ -47,13 +49,13 @@ export default function AngelView({ active }) {
     if (await post('/api/angel/prefs', { picks, note })) { setDirty(false); toast(mine ? '愿望更新好了 ✨' : '愿望交上去了，等抽签吧 😇'); }
   }
   async function draw() {
-    if (data.drawn && !confirm('已经抽过了。重新抽的话大家的结果都会变（愿望不会清掉，只是按现在已填的人重新分配），确定吗？')) return;
+    if (data.drawn && !await confirm({ title: '重新抽签？', message: '已经抽过了。重新抽的话大家的结果都会变（愿望不会清掉，只是按现在已填的人重新分配），确定吗？', confirmText: '重新抽' })) return;
     if (await post('/api/angel/draw', {})) toast('🎲 抽好了！大家去拆信封吧');
   }
   const [transferTo, setTransferTo] = useState('');
   async function transferAdmin() {
     if (!transferTo) return;
-    if (!confirm('把管理员转给 ' + transferTo + '？转完之后就由 TA 来抽签和重新 Shuffle，你将不再是管理员。')) return;
+    if (!await confirm({ title: '转交管理员？', message: '把管理员转给 ' + transferTo + '？转完之后就由 TA 来抽签和重新 Shuffle，你将不再是管理员。', confirmText: '转交' })) return;
     if (await post('/api/angel/admin', { target: transferTo })) { setTransferTo(''); toast('👑 管理员已转给 ' + transferTo); }
   }
 
