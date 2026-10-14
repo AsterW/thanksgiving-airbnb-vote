@@ -13,7 +13,8 @@ works for any group picking a place together.
 
 - Paste any Airbnb listing link → title, photo, bedrooms/beds/baths, capacity,
   and rating are auto-filled
-- One-tap voting with voter names, toggle to unvote
+- One-tap voting with voter names, toggle to unvote — casting a vote sets off a
+  confetti celebration (banner only for people who prefer reduced motion)
 - Separate tabs (and separate lists) for each leg of the trip — Nov 25–26 for
   9 people, Nov 26–29 for 14; "Go to Airbnb" opens each listing with that
   tab's dates and guest count
