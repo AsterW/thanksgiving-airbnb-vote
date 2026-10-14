@@ -37,6 +37,10 @@ export function SessionProvider({ children }) {
   // 邮箱验证码挑战：{ kind: 'login'|'bind', name, email?, emailHint? }。
   // login = 选了绑邮箱的人但这台设备没有 ta 的 token；bind = 正在给某人绑邮箱。
   const [challenge, setChallenge] = useState(null);
+  // 每次登录成功 +1：绑邮箱提醒靠它判断"这是一次新登录"（刷新页面恢复
+  // 会话不算登录，不弹）。bindIntent = 登录框打开后直达绑邮箱那一步。
+  const [loginTick, setLoginTick] = useState(0);
+  const [bindIntent, setBindIntent] = useState(false);
   const pending = useRef(null); // 登录后要接着做的事（比如投票），参数是 { name, token }
 
   const loadUsers = useCallback(async () => {
@@ -50,7 +54,10 @@ export function SessionProvider({ children }) {
     loadUsers(); // 别人可能刚注册，顺手刷新一下列表
   }, [loadUsers]);
 
-  const closeLogin = useCallback(() => { pending.current = null; setChallenge(null); setLoginOpen(false); }, []);
+  const closeLogin = useCallback(() => { pending.current = null; setChallenge(null); setBindIntent(false); setLoginOpen(false); }, []);
+
+  // 打开登录框并直达"给当前账号绑邮箱"那一步（绑邮箱提醒的按钮用）
+  const openBind = useCallback(() => { setBindIntent(true); setLoginOpen(true); loadUsers(); }, [loadUsers]);
 
   // 已登录就直接做；没登录先弹登录框，登录后再做
   const ensureName = useCallback(fn => {
@@ -60,6 +67,7 @@ export function SessionProvider({ children }) {
 
   // 登录/绑定成功后：换上这个账号的身份，关弹窗，接着做刚才想做的事
   const adopt = useCallback(r => {
+    setLoginTick(t => t + 1);
     setName(r.user.name); setToken(r.user.token); if (r.users) setUsers(r.users);
     save('vn', r.user.name); save('vt', r.user.token);
     rememberUserToken(r.user.name, r.user.token);
@@ -141,6 +149,6 @@ export function SessionProvider({ children }) {
     return null;
   }, [token]);
 
-  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, deleteUser };
+  const value = { name, token, users, setUsers, loadUsers, loginOpen, openLogin, closeLogin, ensureName, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, deleteUser, loginTick, bindIntent, openBind };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

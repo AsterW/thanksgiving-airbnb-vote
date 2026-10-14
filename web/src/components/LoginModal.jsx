@@ -6,7 +6,7 @@ import './login.css';
 // 绑了邮箱的账号在新设备上登录要邮箱验证码（challenge 视图）；
 // 没绑的可以从这里绑（选人 → 绑邮箱 → 收到码 → 验证完成）。
 export default function LoginModal() {
-  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, deleteUser } = useSession();
+  const { name, token, users, loginOpen, closeLogin, login, challenge, setChallenge, sendAuthCode, verifyAuthCode, joinWithEmail, deleteUser, bindIntent } = useSession();
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [sel, setSel] = useState('');
@@ -24,6 +24,8 @@ export default function LoginModal() {
     if (!loginOpen) return;
     setNewName(''); setNewEmail(''); setMsg(''); setBindOpen(false); setBindEmail(''); setConfirmDel('');
     setSel(users.some(u => u.name === name) ? name : '');
+    // 从绑邮箱提醒进来：选中本人并直接展开绑邮箱输入框
+    if (bindIntent && name) { setSel(name); setBindOpen(true); }
     (users.length ? selRef.current : inputRef.current)?.focus();
     const onKey = e => { if (e.key === 'Escape') closeLogin(); };
     window.addEventListener('keydown', onKey);
