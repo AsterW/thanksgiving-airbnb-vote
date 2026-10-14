@@ -65,6 +65,10 @@ Airbnb 会拦机房 IP（给 worker 返回机器人验证墙），所以做了�
 
 每段行程在 `worker/config/trips.js` 里配几个区域（中心点 + 半径 km），名字和前端 `TRIPS.areas` 一致。房源有了位置但没区域时，后端按顺序分：落在配置的区域里（几个都包含就取最小的）→ 25 km 内最近的已分区房源的区域 → OpenStreetMap（Nominatim）反查城镇名，比如 Steamboat Springs，作为新区域。加房源、补抓到位置时当场分；页面加载时 `POST /api/zones` 把还没分的补上（每次最多 8 间，查城镇名间隔 1 秒，符合 Nominatim 的使用规则）。前端标签页 = 配置的区域（固定顺序）+ 房源里出现的其他区域（按数量排）+「未分区」。卡片左上角的区域标签可以点开改（`POST /api/area`），手动改过的（`areaManual`）不会再被自动分。
 
+## 天气（`worker/weather/`、`web/src/features/weather/`）
+
+选房页的行程标签页下面，每个地点一行（地点配在 `worker/config/trips.js` 的 `weatherAt`），每天一个天气 emoji 加最低/最高温。数据来自 Open-Meteo（免费、不用 key）：预报只有未来 16 天，更远的日子用过去 5 年同一天的实际天气代替（最常见的天气 + 平均温度，虚线框标「往年同期」），进了 16 天以内自动换成预报。后端 `GET /api/weather?trip=` 把结果存在 KV（`weather:v1:<经纬度>:<日期>`）大家共用：往年数据永久缓存，预报最多 3 小时刷新一次，所以不管多少人打开页面，Open-Meteo 每天只会被调几次（直接从浏览器调会被限流，试过）。
+
 ## 实时价格（`worker/listings/prices.js`）
 
 Airbnb 房源页的价格框是浏览器单独请求的（GraphQL 持久化查询 `StaysPdpBookItQuery`，带公开的网页 API key）。Worker 用同样的请求，按每段行程的日期和人数查总价和是否可订；人数超过房源上限时按上限再查一次。结果存在房源的 `live` 字段，6 小时内不重复查。查询 hash 或 key 变了会查不到，卡片保留上次的价格并显示多久以前查的。
