@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { esc } from '../../lib/format.js';
+import { reduceMotion } from '../../lib/motion.js';
 import { duration, localTime } from './plan.js';
 
 const COLORS = ['#4f46e5', '#e11d48', '#059669', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#ea580c', '#2563eb'];
@@ -23,6 +24,49 @@ function arc(a, b, n = 64) {
     pts.push([Math.atan2(v[2], Math.hypot(v[0], v[1])) / r, lng]);
   }
   return pts;
+}
+
+// 机头朝上的小飞机，转到航向
+const PLANE = color => '<div class="fl-plane"><svg viewBox="0 0 24 24" width="22" height="22"><path fill="' + color + '" stroke="#fff" stroke-width="1.2" stroke-linejoin="round" '
+  + 'd="M12 1.5c.9 0 1.6 1 1.6 2.3v5.7l7.9 4.6v2.2l-7.9-2.3v4.6l2.3 1.7v1.8L12 21l-3.9 1.1v-1.8l2.3-1.7v-4.6l-7.9 2.3v-2.2l7.9-4.6V3.8c0-1.3.7-2.3 1.6-2.3z"/></svg></div>';
+
+// 动起来：每条航线先顺着飞行方向画出来（到达从外地画进丹佛，离开从丹佛画出去），
+// 然后线上的虚线一直往前流，小飞机沿着航线一圈圈地飞。系统开了「减少动态效果」就不动。
+function animate(m, group, drawn) {
+  const timers = [], planes = [];
+  drawn.forEach(({ line, flow, pts, color, minutes }, i) => {
+    const el = line.getElement();
+    if (!el) return;
+    const len = el.getTotalLength();
+    const delay = i * 250;
+    el.style.strokeDasharray = len; el.style.strokeDashoffset = len;
+    void el.getBoundingClientRect();
+    el.style.transition = 'stroke-dashoffset 1.3s ease-in-out ' + delay + 'ms';
+    el.style.strokeDashoffset = 0;
+    timers.push(setTimeout(() => {
+      el.style.transition = ''; el.style.strokeDasharray = ''; el.style.strokeDashoffset = '';
+      flow.addTo(group);
+      const plane = L.marker(pts[0], { interactive: false, keyboard: false, icon: L.divIcon({ className: 'pin-wrap', html: PLANE(color), iconSize: [0, 0] }) }).addTo(m);
+      // 长途飞得慢一点：2 小时的航班一圈约 3.5 秒，13 小时的约 9 秒
+      planes.push({ plane, pts, period: Math.min(9000, Math.max(3000, 2000 + minutes * 9)), start: performance.now() });
+    }, delay + 1300));
+  });
+  let raf = 0;
+  const tick = now => {
+    for (const p of planes) {
+      // rAF 给的时间可能比加飞机那一刻还早一点，别让进度变成负数
+      const t = (Math.max(0, now - p.start) % p.period) / p.period;
+      const x = t * (p.pts.length - 1), k = Math.min(p.pts.length - 2, Math.floor(x)), f = x - k;
+      const [a, b] = [p.pts[k], p.pts[k + 1]];
+      p.plane.setLatLng([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+      const pa = m.latLngToContainerPoint(a), pb = m.latLngToContainerPoint(b);
+      const svg = p.plane.getElement()?.firstChild;
+      if (svg) svg.style.transform = 'translate(-50%, -50%) rotate(' + (Math.atan2(pb.y - pa.y, pb.x - pa.x) * 180 / Math.PI + 90) + 'deg)';
+    }
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); planes.forEach(p => p.plane.remove()); };
 }
 
 // 大家的航线：到达 / 离开分开看。同一条航线的人合成一条线，线越粗人越多
@@ -54,6 +98,7 @@ export default function FlightMap({ people, mode }) {
     }
     const bounds = [];
     const airports = new Map();
+    const drawn = [];
     [...routes.values()].forEach((rt, i) => {
       // 让「我们这头」（到达看落地机场，离开看起飞机场）落在 -180°~180° 的主地图上，
       // 所有航线在丹佛这边汇合，跨太平洋的从左边飞进来，而不是画到右边另一个世界副本里
@@ -64,8 +109,11 @@ export default function FlightMap({ people, mode }) {
       bounds.push(...pts);
       const tip = '<b>' + rt.from.iata + ' → ' + rt.to.iata + '</b><br>' + rt.legs.map(x => esc(x.name) + ' · ' + esc(x.f.flight) + ' · '
         + localTime(x.f.depUtc, rt.from.tz) + ' → ' + localTime(x.f.arrUtc, rt.to.tz, false) + '（' + duration(x.f.minutes) + '）').join('<br>');
-      L.polyline(pts, { color: COLORS[i % COLORS.length], weight: 2 + Math.min(4, rt.legs.length), opacity: 0.85, dashArray: mode === 'departure' ? '8 6' : null })
-        .bindTooltip(tip, { sticky: true }).addTo(layer.current);
+      const color = COLORS[i % COLORS.length], weight = 2 + Math.min(4, rt.legs.length);
+      const line = L.polyline(pts, { color, weight, opacity: 0.85 }).bindTooltip(tip, { sticky: true }).addTo(layer.current);
+      // 往前流的白色虚线（线画完之后才加进图层组，切换时跟着一起清掉），方向就是飞行方向
+      const flow = L.polyline(pts, { color: '#fff', weight: Math.max(1.5, weight - 2), opacity: 0.9, className: 'fl-flow', interactive: false });
+      drawn.push({ line, flow, pts, color, minutes: Math.max(...rt.legs.map(x => x.f.minutes)) });
       // 端点：一个机场只画一个点，记下在这儿上下飞机的人
       for (const [ap, end] of [[rt.from, pts[0]], [rt.to, pts[pts.length - 1]]]) {
         const a = airports.get(ap.iata) || { ap, at: end, names: new Set() };
@@ -82,6 +130,8 @@ export default function FlightMap({ people, mode }) {
     }
     m.invalidateSize();
     if (bounds.length) m.fitBounds(bounds, { padding: [30, 30], maxZoom: 6, animate: false });
+    if (reduceMotion) { drawn.forEach(d => d.flow.addTo(layer.current)); return; }
+    return animate(m, layer.current, drawn);
   }, [people, mode]);
 
   return <div ref={box} className="flight-map"></div>;
