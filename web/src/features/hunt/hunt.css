@@ -1,18 +1,7 @@
-/* AirBnb hunting: cards, photo carousel, map pins */
-.card-img { aspect-ratio: 16/10; object-fit: cover; }
+/* AirBnb hunting: cards and map pins (the photo carousel is in components/carousel.css) */
 .filter-chip { cursor:pointer; }
 .filter-chip.active { background:#4f46e5; color:#fff; }
 .vote-btn.voted { background:#e11d48 !important; color:#fff !important; border-color:#e11d48 !important; }
-.carousel { display:flex; overflow-x:auto; scroll-snap-type:x mandatory; scrollbar-width:none; overscroll-behavior-x:contain; }
-.carousel::-webkit-scrollbar { display:none; }
-.carousel > img { flex:0 0 100%; width:100%; scroll-snap-align:start; }
-.car-dots { position:absolute; left:0; right:0; bottom:10px; display:flex; justify-content:center; gap:6px; pointer-events:none; }
-.car-dots button { width:7px; height:7px; border-radius:9999px; background:rgba(255,255,255,.55); box-shadow:0 0 2px rgba(0,0,0,.4); pointer-events:auto; transition:transform .2s, background .2s; }
-.car-dots button.on { background:#fff; transform:scale(1.3); }
-.car-arrow { position:absolute; top:50%; transform:translateY(-50%); width:30px; height:30px; border-radius:9999px; background:rgba(255,255,255,.9); color:#334155; font-size:18px; line-height:30px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.25); opacity:0; transition:opacity .2s; }
-.car-wrap:hover .car-arrow:not([disabled]) { opacity:1; }
-.car-arrow[disabled] { visibility:hidden; }
-@media (hover:none) { .car-arrow { display:none; } }
 /* 地图：自成一个层叠上下文，免得 Leaflet 的高 z-index 盖住弹窗和底栏 */
 #mapBox { position:relative; z-index:0; isolation:isolate; }
 #map { height:340px; }

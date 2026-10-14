@@ -9,6 +9,7 @@ import LoginModal from './components/LoginModal.jsx';
 import HuntView from './features/hunt/HuntView.jsx';
 import SplitView from './features/split/SplitView.jsx';
 import BlackjackView from './features/blackjack/BlackjackView.jsx';
+import FoodView from './features/food/FoodView.jsx';
 import AngelView from './features/angel/AngelView.jsx';
 import { useHashRoute } from './lib/useHashRoute.js';
 
@@ -48,6 +49,7 @@ function Shell() {
         <Header view={view} trip={trip} onTrip={t => setRoute({ trip: t })} />
         <main className="max-w-6xl mx-auto px-4 py-6">
           <Pane active={view === 'hunt'}><HuntView trip={trip} active={view === 'hunt'} /></Pane>
+          <Pane active={view === 'food'}><FoodView trip={trip} active={view === 'food'} /></Pane>
           <Pane active={view === 'split'}><SplitView active={view === 'split'} /></Pane>
           <Pane active={view === 'blackjack'}><BlackjackView active={view === 'blackjack'} /></Pane>
           <Pane active={view === 'angel'}><AngelView active={view === 'angel'} /></Pane>

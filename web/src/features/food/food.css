@@ -1,0 +1,16 @@
+/* Restaurant hunting: map pins and the card highlight */
+.food-map-box { position:relative; z-index:0; isolation:isolate; }
+.food-map { height:320px; }
+@media (min-width:768px) { .food-map { height:380px; } }
+.fpin-wrap { background:none; border:none; }
+.fpin { position:absolute; left:0; bottom:0; transform:translate(-50%, -6px); white-space:nowrap; background:#fff; color:#0f172a; font-weight:700; font-size:12px;
+  padding:4px 9px; border-radius:9999px; box-shadow:0 2px 8px rgba(15,23,42,.28); border-top-color:#fff; transition: transform .15s, background .15s, color .15s; cursor:pointer; }
+.fpin::after { content:''; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); border:5px solid transparent; border-bottom:0; border-top-color:inherit; }
+.fpin .fpin-votes { color:#e11d48; margin-left:4px; }
+.fpin.mine { background:#e11d48; color:#fff; border-top-color:#e11d48; }
+.fpin.mine .fpin-votes { color:#ffe4e6; }
+.fpin.hot, .fpin:hover { background:#1e1b4b; color:#fff; border-top-color:#1e1b4b; transform:translate(-50%, -6px) scale(1.1); z-index:1000; }
+.fpin.hot .fpin-votes, .fpin:hover .fpin-votes { color:#f9a8d4; }
+.food-flash { animation: food-flash 1.4s ease; }
+@keyframes food-flash { 0%, 100% { box-shadow:0 1px 3px rgba(0,0,0,.1); } 30% { box-shadow:0 0 0 4px #818cf8, 0 10px 25px -5px rgba(79,70,229,.35); } }
+@media (prefers-reduced-motion: reduce) { .food-flash { animation:none; } .fpin { transition:none; } }

@@ -1,12 +1,14 @@
 import { useRef, useState } from 'react';
-import { reduceMotion } from '../../lib/motion.js';
+import { reduceMotion } from '../lib/motion.js';
+import './carousel.css';
 
 // 封面照片：可以左右滑，下面的小圆点表示第几张。当前是第几张记在 data-idx 上，
-// 卡片换位置后 ListingGrid 用它把滚动位置恢复回来。
-export default function Carousel({ pics }) {
+// 卡片换位置后 ListingGrid 用它把滚动位置恢复回来。选房和餐厅的卡片都用它；
+// 外层要有 car-wrap（悬停时显示左右箭头）和 relative。
+export default function Carousel({ pics, placeholder = '🏠' }) {
   const ref = useRef(null);
   const [idx, setIdx] = useState(0);
-  if (!pics.length) return <div className="card-img w-full rounded-t-2xl bg-slate-200 flex items-center justify-center text-slate-400 text-4xl">🏠</div>;
+  if (!pics.length) return <div className="card-img w-full rounded-t-2xl bg-slate-200 flex items-center justify-center text-slate-400 text-4xl">{placeholder}</div>;
   if (pics.length === 1) return <img src={pics[0]} className="card-img w-full rounded-t-2xl" loading="lazy" alt="" />;
   const go = i => { const c = ref.current; c.scrollTo({ left: i * c.clientWidth, behavior: reduceMotion ? 'auto' : 'smooth' }); };
   return (

@@ -1,5 +1,5 @@
 import { statsLine } from '../../lib/format.js';
-import Carousel from './Carousel.jsx';
+import Carousel from '../../components/Carousel.jsx';
 import PriceBlock from './PriceBlock.jsx';
 import AreaBadge from './AreaBadge.jsx';
 import { isBooked } from './price.js';
