@@ -9,6 +9,8 @@ export const DEFAULT_TRIP = 'nov25';
 
 // 左侧导航的几个页面。tripScoped：页面内容按行程分（显示行程标签页和日期人数）
 export const VIEWS = {
+  calendar: { title: '📅 Calendar · 日程', sub: '按天看每个人的安排：住哪、航班、接送机',
+    nav: 'Calendar', navSub: '日程 · 每天做什么', icon: '📅' },
   hunt: { title: '🏠 AirBnb hunting · 一起选房', sub: '看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它',
     nav: 'AirBnb hunting', navSub: '一起选房 · 投票', icon: '🏠', tripScoped: true },
   food: { title: '🍜 Restaurant hunting · 找餐厅', sub: '看中哪家就把 Google 地图链接贴进来，大家点想去',
