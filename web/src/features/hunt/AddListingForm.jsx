@@ -24,25 +24,6 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
     const u = url.trim();
     if (!u) return;
     setBusy(true);
-    // Booking.com 酒店链接：Booking 挡服务器抓取，页面读不到，先用链接里的
-    // 酒店名建卡；评分/照片/价格由后续从 Booking 拉取时补齐刷新。
-    const bk = u.match(/booking\.com\/hotel\/[a-z]{2}\/([a-z0-9-]+)/i);
-    if (bk) {
-      const stop = new Set(['by', 'the', 'a', 'an', 'at', 'of', 'in', 'on', 'and']);
-      const title = bk[1].split('-').map((w, i) => (i && stop.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
-      setMsg({ text: '正在加入酒店…', tone: 'text-slate-500' });
-      try {
-        const r = await api('/api/add-hotel', 'POST', { trip, url: u, title, addedBy: name });
-        if (r.ok) {
-          setUrl('');
-          setMsg({ text: r.updated ? '这家酒店已更新 🏨' : '酒店已加入清单 🏨 价格拉取后会自动显示', tone: 'text-green-600' });
-          await onAdded();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else setMsg({ text: '加入失败：' + (r.error || '未知错误'), tone: 'text-amber-600' });
-      } catch (e) { setMsg({ text: '网络有点问题，稍后再试', tone: 'text-red-500' }); }
-      setBusy(false);
-      return;
-    }
     setMsg({ text: '正在读取 Airbnb 房源信息…', tone: 'text-slate-500' });
     try {
       const r = await api('/api/add', 'POST', { trip, url: u, addedBy: name });
@@ -78,7 +59,7 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
       <h2 className="font-bold text-lg mb-3">➕ 添加候选房源</h2>
       <div className="flex flex-col md:flex-row gap-3">
         <input type="url" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="粘贴 Airbnb 房源链接，或 Booking.com 酒店链接"
+          placeholder="粘贴 Airbnb 房源链接，例如 https://www.airbnb.com/rooms/123456…"
           className="flex-1 border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <button onClick={add} disabled={busy} className="btn-primary font-bold rounded-xl px-6 py-3">{busy ? '抓取中…' : '加入清单'}</button>
       </div>

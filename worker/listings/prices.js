@@ -49,9 +49,7 @@ async function queryBookIt(roomId, checkIn, checkOut, adults) {
 // Price for the trip's dates and head count. When the group is bigger than
 // the listing allows, price it at the listing's max so there's still a number.
 async function fetchLivePrice(listing, trip) {
-  // Hotels (roomId 'bk:<slug>') have no Airbnb quote to pull — their
-  // price is the Booking pull snapshot (see hotels.js); never query it.
-  if (!listing.roomId || !/^\d+$/.test(listing.roomId) || !trip.checkIn) return null;
+  if (!listing.roomId || !trip.checkIn) return null;
   const nights = Math.round((Date.parse(trip.checkOut) - Date.parse(trip.checkIn)) / 86400000);
   let guests = trip.people;
   let r = await queryBookIt(listing.roomId, trip.checkIn, trip.checkOut, guests);
