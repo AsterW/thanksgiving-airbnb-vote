@@ -6,25 +6,32 @@ import { soundEvents } from './sound-events.js';
 import * as sfx from './sfx.js';
 
 // One run. The simulation steps 60 times a second; inputs between steps are
-// queued and applied on the next one.
+// queued and applied on the next one, and every input is recorded: the
+// server replays them to check the score (verify.js), and a best run can be
+// watched again. With `replay` (a recorded input list) it plays those back
+// instead of taking input, at 1×, 2× or 4×.
 // PC: right-click (or hold it) to move, F / D for 闪现 toward the mouse.
 // Phone: joystick on the left, 闪现 button on the right.
 const dirOf = (dx, dy) => ((Math.round(Math.atan2(dy, dx) / (2 * Math.PI) * DIRS) % DIRS) + DIRS) % DIRS;
 const ASPECT = VIEW.width / VIEW.height;
+const SPEEDS = [1, 2, 4];
 
-export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, children }) {
+export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, replay, replayName, children }) {
   const wrap = useRef(null), canvas = useRef(null), hud = useRef(null), cdBtn = useRef(null), joyEl = useRef(null);
   const g = useRef(null), pending = useRef({}), mouse = useRef(null), joy = useRef(null);
   const aim = useRef(null), inputEnabled = useRef(false);
+  const log = useRef([]), cursor = useRef(0), speedRef = useRef(1);
   const callbacks = useRef({ onDead, onPause });
   callbacks.current = { onDead, onPause };
-  const [count, setCount] = useState(3); // 3, 2, 1, then go
+  const [count, setCount] = useState(replay ? 0 : 3); // 3, 2, 1, then go (a replay just starts)
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [soundOff, setSoundOff] = useState(sfx.isMuted);
   const toggleSound = () => { const m = !sfx.isMuted(); sfx.setMuted(m); setSoundOff(m); };
+  const [speed, setSpeed] = useState(1);
+  speedRef.current = speed;
   const doneRef = useRef(false), deathAt = useRef(null), beeped = useRef(null);
   if (!g.current) g.current = newGame(seed);
-  inputEnabled.current = count <= 0 && !hold && !g.current.over;
+  inputEnabled.current = !replay && count <= 0 && !hold && !g.current.over;
 
   useEffect(() => {
     if (!hold) return;
@@ -52,7 +59,7 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
   // (this also re-runs on pause / resume: beep each number only once)
   useEffect(() => {
     if (count <= 0) {
-      if (beeped.current !== 0) { beeped.current = 0; sfx.play('go'); }
+      if (beeped.current !== 0) { beeped.current = 0; if (!replay) sfx.play('go'); }
       onGo?.(); return;
     }
     if (hold) return;
@@ -74,14 +81,25 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
     const frame = now => {
       const sim = g.current;
       if (running && !sim.over) {
-        acc += Math.min(now - last, 250);
+        const sp = speedRef.current;
+        acc += Math.min(now - last, 250) * sp;
         let n = 0;
-        while (acc >= 1000 / HZ && !sim.over && n++ < 8) {
-          const p = pending.current, ev = [];
-          if (p.move) ev.push([sim.tick, 0, p.move[0], p.move[1]]);
-          if (p.dir !== undefined) ev.push([sim.tick, 1, p.dir]);
-          if (p.flash !== undefined) ev.push([sim.tick, 2, p.flash]);
-          pending.current = {};
+        while (acc >= 1000 / HZ && !sim.over && n++ < 8 * sp) {
+          const ev = [];
+          if (replay) { // play the recorded inputs back on their ticks
+            while (cursor.current < replay.length && replay[cursor.current][0] <= sim.tick) {
+              const e = replay[cursor.current++];
+              if (e[0] === sim.tick) ev.push(e);
+            }
+          } else {
+            const p = pending.current;
+            // whole pixels, so the recorded input is exactly what was played
+            if (p.move) ev.push([sim.tick, 0, Math.round(p.move[0]), Math.round(p.move[1])]);
+            if (p.dir !== undefined) ev.push([sim.tick, 1, p.dir]);
+            if (p.flash !== undefined) ev.push([sim.tick, 2, p.flash]);
+            pending.current = {};
+            log.current.push(...ev);
+          }
           const wasOver = sim.over;
           step(sim, ev);
           for (const e of soundEvents(sim, wasOver)) sfx.play(e.sound, e);
@@ -101,7 +119,7 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
       }
       // Let the hit and fall read before the result panel covers the battlefield.
       // Only presentation is delayed: the submitted survival tick stays frozen.
-      if (sim.over && deathAge >= 27 && !doneRef.current) { doneRef.current = true; callbacks.current.onDead(sim); }
+      if (sim.over && deathAge >= 27 && !doneRef.current) { doneRef.current = true; callbacks.current.onDead(sim, log.current); }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -205,16 +223,17 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
         aria-label="鲁班七号躲技能训练场"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
         onPointerCancel={() => { rightDown.current = false; }} onLostPointerCapture={() => { rightDown.current = false; }} onContextMenu={e => e.preventDefault()} />
-      <div className="dg-hud"><span className="dg-hud-title">峡谷 · 走位训练</span><strong ref={hud}>存活 0.0 秒</strong></div>
+      <div className="dg-hud"><span className="dg-hud-title">{replay ? `回放 · ${replayName}` : '峡谷 · 走位训练'}</span><strong ref={hud}>存活 0.0 秒</strong></div>
       <div className="dg-hero-hud" aria-hidden="true"><i className="dg-hero-avatar" /><span>鲁班七号<small>机关造物</small></span></div>
       {!hold && count <= 0 && !g.current.over && <button className="dg-pause" onClick={onPause} aria-label="暂停">⏸</button>}
       <button className="dg-sound" onClick={toggleSound} aria-pressed={!soundOff} aria-label={(soundOff ? '打开音效' : '关闭音效') + (touch ? '' : '（M）')}>{soundOff ? '🔇' : '🔊'}</button>
-      {touch && <>
+      {replay && <button className="dg-speed" onClick={() => setSpeed(s => SPEEDS[(SPEEDS.indexOf(s) + 1) % SPEEDS.length])} aria-label={`回放速度 ${speed} 倍，点一下换`}>{speed}×</button>}
+      {touch && !replay && <>
         <div className="dg-joy-rest" aria-hidden="true"><span /></div>
         <div className="dg-joyzone" onPointerDown={joyDown} onPointerMove={joyMove} onPointerUp={joyUp} onPointerCancel={joyUp} onLostPointerCapture={joyUp} />
         <div className="dg-joy" ref={joyEl} hidden><div className="dg-knob" /></div>
       </>}
-      <div className="dg-control-hint">{touch ? '左侧移动 · 拖动闪现瞄准 · 拖远取消' : '右键移动 · F / D 闪现 · Esc 暂停 · M 音效'}</div>
+      <div className="dg-control-hint">{replay ? '回放：操作和原来那局一模一样' : touch ? '左侧移动 · 拖动闪现瞄准 · 拖远取消' : '右键移动 · F / D 闪现 · Esc 暂停 · M 音效'}</div>
       <button ref={cdBtn} className={'dg-flash' + (touch ? ' big' : '')}
         onPointerDown={flashDown} onPointerMove={flashMove} onPointerUp={flashUp}
         onPointerCancel={() => { aim.current = null; }} onLostPointerCapture={() => { aim.current = null; }}

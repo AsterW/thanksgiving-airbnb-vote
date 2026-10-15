@@ -69,9 +69,16 @@ const ex = await J('POST', '/api/expense', { paidBy: VICTIM, amountUSD: 30, spli
 ck('victim expense recorded', ex.ok === true, JSON.stringify(ex));
 
 // Game records live in their own Durable Objects: give the victim a
-// dodge score, and deletion must reach that board too.
-const sc = await J('POST', '/api/dodge/score', { name: VICTIM, token: vicTok, ticks: 3600 });
+// dodge score, and deletion must reach that board too. A dodge score is
+// the server's replay of a ticketed run's inputs; a run with no input
+// lasts under 3 s, and can't be longer than the time since its ticket
+// (+2 s), so wait a second before sending it.
+const tk = await J('POST', '/api/dodge/start', { name: VICTIM, token: vicTok });
+await new Promise(r => setTimeout(r, 1000));
+const sc = await J('POST', '/api/dodge/score', { name: VICTIM, token: vicTok, ticket: tk.ticket, events: [] });
 ck('victim dodge score recorded', sc.ok === true, JSON.stringify(sc));
+const repMid = await J('GET', '/api/dodge/replay?name=' + encodeURIComponent(VICTIM));
+ck('victim dodge replay saved', repMid.ok === true, JSON.stringify(repMid).slice(0, 200));
 // The board's scrub door is publicly routed (unlike the halls'), so it
 // must refuse anyone who is not PM.
 const directScrub = await J('POST', '/api/dodge/scrub-user', { target: VICTIM, byName: VICTIM, byToken: vicTok });
@@ -115,6 +122,8 @@ ck('aster now gives to PM', angelAst.master?.name === 'PM', JSON.stringify(angel
 
 const boardEnd = await J('GET', '/api/dodge/board');
 ck('no dodge record of victim remains', boardEnd.board.every(r => !isVictim(r.name)), JSON.stringify(boardEnd.board));
+const repEnd = await J('GET', '/api/dodge/replay?name=' + encodeURIComponent(VICTIM));
+ck('no dodge replay of victim remains', repEnd.ok === false, JSON.stringify(repEnd).slice(0, 200));
 
 console.log(`USERS: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
