@@ -20,9 +20,10 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
   const pics = l.images && l.images.length ? l.images : l.image ? [l.image] : [];
   return (
     <article ref={cardRef} data-id={l.id}
-      className={'glass-card rounded-2xl overflow-hidden flex flex-col' + (chosen ? ' ring-4 ring-amber-400' : '') + (isBooked(l, T) ? ' opacity-60 grayscale-[40%] hover:opacity-100 hover:grayscale-0 transition' : '') + (glow ? ' just-voted' : '')}>
+      className={'glass-card rounded-2xl overflow-hidden flex flex-col ' + (hotel ? 'is-hotel' : 'is-airbnb') + (chosen ? ' ring-4 ring-amber-400' : '') + (isBooked(l, T) ? ' opacity-60 grayscale-[40%] hover:opacity-100 hover:grayscale-0 transition' : '') + (glow ? ' just-voted' : '')}>
       <div className="relative car-wrap">
         <Carousel pics={pics} />
+        <span className={'kind-tag ' + (hotel ? 'hotel' : 'airbnb')}>{hotel ? '🏨 酒店' : '🏠 Airbnb'}</span>
         <AreaBadge area={l.area} zones={zones} onChange={a => onSetArea(l, a)} />
         {!closed && <button onClick={() => onRemove(l)} title="删除这个房源" className="absolute top-3 right-3 bg-black/60 hover:bg-red-600 text-white text-xs px-2 py-1 rounded-full">✕</button>}
         {chosen && <span className="absolute top-3 right-3 bg-amber-400 text-amber-950 text-xs font-black px-2 py-1 rounded-full shadow">🏆 我们选了这间</span>}

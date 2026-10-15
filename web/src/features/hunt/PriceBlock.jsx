@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { ago } from '../../lib/format.js';
-import { hotelTotal, liveOf, roomsFor, ROOM_SLEEPS, UNAVAILABLE } from './price.js';
+import { hotelTotal, liveOf, rateForTrip, roomsFor, UNAVAILABLE } from './price.js';
 import { perPerson } from './deadline.js';
 
-// 酒店的价格：每间每晚（Google 参考价，或有人手填的），加上按间数和晚数估的整趟总价。
-// Google 的参考价是它自己挑的那一晚（显示出来），不是行程日期，所以谁都可以改成真实价格。
+// 酒店的价格：每间每晚（Google 按行程日期查的均价，或有人手填的），加上按间数（两人一间）和晚数算的整趟总价。
+// 之前加的酒店存的是 Google 自己挑的某一晚，后端补查到行程日期的价格之前照旧标出来。
 function HotelPrice({ l, T, closed, onSetRate }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState('');
@@ -28,11 +28,15 @@ function HotelPrice({ l, T, closed, onSetRate }) {
       <>
         <div className="text-lg font-bold text-slate-800">${r.nightly.toLocaleString()} <span className="text-xs font-normal text-slate-500">/ 间 / 晚</span></div>
         <div className="text-sm font-bold text-indigo-700 mt-0.5">
-          约 {roomsFor(T)} 间 × {T.nights} 晚 ≈ ${total.toLocaleString()} · 每人约 ${pp.each.toLocaleString()}
-          <span className="font-normal text-xs text-slate-500">（按每间住 {ROOM_SLEEPS} 人估）</span>
+          {roomsFor(T)} 间 × {T.nights} 晚 ≈ ${total.toLocaleString()} · 每人约 ${pp.each.toLocaleString()}
+          <span className="font-normal text-xs text-slate-500">（{T.people} 人，两人一间）</span>
         </div>
-        <div className="text-xs text-sky-700 mt-0.5">
-          {r.source === 'google' ? `🏨 Google 参考价 · ${r.dates} 那晚的，不是行程日期 · ${ago(r.at)}` : `🏨 ${r.by ? r.by + ' ' : ''}手填的价格 · ${ago(r.at)}`}
+        <div className={'text-xs mt-0.5 ' + (r.source === 'google' && !rateForTrip(r, T) ? 'text-amber-700' : 'text-sky-700')}>
+          {r.source !== 'google' ? `🏨 ${r.by ? r.by + ' ' : ''}手填的价格 · ${ago(r.at)}`
+            : rateForTrip(r, T) ? (r.provider
+              ? `✓ Google 最低含税价 · ${r.provider}（共 ${r.offers} 家报价）· ${r.dates} · ${ago(r.at)}`
+              : `✓ Google 价 · ${r.dates} 每晚均价（不含税）· ${ago(r.at)}`)
+              : `⚠️ Google 参考价是 ${r.dates} 那晚的，不是行程日期（行程日期的价还没查到）`}
         </div>
         {edit}
       </>

@@ -15,9 +15,13 @@ export const closedError = () => j({ ok: false, error: '投票已经截止，房
 const liveFor = (l, trip) => (l.live && l.live.checkIn === trip.checkIn && l.live.checkOut === trip.checkOut ? l.live : null);
 const unavailable = (l, trip) => { const v = liveFor(l, trip); return !!(v && !v.available); };
 
+// A hotel's total for the trip: per room per night × rooms (two people a room) × nights.
+const nights = trip => Math.round((Date.parse(trip.checkOut) - Date.parse(trip.checkIn)) / 86400000) || 1;
+const hotelTotal = (l, trip) => (l.rate && l.rate.nightly ? l.rate.nightly * Math.ceil((trip.people || 2) / 2) * nights(trip) : null);
+
 // Listings in decision order; unavailable ones last.
 export function ranking(state, trip) {
-  const total = l => liveFor(l, trip)?.total ?? l.priceUSD ?? Infinity;
+  const total = l => (l.kind === 'hotel' ? hotelTotal(l, trip) : liveFor(l, trip)?.total) ?? l.priceUSD ?? Infinity;
   return state.listings.slice().sort((a, b) =>
     unavailable(a, trip) - unavailable(b, trip)
     || (b.votes || []).length - (a.votes || []).length

@@ -10,8 +10,9 @@ function pinHtml(l, T, token) {
   const n = (l.votes || []).length;
   const mine = (l.votes || []).some(v => v.token === token);
   const booked = isBooked(l, T), p = effPrice(l, T);
-  const label = booked ? '已订满' : p ? '$' + p.toLocaleString() : '🏠';
-  return '<div class="pin' + (mine ? ' mine' : '') + (booked ? ' booked' : '') + '">' + label + (n ? '<span class="pin-votes">♥' + n + '</span>' : '') + '</div>';
+  const hotel = l.kind === 'hotel';
+  const label = (hotel ? '🏨 ' : '') + (booked ? '已订满' : p ? '$' + p.toLocaleString() : hotel ? '' : '🏠');
+  return '<div class="pin' + (hotel ? ' hotel' : '') + (mine ? ' mine' : '') + (booked ? ' booked' : '') + '">' + label + (n ? '<span class="pin-votes">♥' + n + '</span>' : '') + '</div>';
 }
 function popupEl(l, onFocus) {
   const pic = (l.images && l.images[0]) || l.image;
@@ -19,7 +20,7 @@ function popupEl(l, onFocus) {
   const el = document.createElement('div');
   el.innerHTML = (pic ? '<img src="' + esc(pic) + '" style="width:100%;aspect-ratio:16/10;object-fit:cover" alt="">' : '')
     + '<div style="padding:10px 12px 12px"><div style="font-weight:700;line-height:1.3;margin-bottom:4px">' + esc(l.title || '未命名房源') + '</div>'
-    + '<div style="color:#64748b;font-size:12px;margin-bottom:8px">' + esc(statsLine(l)) + (n ? ' · ♥ ' + n + ' 票' : '') + '</div>'
+    + '<div style="color:#64748b;font-size:12px;margin-bottom:8px">' + esc(l.kind === 'hotel' ? '🏨 酒店' + (l.address ? ' · ' + l.address : '') : statsLine(l)) + (n ? ' · ♥ ' + n + ' 票' : '') + '</div>'
     + '<button style="width:100%;background:#4f46e5;color:#fff;font-weight:700;border-radius:10px;padding:6px 0">看这间 ↓</button></div>';
   el.querySelector('button').addEventListener('click', () => onFocus(l.id));
   return el;

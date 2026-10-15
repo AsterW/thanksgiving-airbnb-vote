@@ -9,11 +9,11 @@ import { useConfirm } from '../../components/ConfirmDialog.jsx';
 import AddListingForm from './AddListingForm.jsx';
 import VoteBanner from './VoteBanner.jsx';
 import DecisionPanel from './DecisionPanel.jsx';
-import Toolbar from './Toolbar.jsx';
+import Toolbar, { KINDS } from './Toolbar.jsx';
 import ListingMap from './ListingMap.jsx';
 import ListingGrid from './ListingGrid.jsx';
 import { celebrateVote } from '../../lib/celebrate.js';
-import { sortListings } from './price.js';
+import { isHotel, sortListings } from './price.js';
 import { inZone, NO_AREA, zoneTabs } from './zones.js';
 import { useListings } from './useListings.js';
 import WeatherStrip from '../weather/WeatherStrip.jsx';
@@ -38,6 +38,7 @@ export default function HuntView({ trip, active }) {
     return () => clearTimeout(id);
   }, [voteInfo, refresh]);
   const [filter, setFilter] = useState('all');
+  const [kind, setKind] = useState(() => (KINDS.some(([k]) => k === load('huntKind')) ? load('huntKind') : 'all'));
   const [sortBy, setSortBy] = useState('votes');
   const [showMap, setShowMap] = useState(() => load('showMap') !== '0');
   const [hotId, setHotId] = useState(null);
@@ -55,9 +56,16 @@ export default function HuntView({ trip, active }) {
   // 锚点只用一次：网格（子组件的 layout effect 先跑）重排完就清掉，免得之后换排序时又跳回这间
   useEffect(() => { if (anchorId) setAnchorId(null); }, [anchorId]);
 
+  const ofKind = useMemo(() => (kind === 'all' ? listings : listings.filter(l => isHotel(l) === (kind === 'hotel'))), [listings, kind]);
+  const kindCounts = useMemo(() => {
+    const hotels = listings.filter(isHotel).length;
+    return { all: listings.length, airbnb: listings.length - hotels, hotel: hotels };
+  }, [listings]);
+  function pickKind(k) { save('huntKind', k); setKind(k); setFrozen(null); }
+
   const visible = useMemo(() => {
-    return sortListings(listings.filter(l => inZone(l, filter)), sortBy, T);
-  }, [listings, filter, sortBy, T]);
+    return sortListings(ofKind.filter(l => inZone(l, filter)), sortBy, T);
+  }, [ofKind, filter, sortBy, T]);
 
   // 冻结期间按冻结时的顺序显示（新出现的房源排在后面），数据照常更新
   const items = useMemo(() => {
@@ -67,10 +75,10 @@ export default function HuntView({ trip, active }) {
     return kept.concat(visible.filter(l => !frozen.includes(l.id)));
   }, [visible, frozen]);
 
-  const tabs = useMemo(() => zoneTabs(T, listings), [T, listings]);
+  const tabs = useMemo(() => zoneTabs(T, ofKind), [T, ofKind]);
   const zoneNames = tabs.map(t => t.name).filter(n => n !== NO_AREA);
   // 选中的区域标签没了（比如最后一间被改到别的区域）：回到「全部」
-  useEffect(() => { if (filter !== 'all' && listings.length && !tabs.some(t => t.name === filter)) setFilter('all'); }, [tabs, filter, listings.length]);
+  useEffect(() => { if (filter !== 'all' && ofKind.length && !tabs.some(t => t.name === filter)) setFilter('all'); }, [tabs, filter, ofKind.length]);
 
   async function setArea(l, area) {
     const r = await api('/api/area', 'POST', { trip, id: l.id, area });
@@ -141,7 +149,16 @@ export default function HuntView({ trip, active }) {
     return { name: filter, lat: Math.round(avg('lat') * 10) / 10, lng: Math.round(avg('lng') * 10) / 10 };
   }, [filter, visible]);
 
-  const fitKey = trip + '|' + filter + '|' + visible.map(l => l.id + (l.lat != null ? '@' : '')).sort().join(',');
+  // 「全部类型」时 Airbnb 和酒店分成两块，各有标题；只有一种时不分
+  const emptyText = (kind === 'hotel' ? '还没有酒店' : kind === 'airbnb' ? '还没有 Airbnb' : '还没有候选') + (filter === 'all' ? '' : '（这个区域）')
+    + '，贴个 ' + (kind === 'hotel' ? 'Google 地图酒店' : kind === 'airbnb' ? 'Airbnb' : 'Airbnb 或 Google 地图酒店') + '链接进来吧 👆';
+  const split = kind === 'all' && items.some(isHotel) && items.some(l => !isHotel(l));
+  const sections = split
+    ? [{ key: 'airbnb', title: '🏠 Airbnb 整套', sub: '整套房子，总价按 ' + T.nights + ' 晚', items: items.filter(l => !isHotel(l)) },
+      { key: 'hotel', title: '🏨 酒店', sub: '按 ' + T.people + ' 人两人一间、' + T.nights + ' 晚算总价', items: items.filter(isHotel) }]
+    : [{ key: 'one', items }];
+
+  const fitKey = trip + '|' + kind + '|' + filter + '|' + visible.map(l => l.id + (l.lat != null ? '@' : '')).sort().join(',');
   return (
     <>
       {/* 切行程转场的分工（见 styles.css）：顶部小块 .trip-blur 带模糊，
@@ -167,16 +184,21 @@ export default function HuntView({ trip, active }) {
       </div>
       <div className="trip-blur"><AddListingForm trip={trip} T={T} zones={zoneNames} closed={closed} onAdded={refresh} /></div>
       <div className="trip-blur">
-        <Toolbar tabs={tabs} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}
+        <Toolbar kind={kind} onKind={pickKind} kindCounts={kindCounts} tabs={tabs} filter={filter} onFilter={setFilter} sortBy={sortBy} onSort={setSortBy} count={listings.length}
           showMap={showMap} onToggleMap={() => { save('showMap', showMap ? '0' : '1'); setShowMap(!showMap); }} />
         {region && <WeatherStrip trip={trip} name={region.name} lat={region.lat} lng={region.lng} />}
       </div>
       {showMap && <div className="trip-fade"><ListingMap items={visible} T={T} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} /></div>}
       <div ref={gridBox} className="trip-fade">
-        <ListingGrid items={items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
-          emptyText={(filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 或 Google 地图酒店链接进来吧 👆'}
-          zones={zoneNames} closed={closed} chosenId={voteInfo?.chosenId} onChoose={closed && isAdmin ? choose : null}
-          onVote={vote} onRemove={remove} onSetArea={setArea} onSetRate={setRate} onHover={setHotId} />
+        {sections.map(sec => (
+          <div key={sec.key} className={sec.title ? 'kind-section kind-section-' + sec.key : ''}>
+            {sec.title && <h2 className="kind-heading">{sec.title}<span className="kind-heading-n">{sec.items.length}</span><span className="kind-heading-sub">{sec.sub}</span></h2>}
+            <ListingGrid items={sec.items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
+              emptyText={emptyText}
+              zones={zoneNames} closed={closed} chosenId={voteInfo?.chosenId} onChoose={closed && isAdmin ? choose : null}
+              onVote={vote} onRemove={remove} onSetArea={setArea} onSetRate={setRate} onHover={setHotId} />
+          </div>
+        ))}
       </div>
     </>
   );

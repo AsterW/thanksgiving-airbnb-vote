@@ -1,7 +1,9 @@
 import { NO_AREA } from './zones.js';
 
-// 区域筛选（带房源数）、排序、地图开关、房源数
-export default function Toolbar({ tabs, filter, onFilter, sortBy, onSort, showMap, onToggleMap, count }) {
+export const KINDS = [['all', '全部类型'], ['airbnb', '🏠 Airbnb'], ['hotel', '🏨 酒店']];
+
+// 类型筛选（Airbnb / 酒店）、区域筛选（带房源数）、排序、地图开关、房源数
+export default function Toolbar({ kind, onKind, kindCounts, tabs, filter, onFilter, sortBy, onSort, showMap, onToggleMap, count }) {
   const chip = (key, label, n) => (
     <button key={key} onClick={() => onFilter(key)} className={'filter-chip glass-pill rounded-full px-4 py-1.5 text-sm' + (key === filter ? ' active' : '')}>
       {label}{n != null && <span className="ml-1 opacity-60">{n}</span>}
@@ -9,7 +11,15 @@ export default function Toolbar({ tabs, filter, onFilter, sortBy, onSort, showMa
   );
   return (
     <section className="flex flex-wrap items-center gap-2 mb-4">
-      {chip('all', '全部')}
+      <div role="group" aria-label="按类型筛选" className="kind-filter glass-pill rounded-full p-1 flex w-full sm:w-auto">
+        {KINDS.map(([k, label]) => (
+          <button key={k} onClick={() => onKind(k)} aria-pressed={k === kind}
+            className={'kind-btn kind-' + k + ' flex-1 sm:flex-none rounded-full px-4 py-1 text-sm font-medium whitespace-nowrap' + (k === kind ? ' active' : '')}>
+            {label}<span className="ml-1 opacity-60">{kindCounts[k]}</span>
+          </button>
+        ))}
+      </div>
+      {chip('all', '全部区域')}
       {tabs.map(t => chip(t.name, t.name === NO_AREA ? '未分区' : t.name, t.count))}
       <select value={sortBy} onChange={e => onSort(e.target.value)} className="ml-auto glass-pill rounded-full px-4 py-1.5 text-sm">
         <option value="votes">按票数排序</option>
