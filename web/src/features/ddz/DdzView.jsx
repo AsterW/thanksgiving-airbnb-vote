@@ -59,7 +59,7 @@ export default function DdzView({ active }) {
     return () => clearTimeout(id);
   }, [t?.redealtAt]); // eslint-disable-line react-hooks/exhaustive-deps -- only a new redeal matters
   const yourTurn = thinking && live && (
-    <div className={'dz-yourturn' + (hurry ? ' hurry' : '')} role="status">
+    <div className={'gt-yourturn' + (hurry ? ' hurry' : '')} role="status">
       <span>{hurry ? '⏰ 快没时间了' : '🔔 轮到你了'}{t.phase === 'bidding' ? (t.bidStage === 'call' ? '：叫地主吗？' : '：抢地主吗？') : leading ? '：你先出' : '：管不管？'}</span>
       {secs != null && <b className="tabular-nums">{secs}s</b>}
       {hurry && <small>{t.phase === 'bidding' ? (t.bidStage === 'call' ? '超时算不叫' : '超时算不抢') : '超时自动帮你出'}</small>}

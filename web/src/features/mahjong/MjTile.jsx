@@ -48,10 +48,11 @@ function Face({ kind }) {
   );
 }
 
-export default function MjTile({ kind, size = '', selected, lit, className = '', ...rest }) {
-  const Tag = rest.onClick ? 'button' : 'div';
+// inline：放在一行字里的牌（「胡了 X 打的 [三萬]」、按钮上的牌），跟着字走，不另起一行
+export default function MjTile({ kind, size = '', selected, lit, inline, className = '', ...rest }) {
+  const Tag = rest.onClick ? 'button' : inline ? 'span' : 'div';
   return (
-    <Tag {...rest} className={'mj-tile ' + size + (kind ? '' : ' back') + (selected ? ' sel' : '') + (lit ? ' lit' : '') + (className ? ' ' + className : '')}>
+    <Tag {...rest} className={'mj-tile ' + size + (kind ? '' : ' back') + (selected ? ' sel' : '') + (lit ? ' lit' : '') + (inline ? ' inline' : '') + (className ? ' ' + className : '')}>
       {kind && <Face kind={kind} />}
     </Tag>
   );
