@@ -1,11 +1,11 @@
-// Dated Google hotel prices (worker/listings/google.js) on top of the
+// Dated Google hotel prices (worker/listings/hotels.js) on top of the
 // map-link hotel flow: a hotel added from a Maps link should carry a
-// rate for the trip's own dates, /api/prices should upgrade an undated
-// reference rate to a dated one, and a hand-typed rate must never be
+// rate for the trip's own dates, /api/prices should bring a cleared
+// rate back for those dates, and a hand-typed rate must never be
 // overwritten. The worker reads Google live; when the network path
 // can't (some sandboxes break the TLS), the Google-dependent checks
 // warn instead of failing — the parsers are unit-tested in
-// worker/listings/google.test.js.
+// worker/lib/maplink.test.js.
 // Standalone use: TEST_BASE=http://localhost:8791 node tests/robustness/google.mjs
 const B = process.env.TEST_BASE || 'http://localhost:8791';
 const J = async (m, p, o) => {
@@ -26,11 +26,12 @@ if (!made.ok || made.listing?.kind !== 'hotel') {
   process.exit(fail ? 1 : 0);
 }
 const L = made.listing;
+const dated = r => r?.source === 'google' && r.checkIn === '2026-11-26' && r.checkOut === '2026-11-29';
 ck('hotel created from the maps link', L.roomId?.startsWith('map:'), L.roomId);
-if (L.rate?.dated) {
-  ck('rate is dated for the trip', L.rate.dates === 'Nov 26 – 29' && !!L.rate.provider && L.rate.total > 0, JSON.stringify(L.rate));
-  ck('entity remembered for refreshes', typeof L.gEntity === 'string' && L.gEntity.length > 5, L.gEntity);
-} else warn('dated rate on add (fell back to ' + (L.rate ? 'reference' : 'none') + ')');
+if (dated(L.rate)) {
+  ck('rate is dated for the trip', L.rate.dates === 'Nov 26 – 29' && L.rate.nightly > 0, JSON.stringify(L.rate));
+  if (L.rate.provider) ck('entity remembered for refreshes', typeof L.rate.entity === 'string' && L.rate.entity.length > 5, L.rate.entity);
+} else warn('dated rate on add (got ' + (L.rate ? JSON.stringify(L.rate) : 'none') + ')');
 
 // ---- a hand-typed rate wins and survives price refreshes ----
 const typed = await J('POST', '/api/hotel-rate', { id: L.id, nightly: 123, name: 'GoogleTester' });
@@ -46,7 +47,7 @@ ck('manual rate cleared', cleared.ok === true && cleared.listing?.rate === null,
 await J('POST', '/api/prices', { id: L.id, force: true });
 const st2 = await J('GET', '/api/state');
 const after2 = (st2.listings || []).find(l => l.id === L.id);
-if (after2?.rate?.dated) ck('prices run restored a dated rate', after2.rate.dates === 'Nov 26 – 29', JSON.stringify(after2.rate));
+if (dated(after2?.rate)) ck('prices run restored a dated rate', after2.rate.dates === 'Nov 26 – 29', JSON.stringify(after2.rate));
 else warn('dated rate via prices refresh');
 
 console.log(`GOOGLE: ${pass} passed, ${fail} failed`);

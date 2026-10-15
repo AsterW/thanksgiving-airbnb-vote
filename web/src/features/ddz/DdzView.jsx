@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
-import { useTable, useCountdown } from '../games/useTable.js';
+import { useTable, useCountdown, secondsLeft } from '../games/useTable.js';
+import { alertsOn, setAlertsOn, unlock, useTurnAlert } from '../games/turnAlert.js';
 import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/TableFrame.jsx';
 import PlayingCard from '../games/PlayingCard.jsx';
 import CardHand from '../games/CardHand.jsx';
@@ -38,6 +39,32 @@ export default function DdzView({ active }) {
   const bottom = me >= 0 ? me : 0, right = (bottom + 1) % 3, left = (bottom + 2) % 3;
   const myTurn = me >= 0 && t.turn === me;
   const leading = myTurn && t.phase === 'playing' && (t.trickBy === -1 || t.trickBy === me);
+  // 轮到你了（自己在想，不是托管）：横幅 + 叮咚 / 震动；最后 5 秒变红、每秒滴一声；后台时标题闪
+  const thinking = myTurn && !mySeat.auto && (t.phase === 'bidding' || t.phase === 'playing');
+  const secs = secondsLeft(st);
+  const hurry = thinking && secs != null && secs <= 5;
+  useTurnAlert(thinking && live ? t.deadline : 0, secs);
+  const [alerts, setAlerts] = useState(alertsOn);
+  const toggleAlerts = () => { setAlertsOn(!alerts); setAlerts(!alerts); };
+  // 三家都不叫：服务器重新洗牌发牌了，说一声（只在刚发生时）
+  const [redealt, setRedealt] = useState(false);
+  const seenRedeal = useRef(null);
+  useEffect(() => {
+    if (!t?.redealtAt || t.redealtAt === seenRedeal.current) return;
+    const fresh = seenRedeal.current !== null || t.now - t.redealtAt < 4000; // opening the page long after: don't
+    seenRedeal.current = t.redealtAt;
+    if (!fresh) return;
+    setRedealt(true);
+    const id = setTimeout(() => setRedealt(false), 3500);
+    return () => clearTimeout(id);
+  }, [t?.redealtAt]); // eslint-disable-line react-hooks/exhaustive-deps -- only a new redeal matters
+  const yourTurn = thinking && live && (
+    <div className={'dz-yourturn' + (hurry ? ' hurry' : '')} role="status">
+      <span>{hurry ? '⏰ 快没时间了' : '🔔 轮到你了'}{t.phase === 'bidding' ? (t.bidStage === 'call' ? '：叫地主吗？' : '：抢地主吗？') : leading ? '：你先出' : '：管不管？'}</span>
+      {secs != null && <b className="tabular-nums">{secs}s</b>}
+      {hurry && <small>{t.phase === 'bidding' ? (t.bidStage === 'call' ? '超时算不叫' : '超时算不抢') : '超时自动帮你出'}</small>}
+    </div>
+  );
   const status = !t ? '连接中…' : !live ? '断线了，重连中…' : '桌 ' + room + ' · ' + PHASE[t.phase];
   const odds = t ? t.multiplier * 2 ** t.bombs : 1;
   const here = st?.lobby?.[room - 1];
@@ -86,12 +113,17 @@ export default function DdzView({ active }) {
       <RoomPicker st={st} room={room} watch={watch} phases={PHASE} />
       <div className="grid lg:grid-cols-3 gap-5">
         <TableFrame full={full} onExit={exit} className="lg:col-span-2">
+          {/* 点牌桌任何地方都让浏览器允许提醒出声（浏览器要求先点过页面） */}
+          <div style={{ display: 'contents' }} onPointerDownCapture={unlock}>
           <div className="gt-bar flex items-center justify-between gap-3 mb-3 text-sm">
             <span className="font-medium text-emerald-100">{status}</span>
             {meLine}
             {t && t.landlord >= 0 && <span className="font-bold text-amber-200">倍数 ×{odds}{t.bombs ? '（炸弹 ' + t.bombs + '）' : ''}</span>}
+            <button onClick={toggleAlerts} aria-pressed={alerts} title={alerts ? '轮到你时响一声（点一下关掉）' : '轮到你时不响（点一下打开）'}
+              className="text-xs rounded-full bg-white/15 px-2 py-1">{alerts ? '🔔 提醒' : '🔕 提醒'}</button>
             {canEnter && <button onClick={enter} className="text-xs rounded-full bg-white/15 px-2 py-1">⛶ 全屏</button>}
           </div>
+          {redealt && <div className="dz-redeal" role="status">🔀 三家都不叫，重新洗牌发牌</div>}
           {t && (
             <>
               <div className="gt-mid">
@@ -123,12 +155,15 @@ export default function DdzView({ active }) {
                 sel={sel} onToggle={flip} pickable={me >= 0 && t.phase === 'playing'} />
             </>
           )}
+          {yourTurn}
           <div className="flex flex-wrap items-center gap-2 mt-4 dz-controls">{controls()}</div>
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 dz-msg">{msg}</p>
+          </div>
         </TableFrame>
         <ReactionBar send={send} seated={!!st?.you} />
         <PointsBoard title="斗地主豆子榜" rows={st?.board || []}>
           规则：一副牌 54 张，三人各 17 张，留 3 张底牌。叫地主 / 抢地主，每抢一次 ×2；炸弹、王炸各 ×2；春天 / 反春 ×2。底分 10 豆，地主一人对两家，输赢都算两份。
+          叫地主超时算不叫（抢地主超时算不抢），三家都不叫就重新洗牌。提示：点一次给一种管得上的出法，再点换下一种。
           空位由机器人补上；掉线或连着两次没出牌会自动托管。豆子只是好玩，和分账无关。
         </PointsBoard>
       </div>

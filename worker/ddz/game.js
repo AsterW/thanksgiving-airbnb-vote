@@ -3,6 +3,7 @@
 // on its own. hooks: { now, rand, schedule(fn, ms), cancel(t), save(seat) }.
 import { deck, isBombish, legalPlay, shuffle, sortHand, takeFrom } from './cards.js';
 import { choosePlay, wantsCall, wantsGrab } from './bot.js';
+import { beatOptions } from './hints.js';
 
 export const DDZ = { base: 10, startPoints: 1000, bidMs: 15000, turnMs: 30000, botMs: 900, idleMs: 10 * 60 * 1000 };
 const BOT_NAMES = ['🤖 小白', '🤖 阿黄', '🤖 小黑'];
@@ -76,6 +77,8 @@ export class DdzGame {
   }
 
   // Bots (and people on 托管) move after a short pause; people get a countdown.
+  // Time's up while bidding counts as 不叫 / 不抢 — nobody is made landlord
+  // without saying so; time's up while playing, 托管 plays that turn for them.
   setTurn(i) {
     this.turn = i;
     const s = this.seats[i];
@@ -83,6 +86,7 @@ export class DdzGame {
     this.setTimer(this.phase === 'bidding' ? DDZ.bidMs : DDZ.turnMs, () => {
       s.timeouts++;
       if (s.timeouts >= 2) s.auto = true; // two missed turns in a row: 托管
+      if (this.phase === 'bidding') return this.doBid(i, false);
       this.botMove(i);
     });
   }
@@ -101,7 +105,11 @@ export class DdzGame {
     if (b.stage === 'call') {
       if (!yes) {
         b.pos++;
-        if (b.pos === 3) { this.first = next(this.first); return this.deal(); } // nobody called: deal again
+        if (b.pos === 3) { // nobody called: shuffle and deal again (redealtAt lets the page say so)
+          this.first = next(this.first);
+          this.redealtAt = this.h.now();
+          return this.deal();
+        }
         return this.setTurn(b.order[b.pos]);
       }
       b.caller = b.last = i;
@@ -184,10 +192,20 @@ export class DdzGame {
     const teammateLed = !!(this.trick && this.trick.by !== i && i !== this.landlord && this.trick.by !== this.landlord);
     return choosePlay(this.seats[i].cards, this.toBeat(i), { teammateLed, oppMin: Math.min(...opp.map(k => this.seats[k].cards.length)) });
   }
+  // 提示: leading, the bot's lead; following, every play that beats the table
+  // (hints.js) — not just what the bot would do, which can be a deliberate
+  // pass — one per press, starting over when the cards on the table change.
   hint(key) {
     const i = this.seatOf(key);
     if (this.phase !== 'playing' || i !== this.turn) return null;
-    return this.suggest(i);
+    const prev = this.toBeat(i);
+    if (!prev) return this.suggest(i);
+    const opts = beatOptions(this.seats[i].cards, prev);
+    if (!opts.length) return [];
+    const s = this.seats[i], at = this.round + ':' + this.trick.by + ':' + this.trick.cards.join(',');
+    s.hintN = s.hintAt === at ? s.hintN + 1 : 0;
+    s.hintAt = at;
+    return opts[s.hintN % opts.length];
   }
   setAuto(key, on) {
     const i = this.seatOf(key);
@@ -267,7 +285,7 @@ export class DdzGame {
   view(key) {
     const me = this.seatOf(key), over = this.phase === 'result';
     return {
-      phase: this.phase, round: this.round, turn: this.turn, deadline: this.deadline, now: this.h.now(),
+      phase: this.phase, round: this.round, turn: this.turn, deadline: this.deadline, now: this.h.now(), redealtAt: this.redealtAt || 0,
       landlord: this.landlord, multiplier: this.multiplier, bombs: this.bombs, base: DDZ.base,
       bottom: this.landlord >= 0 || over ? this.bottom : this.bottom.map(() => null),
       bidStage: this.bid && this.phase === 'bidding' ? this.bid.stage : null,

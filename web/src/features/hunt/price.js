@@ -1,12 +1,14 @@
 // 价格：优先用 Airbnb 实时报价（按当前行程的日期和人数）
 export const liveOf = (l, T) => (l.live && l.live.checkIn === T.checkIn && l.live.checkOut === T.checkOut ? l.live : null);
 export const isBooked = (l, T) => { const v = liveOf(l, T); return !!(v && !v.available); };
-// 酒店按「每间每晚」报价（Google 参考价或手填的）：估这群人要几间（每间住 ROOM_SLEEPS 人）、乘晚数，
+// 酒店按「每间每晚」报价（Google 按行程日期查的均价，或手填的）：这群人要几间（两人一间）、乘晚数，
 // 才能和 Airbnb 的整套总价放在一起比。之前从 Booking.com 拉过价格的酒店存的已经是整趟总价。
-export const ROOM_SLEEPS = 4;
+export const ROOM_SLEEPS = 2;
 export const roomsFor = T => Math.ceil(T.people / ROOM_SLEEPS);
+// Google 价是不是按当前行程的日期查的（之前加的酒店是 Google 自己挑的某一晚，后端会补查）
+export const rateForTrip = (r, T) => !!(r && r.checkIn === T.checkIn && r.checkOut === T.checkOut);
+export const isHotel = l => l.kind === 'hotel';
 export function hotelTotal(l, T) {
-  if (l.rate && l.rate.total) return l.rate.total * roomsFor(T); // 按行程日期拉的每间整趟总价（含税费）
   if (l.rate && l.rate.nightly) return l.rate.nightly * roomsFor(T) * T.nights;
   return l.priceNights ? l.priceUSD || null : null;
 }

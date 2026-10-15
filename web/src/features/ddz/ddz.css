@@ -16,3 +16,18 @@
 .gt-full .dz-center .pc.sm { width:1.7rem; height:2.4rem; }
 .gt-full .dz-controls { margin-top:.35rem; }
 .gt-full .dz-msg { margin-top:.15rem; min-height:1rem; font-size:.75rem; }
+
+/* 轮到你了: a banner right above your buttons (also in full screen, where your own seat box is hidden);
+   the last 5 seconds turn it red and make it pulse faster */
+.dz-yourturn { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:.25rem .6rem; margin-top:.75rem; padding:.45rem .9rem;
+  border-radius:9999px; background:#facc15; color:#422006; font-weight:800; font-size:.95rem; box-shadow:0 0 0 0 rgba(250,204,21,.7);
+  animation:dz-call 1.4s ease-out infinite; }
+.dz-yourturn b { font-size:1.05rem; }
+.dz-yourturn small { font-weight:600; font-size:.75rem; opacity:.85; }
+.dz-yourturn.hurry { background:#ef4444; color:#fff; box-shadow:0 0 0 0 rgba(239,68,68,.8); animation:dz-hurry .5s ease-out infinite alternate; }
+@keyframes dz-call { 0% { box-shadow:0 0 0 0 rgba(250,204,21,.7); } 100% { box-shadow:0 0 0 14px rgba(250,204,21,0); } }
+@keyframes dz-hurry { from { transform:scale(1); box-shadow:0 0 0 0 rgba(239,68,68,.8); } to { transform:scale(1.04); box-shadow:0 0 0 10px rgba(239,68,68,0); } }
+.gt-full .dz-yourturn { margin-top:.3rem; padding:.25rem .8rem; font-size:.85rem; }
+/* 三家都不叫 -> reshuffled */
+.dz-redeal { margin:0 auto .5rem; width:max-content; max-width:100%; padding:.3rem .9rem; border-radius:9999px; background:rgba(0,0,0,.45); color:#fde68a; font-weight:700; font-size:.85rem; }
+@media (prefers-reduced-motion: reduce) { .dz-yourturn, .dz-yourturn.hurry { animation:none; } }
