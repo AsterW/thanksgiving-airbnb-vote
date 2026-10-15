@@ -12,6 +12,7 @@ import { routes as angelRoutes } from './angel/routes.js';
 import { routes as weatherRoutes } from './weather/routes.js';
 import { routes as flightRoutes } from './flights/routes.js';
 import { routes as activityRoutes } from './activities/routes.js';
+import { routes as pollRoutes } from './polls/routes.js';
 
 // The Durable Object classes must be exported from the entry module.
 export { BlackjackTable } from './blackjack/table.js';
@@ -21,7 +22,7 @@ export { MahjongHall } from './mahjong/hall.js';
 export { StoreDO } from './store/store.js';
 export { DodgeBoard } from './dodge/board.js';
 
-const ROUTES = { ...listingRoutes, ...userRoutes, ...authRoutes, ...adminRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes };
+const ROUTES = { ...listingRoutes, ...userRoutes, ...authRoutes, ...adminRoutes, ...splitRoutes, ...foodRoutes, ...angelRoutes, ...weatherRoutes, ...activityRoutes, ...flightRoutes, ...pollRoutes };
 
 export default {
   async fetch(request, env) {
