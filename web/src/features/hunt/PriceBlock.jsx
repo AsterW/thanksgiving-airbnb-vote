@@ -21,6 +21,20 @@ export default function PriceBlock({ l, T }) {
       <div className="text-xs text-emerald-700 mt-0.5">✓ Airbnb 实时价{v.guests < T.people ? ' · 按 ' + v.guests + ' 人计' : ''} · {ago(v.at)}</div>
     </>
   );
+  // 酒店：没有 Airbnb 实时价，显示从 Booking 拉取的价格快照（带拉取时间）
+  if (l.kind === 'hotel') {
+    if (l.priceUSD && l.priceNights) return (
+      <>
+        <div className="text-lg font-bold text-slate-800">
+          ${Number(l.priceUSD).toLocaleString()}
+          {' '}<span className="text-xs font-normal text-slate-500">/ {l.priceNights}晚总价</span>
+        </div>
+        {(() => { const pp = perPerson(l.priceUSD, T); return <div className="text-sm font-bold text-indigo-700 mt-0.5">每人约 ${pp.each.toLocaleString()} <span className="font-normal text-xs text-slate-500">（{T.people} 人分 · 每人每晚 ${pp.perNight}）</span></div>; })()}
+        <div className="text-xs text-sky-700 mt-0.5">🏨 Booking.com 拉取价{l.priceAt ? ' · ' + ago(l.priceAt) : ''}</div>
+      </>
+    );
+    return <div className="text-sm text-slate-500">🏨 价格见 Booking 链接（尚未拉取）</div>;
+  }
   // 还没查到实时价：手动添加时填过价格的先显示那个
   if (l.priceUSD && l.priceNights) return (
     <>
