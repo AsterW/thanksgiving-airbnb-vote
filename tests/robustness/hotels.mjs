@@ -24,9 +24,13 @@ ck('missing title rejected', noTitle.ok === false, JSON.stringify(noTitle));
 // ---- a full structured add ----
 const made = await J('POST', '/api/add-hotel', {
   url, title: 'Robust Test Hotel', image: 'https://example.com/h.jpg', lat: 39.7453, lng: -104.9942,
+  images: ['https://example.com/h.jpg', 'https://example.com/h2.jpg', 'https://example.com/h.jpg', 'https://example.com/h3.jpg'],
   rating: 8.4, reviews: 985, priceUSD: 686, priceNights: 3, note: '3 间房 · 未含税', addedBy: 'HotelTester',
 });
 ck('hotel created', made.ok === true && made.listing?.kind === 'hotel', JSON.stringify(made).slice(0, 300));
+ck('gallery stored deduped, cover is the first photo',
+  JSON.stringify(made.listing?.images) === JSON.stringify(['https://example.com/h.jpg', 'https://example.com/h2.jpg', 'https://example.com/h3.jpg']),
+  JSON.stringify(made.listing?.images));
 ck('roomId is the booking slug', made.listing?.roomId === 'bk:' + slug, made.listing?.roomId);
 ck('price snapshot stamped', made.listing?.priceUSD === 686 && !!made.listing?.priceAt, JSON.stringify(made.listing).slice(0, 300));
 const id = made.listing?.id;
@@ -38,8 +42,12 @@ ck('hotel visible in state, exactly once', inState.length === 1 && inState[0].ra
 const login = await J('POST', '/api/login', { name: 'HotelVoter' + tag, token: 'dev-hotel-' + tag });
 const v = await J('POST', '/api/vote', { id, name: login.user?.name, token: login.user?.token });
 ck('vote on a hotel works', v.ok === true && v.voted === true, JSON.stringify(v).slice(0, 200));
-const repull = await J('POST', '/api/add-hotel', { url, title: 'Robust Test Hotel', priceUSD: 599, priceNights: 3, addedBy: 'HotelTester' });
+const repull = await J('POST', '/api/add-hotel', { url, title: 'Robust Test Hotel', priceUSD: 599, priceNights: 3, addedBy: 'HotelTester',
+  images: ['https://example.com/n1.jpg', 'https://example.com/n2.jpg'] });
 ck('re-pull reports updated', repull.ok === true && repull.updated === true, JSON.stringify(repull).slice(0, 200));
+ck('re-pull replaces the gallery and the cover follows',
+  JSON.stringify(repull.listing?.images) === JSON.stringify(['https://example.com/n1.jpg', 'https://example.com/n2.jpg']) && repull.listing?.image === 'https://example.com/n1.jpg',
+  JSON.stringify(repull.listing?.images));
 ck('re-pull keeps the same card', repull.listing?.id === id, repull.listing?.id);
 const st2 = await J('GET', '/api/state');
 const after = (st2.listings || []).filter(l => l.roomId === 'bk:' + slug);
