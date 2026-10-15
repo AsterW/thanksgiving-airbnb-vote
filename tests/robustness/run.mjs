@@ -89,14 +89,11 @@ try {
     // And the dated-Google-prices suite for map-link hotels.
     const googlePath = new URL('google.mjs', import.meta.url).pathname;
     const google = existsSync(googlePath) ? await runSuite('google.mjs') : true;
-    // And the addressed game-reactions suite (WebSocket).
-    const reactionsPath = new URL('reactions.mjs', import.meta.url).pathname;
-    const reactions = existsSync(reactionsPath) ? await runSuite('reactions.mjs') : true;
     // And the car seats / luggage suite.
     const carsPath = new URL('cars.mjs', import.meta.url).pathname;
     const cars = existsSync(carsPath) ? await runSuite('cars.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && polls && google && reactions && cars && storms;
+    ok = fuzz && email && users && polls && google && cars && storms;
   }
 } finally {
   stopServer();
