@@ -1,29 +1,60 @@
 /* 鲁班七号躲技能 */
-.dg-intro { background: radial-gradient(120% 90% at 20% 0%, #1f5f4a 0%, #134e4a 55%, #0d2e27 100%); }
+.dg-intro { position:relative; isolation:isolate; overflow:hidden; border:1px solid #c2ad7455; background:#102c31 url('/dodge/canyon.webp') center / cover; }
+/* the front-facing frame (3rd of 4 across, top row) of the sprite sheet */
+.dg-preview { position:absolute; z-index:-2; right:3%; bottom:-6%; height:108%; aspect-ratio:3 / 4; background:url('/dodge/luban-directions.webp') 66.667% 0 / 400% 200% no-repeat; filter:drop-shadow(0 18px 24px #000a); }
+.dg-intro::after { content:''; position:absolute; z-index:-1; inset:0; background:linear-gradient(90deg,#0c252bf5 5%,#102a30de 40%,#102a3010 90%),linear-gradient(0deg,#0c252bcc,transparent 50%); }
+.dg-intro-content { position:relative; max-width:36rem; }
+.dg-eyebrow { color:#d6c18c; letter-spacing:.2em; font-size:.65rem; font-weight:700; margin-bottom:1.2rem; }
+.dg-title { font-size:clamp(2rem,4vw,3.2rem); font-weight:900; letter-spacing:.08em; color:#fff4d5; text-shadow:0 3px 12px #06191d; }
+.dg-title span { display:block; font-size:clamp(1rem,2vw,1.35rem); letter-spacing:.12em; margin:.45rem 0 1rem; font-weight:500; }
+.dg-description { max-width:25rem; color:#c0d3d2; line-height:1.8; font-size:.9rem; }
+.dg-rule-tags { display:flex; flex-wrap:wrap; gap:.4rem; margin:1rem 0; }
+.dg-rule-tags span { border:1px solid #c5b27a44; background:#061d2266; color:#e4d4a6; padding:.25rem .6rem; border-radius:3px; font-size:.68rem; }
+.dg-start { background:linear-gradient(135deg,#f1db9e,#c2a167); color:#162c35; border:1px solid #f9e5b3; min-width:11rem; }
+.dg-start span { margin-left:2rem; }
+.dg-roster { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; margin-top:.8rem; }
+.dg-skill-card { --skill:#8be8c4; background:#152e36; border:1px solid #385157; border-top:2px solid var(--skill); border-radius:.6rem; padding:.8rem; color:#dce6df; display:flex; flex-wrap:wrap; gap:.55rem; align-items:center; }
+.dg-skill-fire { --skill:#ffac75; }.dg-skill-ice { --skill:#8cdbff; }.dg-skill-fan { --skill:#f6a2cf; }.dg-skill-bird { --skill:#ffce65; }.dg-skill-beam { --skill:#ffe8a0; }
+.dg-skill-seal { flex-shrink:0; width:2.7rem; height:2.7rem; border-radius:50%; border:2px solid var(--skill); box-shadow:0 0 0 3px #081d2788; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:1.2rem; color:var(--skill); background:radial-gradient(circle at 50% 35%, #ffffff22, #0b1d24 70%); }
+.dg-skill-card strong { display:block; font-size:.8rem; }.dg-skill-card small { display:block; font-size:.6rem; color:#9eb7b9; font-weight:400; }
+.dg-skill-card div>span { font-size:.65rem; color:var(--skill); }.dg-skill-card p { width:100%; font-size:.67rem; color:#abc0c0; line-height:1.5; }
 .dg-btn { border-radius:.8rem; padding:.6rem 1.3rem; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.25); }
 .dg-box { border-radius:1rem; overflow:hidden; background:#0b1f1a; box-shadow:0 20px 40px -15px rgba(0,0,0,.5); }
 .dg-box .dg-stage { aspect-ratio: 16 / 10; }
 .dg-stage { position:relative; width:100%; height:100%; display:flex; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:none; }
 .dg-canvas { display:block; cursor:crosshair; touch-action:none; }
-.dg-hud { position:absolute; top:.6rem; left:50%; transform:translateX(-50%); color:#fef3c7; font-weight:800; font-size:1rem; text-shadow:0 2px 4px rgba(0,0,0,.6); pointer-events:none; }
+.dg-hud { position:absolute; top:.6rem; left:50%; transform:translateX(-50%); color:#fef3c7; font-size:1rem; text-shadow:0 2px 4px #0008; pointer-events:none; text-align:center; background:linear-gradient(90deg,#0b253000,#0b2530db 20%,#0b2530db 80%,#0b253000); padding:.35rem 2.6rem .6rem; white-space:nowrap; }
+.dg-hud strong { display:block; font-variant-numeric:tabular-nums; letter-spacing:.06em; }.dg-hud-title { font-size:.6rem; color:#b8caca; letter-spacing:.18em; }
 /* 闪现: a round button that fills back up while it cools down (--p: 1 just used, 0 ready) */
-.dg-flash { position:absolute; right:1rem; bottom:1rem; width:3.6rem; height:3.6rem; border-radius:9999px; color:#1e1b4b; font-weight:900; font-size:.85rem;
-  background: conic-gradient(rgba(15,23,42,.65) calc(var(--p, 0) * 360deg), #fde68a 0); box-shadow:0 0 0 3px rgba(255,255,255,.7), 0 4px 10px rgba(0,0,0,.4);
+.dg-flash { position:absolute; right:1.2rem; bottom:1.7rem; width:4.8rem; height:4.8rem; border-radius:9999px; color:#fff0b1; font-weight:900; font-size:.75rem; border:2px solid #e3c98e; z-index:2;
+  background: radial-gradient(circle at 50% 36%, #fff6d0 0 9%, #f4cf6a 28%, #c48a2c 60%, #6f4a16 100%); box-shadow:0 0 0 4px #102c37cc, inset 0 0 16px #f3d58a44, 0 0 0 5px #ad996577, 0 4px 10px #0008;
   display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.1; touch-action:none; }
-.dg-flash small { font-size:.65rem; opacity:.7; }
+.dg-flash::before { content:''; position:absolute; inset:0; border-radius:inherit; background:conic-gradient(#091727dd calc(var(--p,0) * 360deg),transparent 0); }
+.dg-flash span { position:absolute; bottom:-1.2rem; font-size:.75rem; color:#f5e5be; text-shadow:0 2px 4px #000; }
+.dg-flash small { position:absolute; bottom:0; right:-.3rem; font-size:.6rem; padding:.15rem .3rem; border-radius:.2rem; background:#0c2437; color:#f3e4ba; border:1px solid #c5b17a88; }
+.dg-flash:focus-visible,.dg-btn:focus-visible,.dg-pause:focus-visible { outline:3px solid #9ceeff; outline-offset:5px; }
+.dg-control-hint { position:absolute; bottom:.4rem; left:50%; transform:translateX(-50%); color:#c5d6d6; font-size:.6rem; letter-spacing:.05em; white-space:nowrap; pointer-events:none; text-shadow:0 1px 4px #000; }
 .dg-flash[data-left]:not([data-left=''])::after { content:attr(data-left); position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:#fff; text-shadow:0 1px 3px #000; }
+.dg-flash[data-left]:not([data-left='']) span,.dg-flash[data-left]:not([data-left='']) small { visibility:hidden; }
 .dg-flash.big { width:5.2rem; height:5.2rem; right:max(1.6rem, env(safe-area-inset-right)); bottom:max(1.6rem, env(safe-area-inset-bottom)); font-size:1rem; }
 .dg-joyzone { position:absolute; left:0; top:0; bottom:0; width:50%; touch-action:none; }
-.dg-joy { position:absolute; width:7rem; height:7rem; margin:-3.5rem 0 0 -3.5rem; border-radius:9999px; background:rgba(255,255,255,.12); box-shadow:inset 0 0 0 3px rgba(255,255,255,.35); pointer-events:none; }
+.dg-joy { position:absolute; width:7rem; height:7rem; margin:-3.5rem 0 0 -3.5rem; border-radius:9999px; background:#37677b44; box-shadow:inset 0 0 0 2px #9bc7d780,0 0 0 5px #18334266; pointer-events:none; }
+.dg-joy-rest { position:absolute; bottom:2rem; left:2rem; width:6rem; height:6rem; border:2px solid #b4d7e033; border-radius:50%; background:#17394e22; pointer-events:none; display:grid; place-items:center; }.dg-joy-rest span { width:2.5rem; height:2.5rem; border-radius:50%; background:#aac9d333; border:1px solid #d7f6ff44; }
 .dg-knob { position:absolute; left:50%; top:50%; width:3rem; height:3rem; margin:-1.5rem 0 0 -1.5rem; border-radius:9999px; background:rgba(255,255,255,.75);
   transform:translate(var(--kx, 0), var(--ky, 0)); box-shadow:0 3px 8px rgba(0,0,0,.35); }
-.dg-count { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:5rem; font-weight:900; color:#fde68a; text-shadow:0 4px 16px rgba(0,0,0,.6); pointer-events:none; }
-.dg-over { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#fff; background:rgba(2,6,23,.6); padding:1rem; }
+.dg-count { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:5rem; font-weight:900; color:#fde6ad; text-shadow:0 4px 16px #0009; pointer-events:none; background:#0b263333; }
+.dg-count small { font-size:1rem; letter-spacing:.25em; }.dg-count span { font-size:.75rem; letter-spacing:.2em; color:#e1efec; }
+.dg-over { position:absolute; inset:0; z-index:4; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; color:#fff; background:linear-gradient(#081d2ca6,#081d2ce8); backdrop-filter:blur(3px); padding:1rem; }
+.dg-death-tip { color:#c6d9d8; font-size:.8rem; margin-top:.8rem; padding:.5rem 1rem; border-top:1px solid #c3ae6f55; }
 /* phones: the run takes the whole screen (sideways) */
 .dg-full { position:fixed; inset:0; z-index:80; background:#0b1f1a; overscroll-behavior:none; touch-action:none;
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
 html.dg-lock, html.dg-lock body { overflow:hidden; overscroll-behavior:none; }
-.dg-pause { position:absolute; top:.5rem; left:.6rem; width:2.4rem; height:2.4rem; border-radius:9999px; background:rgba(0,0,0,.35); color:#fff; font-size:1rem; z-index:2; }
+.dg-pause { position:absolute; top:.5rem; right:.6rem; width:2.4rem; height:2.4rem; border-radius:9999px; background:rgba(0,0,0,.35); color:#fff; font-size:1rem; z-index:2; }
+.dg-hero-hud { position:absolute; top:.6rem; left:.75rem; display:flex; align-items:center; gap:.6rem; pointer-events:none; color:#f5e5be; font-size:.75rem; text-shadow:0 2px 4px #000; }.dg-hero-hud .dg-hero-avatar { display:block; width:2.5rem; height:2.5rem; border-radius:50%; border:2px solid #cdbf90; background:#123a3f url('/dodge/luban-directions.webp') no-repeat; background-size:314px 209px; background-position:-177px -24px; }
+.dg-bolt { width:52%; height:52%; fill:#fffbe6; filter:drop-shadow(0 0 6px #ffe08a); }.dg-hero-hud small { display:block; font-size:.55rem; color:#aabfc4; margin-top:.15rem; }
+@media(max-width:640px) { .dg-roster { grid-template-columns:repeat(2,minmax(0,1fr)); }.dg-preview { right:-22%; opacity:.6; }.dg-intro::after { background:linear-gradient(90deg,#0c252bf5,#102a3099); } }
+@media(max-height:450px) { .dg-flash.big { width:4.2rem; height:4.2rem; bottom:1.4rem; }.dg-joy-rest { width:5rem; height:5rem; bottom:1.5rem; }.dg-hud { top:.15rem; }.dg-count { font-size:3rem; } }
 /* nothing in the game is for selecting or copying: a long-press on iPhone would otherwise select text and pop up 拷贝 */
 .dg-full, .dg-stage, .dg-over, .dg-box { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
 html.dg-lock, html.dg-lock body { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }

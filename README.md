@@ -36,8 +36,18 @@ works for any group picking a place together.
   (钟馗's hook, 安琪拉's fireballs, 王昭君's ice, 小乔's fan, 后羿's arrow,
   姜子牙's beam) warn on the ground, then fire, more and faster as time goes
   on; one hit and the run is over. PC: right-click to move, F / D for 闪现.
-  Phone: sideways full screen, joystick + 闪现. One all-time leaderboard of
-  each person's longest survival
+  Phone: sideways full screen, joystick + drag-to-aim 闪现 (release to cast,
+  drag far to cancel). Flash uses an 8-second training cooldown; Esc pauses
+  on desktop. The 2D canvas uses an eight-direction 鲁班 sprite atlas with
+  animated steps, a painted canyon river-and-stone arena, and brief skill
+  warnings that end at release. Canvas-drawn art remains a loading fallback.
+  钟馗's hook disappears at maximum range; only 小乔's fan returns.
+  The start screen shows the same generated 鲁班 on the canyon art, skill
+  cards carry a hero-name seal and the 闪现 button a drawn bolt; no official
+  game images are included (the two generated images are WebP, about 0.7 MB;
+  see `web/public/dodge/SOURCES.md`). The simulation has unit tests:
+  `node --test web/src/features/dodge/sim.test.js`. One all-time
+  leaderboard of each person's longest survival
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can
   claim, and suggested times to be at the airport for departures
