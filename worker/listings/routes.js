@@ -5,6 +5,7 @@ import { tripOf } from '../config/trips.js';
 import { fetchListingInfo, roomIdFrom } from './scrape.js';
 import { getState, updateState } from './state.js';
 import { handlePrices } from './prices.js';
+import { routes as hotelRoutes } from './hotels.js';
 import { needsArea, pickArea, routes as zoneRoutes } from './zones.js';
 import { closedError, voteView, votingOpen, routes as decisionRoutes } from './decision.js';
 import { cleanName, getUsers } from '../users/users.js';
@@ -172,6 +173,7 @@ export const routes = {
   'POST /api/remove': handleRemove,
   'POST /api/enrich': handleEnrich,
   'POST /api/prices': handlePrices,
+  ...hotelRoutes,
   ...zoneRoutes,
   ...decisionRoutes,
 };
