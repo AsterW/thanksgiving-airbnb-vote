@@ -10,8 +10,9 @@
 // has(key), humans(), waitlist, seats, phase, sweepIdle(), view(key). The
 // subclass passes `actions`: message type -> (table, key, message) returning an
 // error string, { reply } (sent back to that socket only), or nothing.
-import { getUsers, sameName, cleanName } from '../users/users.js';
+import { getUsers, sameName, cleanName, USER_ADMIN } from '../users/users.js';
 import { noteReaction, freshReactions } from './reactions.js';
+import { j } from '../lib/http.js';
 
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
 
@@ -40,10 +41,31 @@ export class TableHall {
     this.board.set(s.key, rec);
     this.state.storage.put('p:' + s.key, rec);
   }
+  // Internal, called by POST /api/users/delete through the object
+  // binding — the public worker never routes this path. The caller
+  // still has to prove it is PM, in case routing ever changes.
+  // Removes the deleted person's saved points (their 豆子榜 row).
+  async scrubUser(request) {
+    const body = await request.json().catch(() => null) || {};
+    const users = await getUsers(this.env);
+    const by = users.find(u => sameName(u.name, cleanName(body.byName)));
+    if (!by || !body.byToken || by.token !== body.byToken || !sameName(by.name, USER_ADMIN)) {
+      return j({ ok: false, error: '只有 PM 能清游戏记录' }, 403);
+    }
+    await this.load();
+    const key = cleanName(body.target).toLowerCase();
+    if (!key) return j({ ok: true, removed: 0 });
+    this.tableOf(key)?.leave(key); // a seated ghost leaves first; the save that lands is deleted next
+    const removed = this.board.delete(key) ? 1 : 0;
+    await this.state.storage.delete('p:' + key);
+    this.broadcast();
+    return j({ ok: true, removed });
+  }
   tableOf(key) { return key ? this.tables.find(t => t.has(key)) : null; }
   clampRoom(r, fallback = 1) { return Math.min(this.rooms, Math.max(1, Number(r) || fallback)); }
 
   async fetch(request) {
+    if (request.method === 'POST' && new URL(request.url).pathname.endsWith('/scrub-user')) return this.scrubUser(request);
     if (request.headers.get('Upgrade') !== 'websocket') return new Response('Expected a WebSocket', { status: 426 });
     await this.load();
     const room = this.clampRoom(new URL(request.url).searchParams.get('room'));

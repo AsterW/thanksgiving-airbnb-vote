@@ -68,6 +68,17 @@ ck('victim flight saved', fl.ok === true, JSON.stringify(fl));
 const ex = await J('POST', '/api/expense', { paidBy: VICTIM, amountUSD: 30, splitAmong: [VICTIM, 'PM'], description: 'victim test expense' });
 ck('victim expense recorded', ex.ok === true, JSON.stringify(ex));
 
+// Game records live in their own Durable Objects: give the victim a
+// dodge score, and deletion must reach that board too.
+const sc = await J('POST', '/api/dodge/score', { name: VICTIM, token: vicTok, ticks: 3600 });
+ck('victim dodge score recorded', sc.ok === true, JSON.stringify(sc));
+// The board's scrub door is publicly routed (unlike the halls'), so it
+// must refuse anyone who is not PM.
+const directScrub = await J('POST', '/api/dodge/scrub-user', { target: VICTIM, byName: VICTIM, byToken: vicTok });
+ck('direct board scrub by a non-PM refused', directScrub.ok === false, JSON.stringify(directScrub));
+const boardMid = await J('GET', '/api/dodge/board');
+ck('victim still on the dodge board after refused scrub', boardMid.board.some(r => isVictim(r.name)));
+
 // Secret Angel: victim + PM + Aster (the default admin) submit prefs,
 // Aster draws, then deleting the victim must splice them out of the
 // cycle, leaving PM and Aster giving to each other.
@@ -82,7 +93,7 @@ ck('draw happened with victim in', draw.ok === true && draw.drawn === true, JSON
 // ---- delete the victim and verify the scrub ----
 const del = await J('POST', '/api/users/delete', { name: VICTIM, token: pmTok });
 ck('PM deletes the victim', del.ok === true, JSON.stringify(del));
-ck('scrub counts report the footprint', del.scrubbed?.listingVotes >= 1 && del.scrubbed?.activityVotes >= 1 && del.scrubbed?.splitExpenses >= 1, JSON.stringify(del.scrubbed));
+ck('scrub counts report the footprint', del.scrubbed?.listingVotes >= 1 && del.scrubbed?.activityVotes >= 1 && del.scrubbed?.splitExpenses >= 1 && del.scrubbed?.gameRecords >= 1, JSON.stringify(del.scrubbed));
 
 const usersEnd = await J('GET', '/api/users');
 ck('victim gone from the list', !usersEnd.users.some(u => isVictim(u.name)));
@@ -101,6 +112,9 @@ const angelPm = await J('GET', `/api/angel?name=PM&token=${pmTok}`);
 ck('draw survives with victim spliced out', angelPm.drawn === true && angelPm.master?.name === 'Aster', JSON.stringify(angelPm.master));
 const angelAst = await J('GET', `/api/angel?name=Aster&token=${astTok}`);
 ck('aster now gives to PM', angelAst.master?.name === 'PM', JSON.stringify(angelAst.master));
+
+const boardEnd = await J('GET', '/api/dodge/board');
+ck('no dodge record of victim remains', boardEnd.board.every(r => !isVictim(r.name)), JSON.stringify(boardEnd.board));
 
 console.log(`USERS: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
