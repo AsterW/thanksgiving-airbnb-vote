@@ -104,7 +104,14 @@ works for any group picking a place together.
   any empty seat and stand in for anyone who times out twice or drops (托管).
   豆子 are saved the same way as Blackjack chips, in each hall's own storage,
   so every game's leaderboard is separate and play never touches the KV
-  write budget.
+  write budget. 斗地主: when it's your turn a bar above your buttons says so
+  (with a chime and a phone buzz; the tab title flashes if the page is in the
+  background; 🔔/🔕 turns the sound off), and the last 5 seconds turn it red
+  with a tick each second (`web/src/features/games/turnAlert.js`). Time up
+  while bidding counts as 不叫 / 不抢; three 不叫 reshuffle and deal again,
+  and the table says so. 提示 lists every play that beats the table
+  (`worker/ddz/hints.js`), one per press — not what the bot would do, which
+  can be a deliberate pass.
 - **鲁班七号躲技能** (`/api/dodge/start`, `/api/dodge/score`,
   `/api/dodge/board`, `/api/dodge/replay`): the game runs in the browser
   (`web/src/features/dodge/sim.js`), which is deterministic: the same seed

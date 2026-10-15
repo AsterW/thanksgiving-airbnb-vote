@@ -83,7 +83,13 @@ export function useTable(active, { path, roomKey, noHint }) {
   return { st, live, msg, flash, hint, setHint, room, watch, send, sit, standUp };
 }
 
-// 倒计时用服务器给的时间算；只在这页开着、连着的时候走
+// 还剩几秒（用服务器给的时间算）；没在倒计时就是 null
+export function secondsLeft(st) {
+  const t = st?.table;
+  return t?.deadline ? Math.max(0, Math.ceil((t.deadline - t.now - (Date.now() - st.at)) / 1000)) : null;
+}
+
+// 倒计时：只在这页开着、连着的时候走（每 250ms 重画一次，用到它的组件跟着更新）
 export function useCountdown(st, running) {
   const [, tick] = useState(0);
   const t = st?.table;
@@ -92,6 +98,6 @@ export function useCountdown(st, running) {
     const id = setInterval(() => tick(n => n + 1), 250);
     return () => clearInterval(id);
   }, [running, t?.deadline]);
-  if (!t?.deadline) return '';
-  return Math.max(0, Math.ceil((t.deadline - t.now - (Date.now() - st.at)) / 1000)) + 's';
+  const left = secondsLeft(st);
+  return left == null ? '' : left + 's';
 }
