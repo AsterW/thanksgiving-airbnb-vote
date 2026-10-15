@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { VIEWS } from '../lib/config.js';
+import { NAV_GROUPS, VIEWS } from '../lib/config.js';
+import NavIcon from './NavIcon.jsx';
 import { reduceMotion } from '../lib/motion.js';
 import './nav.css';
 
-// 左侧导航（md 以上）：八个页面按 config 里的顺序全摆出来
+// 左侧导航（md 以上）：按 config 里的分组和顺序全摆出来，每组上面一个小组名
 export function Sidebar({ view, onView }) {
   return (
     <aside id="sidebar" className="hidden md:flex flex-col w-64 shrink-0 h-screen sticky top-0 px-4 py-6">
@@ -12,12 +13,18 @@ export function Sidebar({ view, onView }) {
         <div className="font-extrabold text-lg leading-tight">Denver 感恩节之旅</div>
         <div className="text-xs text-slate-500 mt-1">Thanksgiving 2026 · 大家一起</div>
       </div>
-      <nav className="flex flex-col gap-2" aria-label="主导航">
-        {Object.entries(VIEWS).map(([k, v]) => (
-          <button key={k} className={'nav-item' + (k === view ? ' active' : '')} aria-current={k === view ? 'page' : undefined} onClick={() => onView(k)}>
-            <span className="nav-ico">{v.icon}</span>
-            <span className="font-bold">{v.nav}<span className="nav-sub">{v.navSub}</span></span>
-          </button>
+      <nav className="flex flex-col" aria-label="主导航">
+        {NAV_GROUPS.map(([g, label]) => (
+          <div key={g} className="nav-group">
+            <div className="nav-group-label">{label}</div>
+            {Object.entries(VIEWS).filter(([, v]) => v.group === g).map(([k, v]) => (
+              <button key={k} className={'nav-item' + (k === view ? ' active' : '')} aria-current={k === view ? 'page' : undefined} onClick={() => onView(k)}>
+                <span className="nav-ico"><NavIcon name={v.icon} /></span>
+                <span className="nav-name">{v.nav}</span>
+                <span className="nav-sub">{v.navSub}</span>
+              </button>
+            ))}
+          </div>
         ))}
       </nav>
       <p className="mt-auto px-2 text-xs text-slate-500 leading-relaxed">有链接的人都能加房源、投票、记账 · 数据实时共享</p>
@@ -51,7 +58,7 @@ export function BottomNav({ view, onView }) {
       <nav ref={strip} onScroll={measure} className={'bnav-strip' + (more.l ? ' more-l' : '') + (more.r ? ' more-r' : '')} aria-label="主导航">
         {Object.entries(VIEWS).map(([k, v]) => (
           <button key={k} className={'bnav-item' + (k === view ? ' active' : '')} aria-current={k === view ? 'page' : undefined} onClick={() => onView(k)}>
-            <span className="nav-ico">{v.icon}</span>{v.nav}
+            <span className="nav-ico"><NavIcon name={v.icon} size={21} /></span>{v.nav}
           </button>
         ))}
       </nav>
