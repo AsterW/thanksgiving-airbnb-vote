@@ -2,6 +2,7 @@ import { j } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
 import { SCRAPE_UA } from './scrape.js';
 import { getState, updateState } from './state.js';
+import { refreshHotelRates } from './hotels.js';
 
 // ---------- live prices ----------
 // Airbnb's listing page fetches its price box from this persisted GraphQL
@@ -62,8 +63,9 @@ async function fetchLivePrice(listing, trip) {
   return { ...r, guests, nights, checkIn: trip.checkIn, checkOut: trip.checkOut, at: Date.now() };
 }
 
-// Refresh live prices for a trip's listings that are stale (or for one id).
-// Airbnb lookups run first; then fresh state is re-read and only the `live`
+// Refresh live prices for a trip's listings that are stale (or for one id):
+// Airbnb quotes, and hotels' Google rates for the trip's dates (hotels.js).
+// Lookups run first; then fresh state is re-read and only the `live`
 // field is written, so concurrent votes/adds aren't clobbered.
 export async function handlePrices(req, env) {
   let body = {};
@@ -73,14 +75,31 @@ export async function handlePrices(req, env) {
   const fresh = l => l.live && l.live.at > Date.now() - PRICE_TTL_MS && l.live.checkIn === trip.checkIn && l.live.checkOut === trip.checkOut;
   const todo = peek.listings.filter(l => /^\d+$/.test(String(l.roomId || '')) && (body.id ? l.id === body.id : true) && (body.force || !fresh(l))).slice(0, 12);
   const results = {};
-  for (let i = 0; i < todo.length; i += 4) { // a few at a time, to be gentle with Airbnb
-    await Promise.all(todo.slice(i, i + 4).map(async l => { const p = await fetchLivePrice(l, trip); if (p) results[l.id] = p; }));
-  }
+  const [rates] = await Promise.all([
+    refreshHotelRates(peek.listings, trip, body),
+    (async () => {
+      for (let i = 0; i < todo.length; i += 4) { // a few at a time, to be gentle with Airbnb
+        await Promise.all(todo.slice(i, i + 4).map(async l => { const p = await fetchLivePrice(l, trip); if (p) results[l.id] = p; }));
+      }
+    })(),
+  ]);
   // Apply the fetched prices onto the freshest state in a transaction —
-  // only the `live` field is written, so concurrent votes/adds survive.
-  const live = await updateState(env, trip, state => {
-    for (const l of state.listings) if (results[l.id]) l.live = results[l.id];
-    return Object.fromEntries(state.listings.filter(l => l.live).map(l => [l.id, l.live]));
+  // only the price fields are written, so concurrent votes/adds survive.
+  // A rate someone typed in meanwhile wins over Google's.
+  const now = Date.now();
+  const { live, rate } = await updateState(env, trip, state => {
+    for (const l of state.listings) {
+      if (results[l.id]) l.live = results[l.id];
+      if (l.id in rates) {
+        l.rateTriedAt = now;
+        if (rates[l.id] && l.rate?.source !== 'manual') l.rate = rates[l.id];
+      }
+    }
+    return {
+      live: Object.fromEntries(state.listings.filter(l => l.live).map(l => [l.id, l.live])),
+      rate: Object.fromEntries(state.listings.filter(l => l.kind === 'hotel').map(l => [l.id, l.rate || null])),
+    };
   });
-  return j({ ok: true, updated: Object.keys(results).length, tried: todo.length, live });
+  const updated = Object.keys(results).length + Object.values(rates).filter(Boolean).length;
+  return j({ ok: true, updated, tried: todo.length + Object.keys(rates).length, live, rate });
 }

@@ -44,12 +44,13 @@ export function useListings(trip, token) {
     if (t !== tripRef.current || !r.ok) return;
     setListings(ls => ls.map(l => (r.areas[l.id] && r.areas[l.id] !== l.area ? { ...l, area: r.areas[l.id] } : l)));
   }
-  // 让后端去 Airbnb 查过期（>6 小时）的实时价
+  // 让后端去查过期的价格：Airbnb 实时价（>6 小时），酒店按行程日期的 Google 价
   async function refreshPrices(t) {
     let r;
     try { r = await api('/api/prices', 'POST', { trip: t }); } catch (e) { return; }
     if (t !== tripRef.current || !r.ok || !r.updated) return;
-    setListings(ls => ls.map(l => (r.live[l.id] ? { ...l, live: r.live[l.id] } : l)));
+    const rate = r.rate || {};
+    setListings(ls => ls.map(l => (r.live[l.id] ? { ...l, live: r.live[l.id] } : l.id in rate ? { ...l, rate: rate[l.id] } : l)));
   }
 
   // 换行程：清空重新加载

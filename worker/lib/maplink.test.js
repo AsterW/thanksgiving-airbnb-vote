@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isMapLink, readMapUrl, splitNameAddress } from './maplink.js';
-import { readRateLabel, rateLabels, sameHotel } from '../listings/hotels.js';
+import { rateFresh, readRateLabel, rateLabels, sameHotel, searchState } from '../listings/hotels.js';
 
 test('which links are map links', () => {
   for (const u of ['https://maps.app.goo.gl/caiTwKKFJ4RXUMcC9', 'https://goo.gl/maps/abc', 'https://www.google.com/maps/place/X/@39.7,-104.9,17z',
@@ -58,4 +58,19 @@ test('same hotel, by name', () => {
   assert.equal(sameHotel('Hyatt House Denver Downtown', 'Hyatt Place Denver Downtown'), false);
   assert.equal(sameHotel('Hilton Garden Inn Denver Downtown', 'Hilton Garden Inn Denver Airport'), false);
   assert.equal(sameHotel('', 'Hyatt'), false);
+});
+
+test('searchState puts the trip dates in Google hotel search ts param', () => {
+  // the value Google accepted for Nov 26 – 29, 2026 ("$109 for dates Nov 26 – 29")
+  assert.equal(searchState('2026-11-26', '2026-11-29'), 'CAESABopCgIaABIaEhQKBwjqDxALGBoSBwjqDxALGB0YAzICEAAqBwoFOgNVU0Q');
+});
+
+test('rateFresh: Google rates must be for the trip dates and recent; typed-in rates always count', () => {
+  const trip = { checkIn: '2026-11-26', checkOut: '2026-11-29' };
+  const now = Date.now();
+  assert.equal(rateFresh({ rate: { source: 'google', dates: 'Nov 24 – 25', at: now } }, trip), false);
+  assert.equal(rateFresh({ rate: { source: 'google', checkIn: '2026-11-26', checkOut: '2026-11-29', at: now } }, trip), true);
+  assert.equal(rateFresh({ rate: { source: 'google', checkIn: '2026-11-26', checkOut: '2026-11-29', at: now - 2 * 864e5 } }, trip), false);
+  assert.equal(rateFresh({ rate: { source: 'manual', at: 0 } }, trip), true);
+  assert.equal(rateFresh({}, trip), false);
 });
