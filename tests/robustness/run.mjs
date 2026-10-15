@@ -86,8 +86,11 @@ try {
     // And the quick-polls suite.
     const pollsPath = new URL('polls.mjs', import.meta.url).pathname;
     const polls = existsSync(pollsPath) ? await runSuite('polls.mjs') : true;
+    // And the dated-Google-prices suite for map-link hotels.
+    const googlePath = new URL('google.mjs', import.meta.url).pathname;
+    const google = existsSync(googlePath) ? await runSuite('google.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && polls && storms;
+    ok = fuzz && email && users && polls && google && storms;
   }
 } finally {
   stopServer();
