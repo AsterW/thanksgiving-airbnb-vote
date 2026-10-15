@@ -6,6 +6,7 @@ export const isBooked = (l, T) => { const v = liveOf(l, T); return !!(v && !v.av
 export const ROOM_SLEEPS = 4;
 export const roomsFor = T => Math.ceil(T.people / ROOM_SLEEPS);
 export function hotelTotal(l, T) {
+  if (l.rate && l.rate.total) return l.rate.total * roomsFor(T); // 按行程日期拉的每间整趟总价（含税费）
   if (l.rate && l.rate.nightly) return l.rate.nightly * roomsFor(T) * T.nights;
   return l.priceNights ? l.priceUSD || null : null;
 }

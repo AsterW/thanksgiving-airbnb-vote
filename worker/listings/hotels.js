@@ -3,18 +3,24 @@
 // street address and location (worker/lib/maplink.js) — so it lands in the
 // right area and on the map — and Google's place data gives photos.
 //
-// Price: a hotel prices a room per night. Google's hotel search, as a server
+// Price: a hotel prices a room per night. First choice is Google's offers
+// for the trip's own dates (listings/google.js — the /prices page fetched
+// with the trip's captured googleTs): the cheapest provider's per-room
+// total, taxes included, stored with dated: true. When that can't be read,
+// fall back to the reference rate below: Google's hotel search, as a server
 // sees it, is a page focused on the hotel searched for, whose price reads
-// "$79 for dates Nov 24 – 25, Hyatt House Denver/Downtown". Google picks
-// those dates itself (dates in the URL are ignored), so this is a reference
-// rate for one night, kept with its dates and shown as such — not a quote for
-// the trip. Anyone can type the real rate instead (POST /api/hotel-rate).
-// Stored as rate: { nightly, source: 'google' | 'manual', dates?, at }.
+// "$79 for dates Nov 24 – 25, Hyatt House Denver/Downtown" — Google picks
+// those dates itself, so it is kept with its dates and shown as a reference,
+// not a quote for the trip. Anyone can type the real rate instead
+// (POST /api/hotel-rate); a typed rate wins over both.
+// Stored as rate: { nightly, source: 'google' | 'manual', dates?, at,
+//   total?, provider?, dated? } — total/provider/dated only on dated pulls.
 import { j, uid } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
 import { locatePlace } from '../lib/maplink.js';
 import { placePhotos } from '../food/photos.js';
 import { cleanName } from '../users/users.js';
+import { fetchDatedRateForHotel } from './google.js';
 import { getState, updateState } from './state.js';
 import { pickArea } from './zones.js';
 import { closedError, votingOpen } from './decision.js';
@@ -102,14 +108,18 @@ export async function addHotel(body, env) {
   const preExisting = pre.listings.find(l => l.roomId === roomId);
   if (preExisting) return j({ ok: true, listing: preExisting, deduped: true });
   const typed = nightlyOf(body.nightly);
-  const [rate, images, zone] = await Promise.all([
-    typed ? { nightly: typed, source: 'manual', at: Date.now() } : googleRate(p.name, p.address),
+  const [dated, images, zone] = await Promise.all([
+    typed ? null : fetchDatedRateForHotel({ name: p.name }, trip),
     placePhotos(p.url).catch(() => []),
     pickArea(trip, pre.listings, p),
   ]);
+  const rate = typed ? { nightly: typed, source: 'manual', at: Date.now() }
+    : dated ? { nightly: dated.nightly, total: dated.total, provider: dated.provider, source: 'google', dated: true, dates: dated.dates, at: dated.at }
+    : await googleRate(p.name, p.address);
   const listing = {
     id: uid(), roomId, kind: 'hotel', url: p.url, title: p.name, address: p.address,
     ...(p.lat != null ? { lat: p.lat, lng: p.lng } : {}),
+    ...(dated ? { gEntity: dated.entity } : {}),
     image: images[0] || '', images, area: zone.area || '', priceUSD: null, rate: rate || null,
     rating: null, reviews: null, note: '', addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: [],
   };

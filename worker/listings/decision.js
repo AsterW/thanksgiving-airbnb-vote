@@ -15,9 +15,20 @@ export const closedError = () => j({ ok: false, error: '投票已经截止，房
 const liveFor = (l, trip) => (l.live && l.live.checkIn === trip.checkIn && l.live.checkOut === trip.checkOut ? l.live : null);
 const unavailable = (l, trip) => { const v = liveFor(l, trip); return !!(v && !v.available); };
 
+// A hotel's rate is per room (per night, or a per-room stay total when
+// the dated Google pull provided one); scale it to the whole group the
+// same way the hunt page does (web price.js hotelTotal, 4 to a room).
+const hotelTotal = (l, trip) => {
+  if (l.kind !== 'hotel' || !l.rate) return undefined;
+  const rooms = Math.ceil(trip.people / 4);
+  if (l.rate.total) return l.rate.total * rooms;
+  if (l.rate.nightly) return l.rate.nightly * rooms * Math.round((Date.parse(trip.checkOut) - Date.parse(trip.checkIn)) / 86400000);
+  return undefined;
+};
+
 // Listings in decision order; unavailable ones last.
 export function ranking(state, trip) {
-  const total = l => liveFor(l, trip)?.total ?? l.priceUSD ?? Infinity;
+  const total = l => liveFor(l, trip)?.total ?? hotelTotal(l, trip) ?? l.priceUSD ?? Infinity;
   return state.listings.slice().sort((a, b) =>
     unavailable(a, trip) - unavailable(b, trip)
     || (b.votes || []).length - (a.votes || []).length

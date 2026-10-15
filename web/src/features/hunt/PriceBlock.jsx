@@ -32,7 +32,11 @@ function HotelPrice({ l, T, closed, onSetRate }) {
           <span className="font-normal text-xs text-slate-500">（按每间住 {ROOM_SLEEPS} 人估）</span>
         </div>
         <div className="text-xs text-sky-700 mt-0.5">
-          {r.source === 'google' ? `🏨 Google 参考价 · ${r.dates} 那晚的，不是行程日期 · ${ago(r.at)}` : `🏨 ${r.by ? r.by + ' ' : ''}手填的价格 · ${ago(r.at)}`}
+          {r.source === 'google'
+            ? r.dated
+              ? `🏨 Google 报价 · 行程日期 ${r.dates} · 最低来自 ${r.provider || 'Google'}（含税费）· ${ago(r.at)}`
+              : `🏨 Google 参考价 · ${r.dates} 那晚的，不是行程日期 · ${ago(r.at)}`
+            : `🏨 ${r.by ? r.by + ' ' : ''}手填的价格 · ${ago(r.at)}`}
         </div>
         {edit}
       </>
