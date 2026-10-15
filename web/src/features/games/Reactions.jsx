@@ -18,28 +18,32 @@ export const REACTION_PHRASES = [
 ];
 const isPhrase = v => v && v.length > 2;
 
-// 座位旁冒出来的气泡：单个 emoji 放大，整句话是白色小气泡
+// 座位旁冒出来的气泡：单个 emoji 放大，整句话是白色小气泡。
+// value 是服务器发来的 { v, at }；span 用 at 做 key —— 同一个座位连发
+// 表情时元素必须换新，CSS 动画才会重新播。不换的话动画停在最后一帧
+// （透明），后面的表情全都看不见（"按几次就不行了"的元凶）。
 export function ReactBubble({ value }) {
   if (!value) return null;
-  return isPhrase(value)
-    ? <span className="gt-react gt-react-text">{value}</span>
-    : <span className="gt-react gt-react-emoji">{value}</span>;
+  const { v, at } = typeof value === 'string' ? { v: value, at: value } : value;
+  return isPhrase(v)
+    ? <span key={at} className="gt-react gt-react-text">{v}</span>
+    : <span key={at} className="gt-react gt-react-emoji">{v}</span>;
 }
 
 // 右下角的表情钮 + 面板（坐下才渲染）。点完自己这里也回显一个气泡，
 // 不用等服务器绕一圈——尤其川麻自己的座位没有座位框，全靠这个回显。
 export function ReactionBar({ send, seated }) {
   const [open, setOpen] = useState(false);
-  const [echo, setEcho] = useState('');
+  const [echo, setEcho] = useState(null);
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
   if (!seated) return null;
   const pick = v => {
     send({ type: 'react', value: v });
     setOpen(false);
-    setEcho(v);
+    setEcho({ v, at: Date.now() });
     clearTimeout(timer.current);
-    timer.current = setTimeout(() => setEcho(''), 3000);
+    timer.current = setTimeout(() => setEcho(null), 3000);
   };
   // 挂到 body 上：牌桌全屏时桌面是 portal 出去的浮层（z-60），按钮留在
   // 页面树里会被祖先的层叠上下文压在浮层下面（桌面端全屏时就看不见）。

@@ -2,7 +2,7 @@
 // (给阿姨倒一杯卡布奇诺 and friends) and it pops next to their seat for
 // everyone at the table. Shared by the TableHall games and Blackjack.
 // Only values on these lists are accepted — clients can't inject
-// arbitrary text. A reaction lives 4 seconds; one per player per 800ms.
+// arbitrary text. A reaction lives 4 seconds; one per player per 300ms.
 // Keep the lists in sync with web/src/features/games/Reactions.jsx.
 export const REACTION_EMOJIS = ['😏', '🤣', '😂', '🙄', '🥱', '😴', '😤', '🐢', '💩', '🤡', '👎', '👍', '🔥', '💣', '⏰', '😱', '😭', '🤑', '🐶', '👻'];
 export const REACTION_PHRASES = [
@@ -19,7 +19,7 @@ export const REACTION_PHRASES = [
 ];
 const ALL = new Set([...REACTION_EMOJIS, ...REACTION_PHRASES]);
 export const REACTION_TTL_MS = 4000;
-const MIN_GAP_MS = 800;
+const MIN_GAP_MS = 300;
 
 // Record a reaction in map (key -> { v, at }); false when the value is
 // not allowed or the player is tapping too fast.
@@ -31,11 +31,13 @@ export function noteReaction(map, key, value, now) {
   return true;
 }
 
-// The still-fresh reactions as { key: value }, pruning stale entries.
+// The still-fresh reactions as { key: { v, at } }, pruning stale entries.
+// The timestamp travels with the value so clients can tell a NEW reaction
+// from the one already on screen and replay the pop animation for it.
 export function freshReactions(map, now) {
   const out = {};
   for (const [k, r] of map) {
-    if (now - r.at <= REACTION_TTL_MS) out[k] = r.v;
+    if (now - r.at <= REACTION_TTL_MS) out[k] = { v: r.v, at: r.at };
     else map.delete(k);
   }
   return out;
