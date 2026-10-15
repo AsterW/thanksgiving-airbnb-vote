@@ -14,6 +14,11 @@ import { j } from '../lib/http.js';
 
 const MAX_TICKS = 10 * 60 * 60; // a run stops counting after 10 minutes
 
+// Records taken off the board by hand, each exactly once ([flag, key]): the
+// flag is kept, so a later record of the same person is never touched.
+// 2026-10-14: PM's 86.2 s was an autopilot run (bot.js); removed on request.
+const REMOVE_ONCE = [['removed:pm:2026-10-14', 'pm']];
+
 export class DodgeBoard {
   constructor(state, env) {
     this.state = state; this.env = env;
@@ -25,9 +30,16 @@ export class DodgeBoard {
     return this.loaded ||= Promise.all([
       this.state.storage.list({ prefix: 'p:' }),
       this.state.storage.get('grants'),
-    ]).then(([m, g]) => {
+    ]).then(async ([m, g]) => {
       for (const [k, v] of m) this.best.set(k.slice(2), v);
       if (Array.isArray(g)) for (const k of g) this.grants.add(k);
+      for (const [flag, key] of REMOVE_ONCE) {
+        if (await this.state.storage.get(flag)) continue;
+        const was = this.best.get(key) || null;
+        this.best.delete(key);
+        await this.state.storage.delete('p:' + key);
+        await this.state.storage.put(flag, { at: Date.now(), was });
+      }
     });
   }
   top() {
