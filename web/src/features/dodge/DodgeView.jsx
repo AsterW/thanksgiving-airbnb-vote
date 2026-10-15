@@ -5,7 +5,7 @@ import { load, save } from '../../lib/storage.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
-import { HZ, SKILLS } from './sim.js';
+import { HZ, SKILLS, SIM_VERSION } from './sim.js';
 import DodgeGame, { killedBy } from './DodgeGame.jsx';
 import DodgePreview from './DodgePreview.jsx';
 import * as sfx from './sfx.js';
@@ -31,10 +31,16 @@ function leaveFull() {
   if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
 }
 
-// 交成绩：浏览器算的存活时间就是成绩。网络不通时先存在这台设备上（只留最好的那次），
-// 点「重新提交」或者下次打开这页时再交，好不容易活很久的一局不会丢。
+// 交成绩：开局时服务器发一张签了名的「票」（种子在里面），这局的每个操作都记下来；
+// 死了以后把票和操作交上去，服务器自己重放一遍算出存活时间，那才是成绩（verify.js）。
+// 网络不通时先存在这台设备上（只留最好的那次），点「重新提交」或者下次打开这页时再交，
+// 好不容易活很久的一局不会丢。旧页面存下的只有时间、没有操作，核对不了，就不交了。
 const PENDING = 'dodgePending';
-const pendingScore = () => { try { return JSON.parse(load(PENDING) || 'null'); } catch (e) { return null; } };
+const pendingScore = () => {
+  try { const p = JSON.parse(load(PENDING) || 'null'); return p && p.ticket && Array.isArray(p.events) ? p : null; } catch (e) { return null; }
+};
+// 🤖：重放时量出来躲开危险的速度比人快（verify.js 的 BOT）
+const BOT_NOTE = ms => `🤖 这局躲开危险平均只用了 ${ms} 毫秒，人一般要 200 毫秒以上，可能是外挂`;
 async function sendScore(s) {
   let r = null;
   try { r = await api('/api/dodge/score', 'POST', s); } catch (e) { /* offline */ }
@@ -52,8 +58,9 @@ async function sendScore(s) {
 export default function DodgeView({ active }) {
   const { name, ensureName } = useSession();
   const [board, setBoard] = useState([]);
-  const [run, setRun] = useState(null);      // { me: { name, token }, seed, n } while playing
-  const [result, setResult] = useState(null); // { ticks, by, server?, error?, retry? }
+  // while playing: { me: { name, token }, seed, ticket, practice?, n }; while watching: { replay, seed, n }
+  const [run, setRun] = useState(null);
+  const [result, setResult] = useState(null); // { ticks, by, server?, error?, retry?, practice?, replay? }
   const [msg, setMsg] = useState('');
   const [touch] = useState(isTouch);
   const [portrait, setPortrait] = useState(() => window.matchMedia(PORTRAIT).matches);
@@ -105,11 +112,30 @@ export default function DodgeView({ active }) {
     if (touch) enterFull(); // must happen right on the tap
     sfx.unlock();           // so must starting the sound
     setMsg('');
-    ensureName(me => {
+    ensureName(async me => {
+      // the server deals the seed with a signed ticket, so the run can be checked when it ends;
+      // without one it's a practice run that doesn't count
+      const t = await api('/api/dodge/start', 'POST', { name: me.name, token: me.token }).catch(() => null);
       setResult(null); setPaused(false); setStarted(false);
-      setRun(x => ({ me: { name: me.name, token: me.token }, seed: Math.floor(Math.random() * 4294967296), n: (x?.n || 0) + 1 }));
+      setRun(x => ({ me: { name: me.name, token: me.token }, n: (x?.n || 0) + 1,
+        ...(t?.ok ? { seed: t.seed, ticket: t.ticket } : { seed: Math.floor(Math.random() * 4294967296), ticket: null, practice: t?.error || '没连上服务器' }) }));
     });
   }
+  // watch someone's best run again: the same seed and inputs play out the same way
+  async function watch(who) {
+    if (touch) enterFull(); // right on the tap
+    sfx.unlock();
+    setMsg('');
+    const r = await api('/api/dodge/replay?name=' + encodeURIComponent(who)).catch(() => null);
+    if (!r?.ok || r.v !== SIM_VERSION) {
+      if (touch) leaveFull();
+      setMsg(r?.ok ? '这条回放是旧版游戏录的，放不了了' : r?.error || '回放没加载出来，再试一次');
+      return;
+    }
+    setResult(null); setPaused(false); setStarted(false);
+    setRun(x => ({ replay: r, seed: r.seed, n: (x?.n || 0) + 1 }));
+  }
+  function again() { setResult(null); setPaused(false); setStarted(false); setRun(x => ({ ...x, n: x.n + 1 })); }
   async function submit(score) {
     const r = await sendScore(score);
     setResult(x => ({ ...x, server: r.ok ? r : null, error: r.ok ? '' : r.error, retry: !!r.retry }));
@@ -118,9 +144,11 @@ export default function DodgeView({ active }) {
       if (r.newBest && !reduceMotion) confetti({ particleCount: 140, spread: 90, origin: { y: 0.5 }, colors: CONFETTI_COLORS });
     }
   }
-  function dead(sim) {
-    setResult({ ticks: sim.tick, by: sim.by });
-    submit({ ...run.me, ticks: sim.tick });
+  function dead(sim, events) {
+    if (run.replay) { setResult({ ticks: sim.tick, by: sim.by, replay: true }); return; }
+    setResult({ ticks: sim.tick, by: sim.by, practice: run.ticket ? null : run.practice });
+    // ticks only picks the best of several saved runs; the server replays the inputs for the score
+    if (run.ticket) submit({ ...run.me, ticket: run.ticket, events, ticks: sim.tick });
   }
   function retry() {
     const p = pendingScore();
@@ -130,22 +158,34 @@ export default function DodgeView({ active }) {
   function quit() { setRun(null); setResult(null); setPaused(false); if (touch) leaveFull(); loadBoard(); }
 
   const mine = board.find(r => name && r.name.toLowerCase() === name.toLowerCase());
-  const overlay = result && (
+  const overlay = result && (result.replay ? (
+    <div className="dg-over">
+      <div className="text-2xl font-extrabold">回放结束：{run.replay.name} 存活 {secs(result.ticks)} 秒</div>
+      <div className="text-sm mt-1 text-slate-200">{killedBy(result.by)}</div>
+      {run.replay.bot && <div className="dg-death-tip">{BOT_NOTE(run.replay.stats.medianMs)}</div>}
+      <div className="flex gap-2 justify-center mt-3">
+        <button onClick={again} className="dg-btn bg-amber-400 text-slate-900">再看一次</button>
+        <button onClick={quit} className="dg-btn bg-white/15 text-white">退出</button>
+      </div>
+    </div>
+  ) : (
     <div className="dg-over">
       <div className="text-2xl font-extrabold">阵亡！存活 {secs(result.server?.ticks ?? result.ticks)} 秒</div>
-      <div className="text-sm mt-1 text-slate-200">{killedBy(result.by)}</div>
+      <div className="text-sm mt-1 text-slate-200">{killedBy(result.server ? result.server.by : result.by)}</div>
       {result.by && <div className="dg-death-tip">{SKILLS[result.by].tip}</div>}
       <div className="text-sm mt-2 min-h-[1.25rem] text-amber-200">
-        {result.server ? (result.server.newBest ? `🎉 新纪录！排第 ${result.server.rank} 名` : `你的最好 ${secs(result.server.best)} 秒 · 第 ${result.server.rank} 名`)
-          : result.error || '记分中…'}
+        {result.practice ? `这局没记分：${result.practice}`
+          : result.server ? (result.server.newBest ? `🎉 新纪录！排第 ${result.server.rank} 名` : `你的最好 ${secs(result.server.best)} 秒 · 第 ${result.server.rank} 名`)
+          : result.error || '核对中…'}
       </div>
+      {result.server?.bot && <div className="dg-death-tip">{BOT_NOTE(result.server.react)}</div>}
       <div className="flex gap-2 justify-center mt-3">
         {result.retry && <button onClick={retry} className="dg-btn bg-sky-400 text-slate-900">重新提交</button>}
         <button onClick={start} className="dg-btn bg-amber-400 text-slate-900">再来一局</button>
         <button onClick={quit} className="dg-btn bg-white/15 text-white">{touch ? '退出' : '看排行榜'}</button>
       </div>
     </div>
-  );
+  ));
   const pause = paused && !result && (
     <div className="dg-over">
       {touch && portrait
@@ -158,7 +198,8 @@ export default function DodgeView({ active }) {
   // the first run on an upright phone: wait for it to be turned before counting down
   const hold = paused || (touch && portrait);
   const game = run && (
-    <DodgeGame key={run.n} seed={run.seed} touch={touch} hold={hold} onGo={() => setStarted(true)} onDead={dead} onPause={() => setPaused(true)}>
+    <DodgeGame key={run.n} seed={run.seed} touch={touch} hold={hold} onGo={() => setStarted(true)} onDead={dead} onPause={() => setPaused(true)}
+      replay={run.replay?.events} replayName={run.replay?.name}>
       {overlay}{pause}
     </DodgeGame>
   );
@@ -201,11 +242,17 @@ export default function DodgeView({ active }) {
         </section>
         <aside className="glass-card rounded-2xl p-5 self-start">
           <h2 className="font-bold text-lg mb-1">🏆 躲技能排行榜</h2>
-          <p className="text-xs text-slate-500 mb-3">每人最好的一次 · 活多久就记多久</p>
+          <p className="text-xs text-slate-500 mb-3">每人最好的一次 · 新成绩由服务器重放核对 · ▶ 看回放</p>
           {board.length ? board.map((r, i) => (
             <div key={r.name} className={'flex items-center justify-between gap-2 border-b py-1.5 text-sm' + (mine && r.name === mine.name ? ' font-bold text-indigo-700' : '')}>
-              <span className="truncate">{i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.'} {r.name}</span>
-              <span className="tabular-nums whitespace-nowrap">{secs(r.ticks)} 秒<span className="text-xs font-normal text-slate-400"> · {r.runs} 局</span></span>
+              <span className="truncate">{i < 3 ? ['🥇', '🥈', '🥉'][i] : (i + 1) + '.'} {r.name}
+                {r.bot && <span className="dg-bot-mark" title={BOT_NOTE(r.react)} aria-label={BOT_NOTE(r.react)}> 🤖</span>}</span>
+              <span className="flex items-center gap-1.5">
+                <span className="tabular-nums whitespace-nowrap">{secs(r.ticks)} 秒<span className="text-xs font-normal text-slate-400"> · {r.runs} 局</span></span>
+                {r.replay
+                  ? <button className="dg-watch" onClick={() => watch(r.name)} aria-label={`看 ${r.name} 的回放`} title="看回放">▶</button>
+                  : <span className="dg-watch dg-watch-none" title="以前的纪录，没有回放" aria-hidden="true">·</span>}
+              </span>
             </div>
           )) : <p className="text-sm text-slate-400">还没人玩过，来当第一</p>}
         </aside>

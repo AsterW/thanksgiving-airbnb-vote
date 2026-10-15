@@ -1,7 +1,8 @@
-// 鲁班七号躲技能: the whole game as a simulation stepped 60 times a second,
-// run in the browser. When you die, the page posts how many ticks you lasted.
+// 鲁班七号躲技能: the whole game as a simulation stepped 60 times a second.
 // It's seeded and only uses + - * / and sqrt (with our own sine for the few
-// angles), so the same seed and inputs always play out the same way.
+// angles), so the same seed and inputs always play out the same way: the
+// browser plays it, and the server replays the inputs to get the score
+// (verify.js); best runs can be watched again from the same inputs.
 //
 // Inputs are events [tick, type, a, b], applied at the start of that tick:
 //   [t, 0, x, y]  move to (x, y)              (PC: right-click)
@@ -11,7 +12,10 @@ export const HZ = 60;
 export const W = 1280, H = 800;
 export const HERO = { r: 24, speed: 5.4, flash: 230, flashCd: 8 * HZ };
 export const DIRS = 64;
-const MAX_TICKS = 10 * 60 * HZ; // a run stops counting after 10 minutes
+export const MAX_TICKS = 10 * 60 * HZ; // a run stops counting after 10 minutes
+// Bump whenever a change makes the same seed and inputs play out differently:
+// runs started under another version can't be checked or replayed.
+export const SIM_VERSION = 1;
 
 // ---- deterministic sine, and the 64 directions ----
 const PI = 3.141592653589793;
