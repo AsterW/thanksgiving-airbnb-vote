@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 // 牌桌表情 + 快捷嘲讽：坐下的人随时点一个，自己的座位旁就冒出来，全桌
 // 都看得见，停留约 4 秒。服务器只认这张清单里的值（worker/games/reactions.js，两边保持一致）。
@@ -40,7 +41,9 @@ export function ReactionBar({ send, seated }) {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => setEcho(''), 3000);
   };
-  return (
+  // 挂到 body 上：牌桌全屏时桌面是 portal 出去的浮层（z-60），按钮留在
+  // 页面树里会被祖先的层叠上下文压在浮层下面（桌面端全屏时就看不见）。
+  return createPortal(
     <div className="fixed right-3 z-[65] flex flex-col items-end gap-2" style={{ bottom: 'calc(6.5rem + env(safe-area-inset-bottom))' }}>
       {echo && <div className="relative mr-1"><ReactBubble value={echo} /></div>}
       {open && (
@@ -61,6 +64,5 @@ export function ReactionBar({ send, seated }) {
         className="glass-sheet w-12 h-12 rounded-full text-[22px] grid place-items-center active:scale-90 transition">
         😆
       </button>
-    </div>
-  );
+    </div>, document.body);
 }
