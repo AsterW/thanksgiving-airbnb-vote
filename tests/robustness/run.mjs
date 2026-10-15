@@ -83,8 +83,11 @@ try {
     // Same for the user-management suite (PM-only deletion).
     const usersPath = new URL('users.mjs', import.meta.url).pathname;
     const users = existsSync(usersPath) ? await runSuite('users.mjs') : true;
+    // And the quick-polls suite.
+    const pollsPath = new URL('polls.mjs', import.meta.url).pathname;
+    const polls = existsSync(pollsPath) ? await runSuite('polls.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && storms;
+    ok = fuzz && email && users && polls && storms;
   }
 } finally {
   stopServer();

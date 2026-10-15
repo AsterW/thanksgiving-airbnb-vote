@@ -22,6 +22,7 @@ import { scrubUserFromActivities } from '../activities/store.js';
 import { scrubUserFromFlights } from '../flights/routes.js';
 import { scrubUserFromSplit } from '../split/store.js';
 import { scrubUserFromAngel } from '../angel/routes.js';
+import { scrubUserFromPolls } from '../polls/routes.js';
 
 async function handleUserDelete(req, env) {
   let body = {};
@@ -46,6 +47,7 @@ async function handleUserDelete(req, env) {
     foodVotes: await scrubUserFromFood(env, target),
     activityVotes: await scrubUserFromActivities(env, target),
     splitExpenses: await scrubUserFromSplit(env, target),
+    pollVotes: await scrubUserFromPolls(env, target),
   };
   await scrubUserFromFlights(env, target);
   await scrubUserFromAngel(env, target);
