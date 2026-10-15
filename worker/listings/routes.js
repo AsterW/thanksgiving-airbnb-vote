@@ -7,7 +7,7 @@ import { isMapLink } from '../lib/maplink.js';
 import { fetchListingInfo, roomIdFrom } from './scrape.js';
 import { getState, updateState } from './state.js';
 import { handlePrices } from './prices.js';
-import { addHotel, routes as hotelRoutes } from './hotels.js';
+import { addHotel, travelEntity, routes as hotelRoutes } from './hotels.js';
 import { needsArea, pickArea, routes as zoneRoutes } from './zones.js';
 import { closedError, voteView, votingOpen, routes as decisionRoutes } from './decision.js';
 import { cleanName, getUsers } from '../users/users.js';
@@ -19,9 +19,9 @@ async function handleAdd(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const url = String(body.url || '').trim();
-  if (isMapLink(url)) return addHotel({ ...body, url }, env); // a hotel from a Google / Apple Maps link
+  if (isMapLink(url) || travelEntity(url)) return addHotel({ ...body, url }, env); // a hotel from a Google / Apple Maps or Google Travel link
   const roomId = roomIdFrom(url);
-  if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源或地图链接（要 airbnb.com/rooms/123…，或者酒店在 Google 地图里的分享链接）' });
+  if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源或地图链接（要 airbnb.com/rooms/123…，或者酒店在 Google 地图 / Google 酒店里的链接）' });
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
   // Fast-path dedupe check only — do NOT hold this snapshot across the scrape.

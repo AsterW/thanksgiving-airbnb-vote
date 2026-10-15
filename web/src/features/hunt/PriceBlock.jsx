@@ -33,7 +33,9 @@ function HotelPrice({ l, T, closed, onSetRate }) {
         </div>
         <div className={'text-xs mt-0.5 ' + (r.source === 'google' && !rateForTrip(r, T) ? 'text-amber-700' : 'text-sky-700')}>
           {r.source !== 'google' ? `🏨 ${r.by ? r.by + ' ' : ''}手填的价格 · ${ago(r.at)}`
-            : rateForTrip(r, T) ? `✓ Google 价 · ${r.dates} 每晚均价 · ${ago(r.at)}`
+            : rateForTrip(r, T) ? (r.provider
+              ? `✓ Google 最低含税价 · ${r.provider}（共 ${r.offers} 家报价）· ${r.dates} · ${ago(r.at)}`
+              : `✓ Google 价 · ${r.dates} 每晚均价（不含税）· ${ago(r.at)}`)
               : `⚠️ Google 参考价是 ${r.dates} 那晚的，不是行程日期（行程日期的价还没查到）`}
         </div>
         {edit}
