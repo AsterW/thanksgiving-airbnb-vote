@@ -149,14 +149,11 @@ export default function HuntView({ trip, active }) {
     return { name: filter, lat: Math.round(avg('lat') * 10) / 10, lng: Math.round(avg('lng') * 10) / 10 };
   }, [filter, visible]);
 
-  // 「全部类型」时 Airbnb 和酒店分成两块，各有标题；只有一种时不分
+  // 「全部类型」不分酒店和 Airbnb：一份列表按所选排序交错排（价格已统一成
+  // 全团总价口径，见 price.js 的 hotelTotal），卡上的类型标签足够区分。
   const emptyText = (kind === 'hotel' ? '还没有酒店' : kind === 'airbnb' ? '还没有 Airbnb' : '还没有候选') + (filter === 'all' ? '' : '（这个区域）')
     + '，贴个 ' + (kind === 'hotel' ? 'Google 地图酒店' : kind === 'airbnb' ? 'Airbnb' : 'Airbnb 或 Google 地图酒店') + '链接进来吧 👆';
-  const split = kind === 'all' && items.some(isHotel) && items.some(l => !isHotel(l));
-  const sections = split
-    ? [{ key: 'airbnb', title: '🏠 Airbnb 整套', sub: '整套房子，总价按 ' + T.nights + ' 晚', items: items.filter(l => !isHotel(l)) },
-      { key: 'hotel', title: '🏨 酒店', sub: '按 ' + T.people + ' 人两人一间、' + T.nights + ' 晚算总价', items: items.filter(isHotel) }]
-    : [{ key: 'one', items }];
+  const sections = [{ key: 'one', items }];
 
   const fitKey = trip + '|' + kind + '|' + filter + '|' + visible.map(l => l.id + (l.lat != null ? '@' : '')).sort().join(',');
   return (
