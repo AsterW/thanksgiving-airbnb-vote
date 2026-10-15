@@ -1,12 +1,16 @@
 // Parsing a map share link into a hotel candidate. People share
 // hotels as Google Maps / Apple Maps links, not Airbnb rooms — there
-// is nothing to scrape for rooms or prices, but the share link
-// itself carries the two things the hunt needs: the place's name and
+// is nothing to scrape for rooms or prices, but between the link,
+// the page it resolves to, and a geocode of the address it names,
+// everything the hunt needs can be recovered: the place's name and
 // its coordinates (for the map and the automatic area grouping).
-// Short links (maps.app.goo.gl) resolve by following the redirect;
-// the resolved place URL has both. The place page's og:image is a
-// bonus photo when it can be read.
 import { SCRAPE_UA } from './scrape.js';
+
+// Short links only resolve for a phone: with a desktop UA,
+// maps.app.goo.gl answers a generic landing page with no target in
+// it at all (verified live); a mobile UA gets the real 302 to the
+// place URL. The place page itself reads fine with either.
+const MAP_UA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36';
 
 export function isMapLink(url) {
   let u;
@@ -50,17 +54,27 @@ export function coordsFromMapUrl(u) {
   return null;
 }
 
-// The place's name: Google puts it in the /place/<name>/ path segment;
-// Apple Maps carries it in q= (when q= is not a coordinate pair).
+// The raw /place/ segment, decoded: name and often the full street
+// address ("Sheraton Denver Downtown Hotel, 1550 Court Pl, Denver,
+// CO 80202"). Also the best geocoding input when no coordinates
+// came with the link.
+export function placeSegment(u) {
+  const m = String(u || '').match(/\/place\/([^/]+)/);
+  if (!m) return '';
+  try { return decodeURIComponent(m[1].replace(/\+/g, ' ')).trim(); } catch (e) { return ''; }
+}
+
+// The place's name: the segment above, cut where the digit-led
+// street address starts. Apple Maps carries the name in q= (when
+// q= is not a coordinate pair).
 export function nameFromMapUrl(u) {
-  const s = String(u || '');
-  const m = s.match(/\/place\/([^/]+)/);
-  if (m) {
-    try {
-      const n = decodeURIComponent(m[1].replace(/\+/g, ' ')).trim();
-      if (n) return n;
-    } catch (e) { /* malformed escape: fall through */ }
+  const seg = placeSegment(u);
+  if (seg) {
+    const cut = seg.search(/,\s*(?=\d)/);
+    const n = (cut > 0 ? seg.slice(0, cut) : seg).trim();
+    if (n) return n;
   }
+  const s = String(u || '');
   try {
     const q = new URL(s).searchParams;
     for (const k of ['q', 'name', 'query']) {
@@ -114,6 +128,29 @@ function titleFromHtml(html, name) {
 // Resolve the link and read what it offers. Name + coordinates come
 // from the URL whenever possible; the page fetch only adds a photo
 // and a fallback title, so a blocked fetch still yields the hotel.
+// Forward-geocode an address string via OpenStreetMap (the same
+// service zones.js reverse-geocodes with; keyless, and adds are
+// rare, so the volume is trivial). Resolved place URLs from short
+// links carry only a place id — the payload Google serves has no
+// plaintext coordinates — but the segment IS a postal address,
+// which geocodes precisely.
+async function geocodeAddress(text) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(text),
+        { signal: ctrl.signal, headers: { 'User-Agent': SCRAPE_UA, 'Accept-Language': 'en-US,en;q=0.9' } });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const hit = Array.isArray(j) && j[0];
+      if (!hit) return null;
+      const lat = Number(hit.lat), lng = Number(hit.lon);
+      return inRange(lat, lng) ? { lat, lng } : null;
+    } finally { clearTimeout(t); }
+  } catch (e) { return null; }
+}
+
 export async function parseMapLink(url) {
   let finalUrl = String(url || '').trim();
   let html = '';
@@ -122,15 +159,30 @@ export async function parseMapLink(url) {
     const t = setTimeout(() => ctrl.abort(), 12000);
     try {
       const r = await fetch(finalUrl, { signal: ctrl.signal, redirect: 'follow', headers: {
-        'User-Agent': SCRAPE_UA, 'Accept-Language': 'en-US,en;q=0.9' } });
+        'User-Agent': MAP_UA, 'Accept-Language': 'en-US,en;q=0.9' } });
       finalUrl = r.url || finalUrl;
       if (r.ok) html = await r.text();
     } finally { clearTimeout(t); }
   } catch (e) { /* unreachable: the long link itself may still parse below */ }
-  const coords = coordsFromMapUrl(finalUrl) || coordsFromMapUrl(url);
+  let coords = coordsFromMapUrl(finalUrl) || coordsFromMapUrl(url);
   let title = nameFromMapUrl(finalUrl) || nameFromMapUrl(url);
   if (html) title = titleFromHtml(html, title) || title;
-  const image = html ? (getMeta(html, 'og:image') || '') : '';
+  let image = html ? (getMeta(html, 'og:image') || '') : '';
+  if (/maps_512dp|branding|gstatic\.com\/.*logo/i.test(image)) image = ''; // the generic Maps icon is not a photo
+  // A resolved place URL can carry no coordinates at all (just a
+  // place id) — but the page's og:image is sometimes a static map
+  // centred on the place, and its centre IS the place's location.
+  if (!coords && image) {
+    const c = image.match(/center=(-?\d+\.\d+)%2C(-?\d+\.\d+)/) || image.match(/center=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    if (c && inRange(+c[1], +c[2])) coords = { lat: +c[1], lng: +c[2] };
+  }
+  // Still nothing (the common short-link outcome): the place
+  // segment is a full postal address — geocode it.
+  if (!coords) {
+    const seg = placeSegment(finalUrl) || placeSegment(url);
+    const query = seg && /[\d,]/.test(seg) ? seg : (title && /[\d,]/.test(title) ? title : '');
+    if (query) coords = await geocodeAddress(query);
+  }
   const rate = html ? extractCheapestRate(html) : null;
   if (!title && !coords) return { ok: false };
   return { ok: true, title: String(title || '').slice(0, 120), image, rate,
