@@ -22,7 +22,7 @@ export function stayEvents(listingsByTrip, voteByTrip = {}) {
     const chosen = vote && vote.chosenId ? all.find(l => l.id === vote.chosenId) : null; // 投票截止后：大家定下的那间
     const top = chosen || sortListings(all.filter(l => (l.votes || []).length), 'votes', T)[0];
     if (!top) {
-      out.push({ id: key + ':none', at: null, date: T.checkIn, icon: '🏠', tone: 'muted', title: T.date + ' 住哪还没定', detail: '去 AirBnb hunting 投票，票最高的会出现在这里' });
+      out.push({ id: key + ':none', at: null, date: T.checkIn, icon: '🏠', tone: 'muted', title: T.date + ' 住哪还没定', detail: '去 Stays 投票，票最高的会出现在这里' });
       continue;
     }
     const votes = top.votes.length;

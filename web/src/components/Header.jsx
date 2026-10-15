@@ -7,7 +7,7 @@ export default function Header({ view, trip, onTrip }) {
   return (
     <header className="app-header px-6 py-7 md:py-8">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-2xl md:text-3xl font-bold">{V.title}</h1>
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{V.nav}<span className="ml-3 font-medium text-slate-400 text-xl md:text-2xl">{V.navSub}</span></h1>
         <p className="mt-2 text-slate-600">{(V.tripScoped ? T.date + ' · ' + T.people + '人 · 住' + T.nights + '晚 · ' : '') + V.sub}</p>
         {V.tripScoped && (
           <nav className="mt-5 flex flex-wrap gap-2" aria-label="行程">

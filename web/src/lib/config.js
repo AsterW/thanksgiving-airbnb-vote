@@ -9,21 +9,25 @@ export const DEFAULT_TRIP = 'nov25';
 
 // 左侧导航的几个页面。tripScoped：页面内容按行程分（显示行程标签页和日期人数）
 // 这里的顺序就是导航里的标签顺序，八个全直接摆出来
-export const VIEWS = {
-  hunt: { title: '🏠 AirBnb hunting · 一起选房', sub: '看中哪间就把 Airbnb 链接贴进来，票数最高的我们就订它',
-    nav: 'AirBnb hunting', navSub: '一起选房 · 投票', icon: '🏠', tripScoped: true },
-  food: { title: '🍜 Restaurant hunting · 找餐厅', sub: '看中哪家就把 Google 地图链接贴进来，大家点想去',
-    nav: 'Restaurants', navSub: '找餐厅 · Google 地图', icon: '🍜', tripScoped: true },
-  activities: { title: '🎿 Activities · 玩什么', sub: '从 Reddit、本地媒体和官方推荐里扒的第一批 20 个候选 · 喜欢哪个就投票，票高的优先排进行程',
-    nav: 'Activities', navSub: '玩什么 · 投票', icon: '🎿' },
-  flights: { title: '✈️ Flights · 航班', sub: '大家填上到达和离开的航班 · 看航线地图，自动排接机和送机',
-    nav: 'Flights', navSub: '航班 · 接送机', icon: '✈️' },
-  calendar: { title: '📅 Calendar · 日程', sub: '按天看每个人的安排：住哪、航班、接送机',
-    nav: 'Calendar', navSub: '日程 · 每天做什么', icon: '📅' },
-  games: { title: '🎲 Gameroom', sub: 'Blackjack、斗地主、掼蛋、川麻、鲁班躲技能 · 筹码和豆子只是好玩，不跟分账挂钩',
-    nav: 'Gameroom', navSub: 'Blackjack · 斗地主 · 掼蛋 · 川麻', icon: '🎲' },
-  angel: { title: '😇 Secret Angel · 神秘天使', sub: '刷卡片选你想要的礼物 · 大家选好后抽签，偷偷给分到的人准备惊喜',
-    nav: 'Secret Angel', navSub: '选礼物 · 抽天使', icon: '😇' },
-  split: { title: '💰 Split that bill · 分账', sub: '全员一本账 · 共同支出记在这里，自动算清谁该给谁多少钱',
-    nav: 'Split that bill', navSub: '分账 · 谁该给谁', icon: '💰' },
+// 导航：一个英文单词 + 中文名，按行程的先后排、分三组（侧栏上显示组名）。
+// 页面标题也由这两个名字拼成，导航和标题永远一致。键名就是网址里的 #…，别改（旧链接要能打开）。
+export const NAV_GROUPS = [['trip', '行程'], ['explore', '去哪'], ['together', '一起']];
+const views = {
+  hunt: { nav: 'Stays', navSub: '住宿', icon: 'stays', group: 'trip', tripScoped: true,
+    sub: '看中哪间就把 Airbnb 或酒店链接贴进来，票数最高的我们就订它' },
+  flights: { nav: 'Flights', navSub: '航班', icon: 'flights', group: 'trip',
+    sub: '大家填上到达和离开的航班 · 看航线地图，自动排接机和送机' },
+  calendar: { nav: 'Schedule', navSub: '日程', icon: 'schedule', group: 'trip',
+    sub: '按天看每个人的安排：住哪、航班、接送机' },
+  food: { nav: 'Dining', navSub: '餐厅', icon: 'dining', group: 'explore', tripScoped: true,
+    sub: '看中哪家就把 Google 地图链接贴进来，大家点想去' },
+  activities: { nav: 'Activities', navSub: '活动', icon: 'activities', group: 'explore',
+    sub: '从 Reddit、本地媒体和官方推荐里扒的第一批 20 个候选 · 喜欢哪个就投票，票高的优先排进行程' },
+  games: { nav: 'Games', navSub: '游戏', icon: 'games', group: 'together',
+    sub: 'Blackjack、斗地主、掼蛋、川麻、鲁班躲技能 · 筹码和豆子只是好玩，不跟分账挂钩' },
+  angel: { nav: 'Gifts', navSub: '神秘天使', icon: 'gifts', group: 'together',
+    sub: '刷卡片选你想要的礼物 · 大家选好后抽签，偷偷给分到的人准备惊喜' },
+  split: { nav: 'Expenses', navSub: '分账', icon: 'expenses', group: 'together',
+    sub: '全员一本账 · 共同支出记在这里，自动算清谁该给谁多少钱' },
 };
+export const VIEWS = Object.fromEntries(Object.entries(views).map(([k, v]) => [k, { ...v, title: v.nav + ' · ' + v.navSub }]));
