@@ -4,6 +4,7 @@ import { reduceMotion } from '../../lib/motion.js';
 import { useTable, useCountdown } from '../games/useTable.js';
 import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/TableFrame.jsx';
 import MjTile from './MjTile.jsx';
+import { ReactionBar, ReactBubble } from '../games/Reactions.jsx';
 import './mahjong.css';
 
 const PHASE = { waiting: '等人开始', swap: '换三张', lack: '定缺', playing: '打牌中', result: '这局结束' };
@@ -31,12 +32,13 @@ function WonTag({ won }) {
   return <span className="mj-won">第{won.order}胡 · {won.self ? '自摸' : '点炮'} {won.fan}番</span>;
 }
 
-function Opp({ s, idx, t, me, timer, className = '' }) {
+function Opp({ s, idx, t, me, timer, className = '', react }) {
   if (!s) return <div className={'gt-seat empty ' + className}>空位</div>;
   const turn = t.turn === idx && t.phase === 'playing' && t.stage === 'act';
   return (
     <div className={'mj-opp ' + className}>
       <div className={'gt-seat' + (turn ? ' turn' : '') + (s.connected ? '' : ' away')}>
+        <ReactBubble value={react} />
         <div className="mj-head">
           <span className="font-bold truncate">{s.name}{s.me ? '（你）' : ''}</span>
           {t.dealer === idx && <span className="gt-role gold">庄</span>}
@@ -177,13 +179,13 @@ export default function MahjongView({ active }) {
               <div className="gt-mid">
                 {/* 全屏（手机横着）时三家排成一行：左、对面、右；竖着时对面在上，左右在下 */}
                 {full ? (
-                  <div className="mj-grid">{[left, top, right].map(k => <Opp key={k} s={t.seats[k]} idx={k} t={t} me={me} timer={timer} />)}</div>
+                  <div className="mj-grid">{[left, top, right].map(k => <Opp key={k} s={t.seats[k]} idx={k} t={t} me={me} timer={timer} react={st?.reactions?.[t.seats[k]?.name?.toLowerCase()]} />)}</div>
                 ) : (
                   <>
-                    <Opp s={t.seats[top]} idx={top} t={t} me={me} timer={timer} className="mj-top" />
+                    <Opp s={t.seats[top]} idx={top} t={t} me={me} timer={timer} className="mj-top" react={st?.reactions?.[t.seats[top]?.name?.toLowerCase()]} />
                     <div className="mj-grid">
-                      <Opp s={t.seats[left]} idx={left} t={t} me={me} timer={timer} />
-                      <Opp s={t.seats[right]} idx={right} t={t} me={me} timer={timer} />
+                      <Opp s={t.seats[left]} idx={left} t={t} me={me} timer={timer} react={st?.reactions?.[t.seats[left]?.name?.toLowerCase()]} />
+                      <Opp s={t.seats[right]} idx={right} t={t} me={me} timer={timer} react={st?.reactions?.[t.seats[right]?.name?.toLowerCase()]} />
                     </div>
                   </>
                 )}
@@ -236,12 +238,13 @@ export default function MahjongView({ active }) {
                   })}
                   {mySeat.won && <MjTile kind={mySeat.won.tile} className="drawn" lit />}
                 </div>
-              ) : t.seats[bottom] && <Opp s={t.seats[bottom]} idx={bottom} t={t} me={me} timer={timer} />}
+              ) : t.seats[bottom] && <Opp s={t.seats[bottom]} idx={bottom} t={t} me={me} timer={timer} react={st?.reactions?.[t.seats[bottom]?.name?.toLowerCase()]} />}
             </>
           )}
           <div className="flex flex-wrap items-center gap-2 mt-4 mj-controls">{controls()}</div>
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 mj-msg">{msg}</p>
         </TableFrame>
+        <ReactionBar send={send} seated={!!st?.you} />
         <PointsBoard title="川麻豆子榜" rows={st?.board || []}>
           规则：血战到底。108 张（万条筒），开局换三张、定缺；只能碰、杠，不能吃；缺的那门要先打完，手里还有就不能胡。
           一炮可以多响；没胡的放过一张能胡的牌，到自己下次摸牌前都不能胡别人打的（过水不胡）。胡了的人退出，剩下的接着打，直到三家胡完或者摸完牌。

@@ -11,6 +11,7 @@
 // subclass passes `actions`: message type -> (table, key, message) returning an
 // error string, { reply } (sent back to that socket only), or nothing.
 import { getUsers, sameName, cleanName } from '../users/users.js';
+import { noteReaction, freshReactions } from './reactions.js';
 
 const rand = () => crypto.getRandomValues(new Uint32Array(1))[0] / 4294967296;
 
@@ -19,6 +20,7 @@ export class TableHall {
     this.state = state; this.env = env;
     this.rooms = rooms; this.actions = actions; this.idleNotice = idleNotice;
     this.sockets = new Map(); // socket -> { key (seated/queued player, or null), room (1..rooms being watched) }
+    this.reactions = new Map(); // room -> Map(player key -> { v, at }) — emoji/taunt popups, see reactions.js
     this.board = new Map();   // saved points by player key
     this.loaded = null; this.sweeper = null;
     this.tables = Array.from({ length: rooms }, () => new Game({
@@ -64,6 +66,16 @@ export class TableHall {
     let err = null, extra = null;
     if (m.type === 'watch') {
       info.room = this.clampRoom(m.room);
+    } else if (m.type === 'react') {
+      if (!info.key) err = '先坐下';
+      else {
+        const seatedRoom = this.tables.findIndex(t => t.has(info.key)) + 1;
+        if (seatedRoom) {
+          let rm = this.reactions.get(seatedRoom);
+          if (!rm) { rm = new Map(); this.reactions.set(seatedRoom, rm); }
+          noteReaction(rm, info.key, m.value, Date.now());
+        }
+      }
     } else if (m.type === 'sit') {
       const users = await getUsers(this.env);
       const user = users.find(u => sameName(u.name, cleanName(m.name)));
@@ -132,6 +144,7 @@ export class TableHall {
     const seatedAt = this.tables.findIndex(t => t.has(info.key)) + 1;
     try {
       ws.send(JSON.stringify({ type: 'state', room: info.room, seatedAt, you: info.key,
+        reactions: freshReactions(this.reactions.get(info.room) || new Map(), Date.now()),
         table: this.tables[info.room - 1].view(info.key), lobby: this.lobby(), board: this.leaderboard(), ...extra }));
     } catch (e) { /* socket already gone; its close handler cleans up */ }
   }
