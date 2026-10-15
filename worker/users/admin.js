@@ -10,10 +10,11 @@
 // Deletion is thorough: the account goes, and so does everything
 // recorded under that person — listing/food/activity votes, saved
 // flights, split expenses and shares, Secret Angel prefs and draw
-// seat (each feature's scrubUserFrom* does its own part). Cards and
-// restaurants they added stay (others may have voted on them); the
-// games keep their own tables inside their Durable Objects and are
-// not touched.
+// seat (each feature's scrubUserFrom* does its own part), plus the
+// game records inside the game Durable Objects (table-game 豆子,
+// blackjack chips, the dodge leaderboard), reached
+// through their bindings below. Cards and restaurants they added
+// stay (others may have voted on them).
 import { j } from '../lib/http.js';
 import { cleanName, getUsers, updateUsers, publicUsers, sameName, USER_ADMIN } from './users.js';
 import { scrubUserFromTrips } from '../listings/state.js';
@@ -51,6 +52,26 @@ async function handleUserDelete(req, env) {
   };
   await scrubUserFromFlights(env, target);
   await scrubUserFromAngel(env, target);
+  // The games keep their records in their own Durable Objects; ask
+  // each one to drop this person. A game object being unreachable
+  // must not fail the deletion — the account is already gone.
+  const scrubGame = async (ns, idName, url) => {
+    try {
+      const r = await ns.get(ns.idFromName(idName)).fetch(new Request(url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: target.name, byName: caller.name, byToken: presented }),
+      }));
+      const jj = await r.json().catch(() => null);
+      return jj && jj.ok ? (jj.removed || 0) : 0;
+    } catch (e) { return 0; }
+  };
+  scrubbed.gameRecords = (await Promise.all([
+    scrubGame(env.DDZ_HALL, 'hall', 'https://internal/scrub-user'),
+    scrubGame(env.GD_HALL, 'hall', 'https://internal/scrub-user'),
+    scrubGame(env.MJ_HALL, 'hall', 'https://internal/scrub-user'),
+    scrubGame(env.BJ_TABLE, 'main', 'https://internal/scrub-user'),
+    scrubGame(env.DODGE, 'board', 'https://internal/api/dodge/scrub-user'),
+  ])).reduce((a, b) => a + b, 0);
   return j({ ok: true, users: publicUsers(await getUsers(env)), scrubbed });
 }
 

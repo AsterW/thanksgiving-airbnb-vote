@@ -6,8 +6,9 @@
 // a run. Bests live in this object's storage (p:<name>), never in KV.
 //   POST /api/dodge/score { name, token, ticks }   -> { ticks, best, newBest, rank, board }
 //   GET  /api/dodge/board                          -> { board }
+//   POST /api/dodge/scrub-user { target, byName, byToken }  (PM only; user deletion reaches in)
 // Times are in ticks: 60 a second.
-import { getUsers, sameName, cleanName } from '../users/users.js';
+import { getUsers, sameName, cleanName, USER_ADMIN } from '../users/users.js';
 import { j } from '../lib/http.js';
 
 const MAX_TICKS = 10 * 60 * 60; // a run stops counting after 10 minutes
@@ -49,8 +50,25 @@ export class DodgeBoard {
     const parsed = request.method === 'POST' ? await request.json().catch(() => null) : null;
     const body = parsed && typeof parsed === 'object' ? parsed : {};
     if (request.method === 'POST' && path === '/api/dodge/score') return this.score(body);
+    if (request.method === 'POST' && path === '/api/dodge/scrub-user') return this.scrubUser(body);
     // a page from before scores were taken from the browser still calls /start and /finish
     return j({ ok: false, error: '这个版本旧了，刷新一下页面' }, 404);
+  }
+
+  // User deletion reaches in: drop the person's board record. Called
+  // by admin.js through the binding, but this prefix is publicly
+  // routed too, so the caller has to prove it is PM here.
+  async scrubUser({ target, byName, byToken }) {
+    const users = await getUsers(this.env);
+    const by = users.find(u => sameName(u.name, cleanName(byName)));
+    if (!by || !byToken || by.token !== byToken || !sameName(by.name, USER_ADMIN)) {
+      return j({ ok: false, error: '只有 PM 能清排行榜' }, 403);
+    }
+    const key = cleanName(target).toLowerCase();
+    if (!key) return j({ ok: true, removed: 0 });
+    const removed = this.best.delete(key) ? 1 : 0;
+    await this.state.storage.delete('p:' + key);
+    return j({ ok: true, removed });
   }
 
   async score({ name, token, ticks }) {
