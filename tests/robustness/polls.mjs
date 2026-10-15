@@ -67,9 +67,19 @@ ck('creator closes the poll', closed.polls.find(p => p.id === poll.id)?.status =
 const lateVote = await J('POST', '/api/polls/vote', { name: C.name, token: C.token, pollId: poll.id, optionId: hot.id });
 ck('vote after close rejected', lateVote.ok === false, JSON.stringify(lateVote));
 
+// ---- deletion: creator only, and it's really gone ----
+const delByOther = await J('POST', '/api/polls/delete', { name: Bv.name, token: Bv.token, pollId: sp.id });
+ck('delete by a non-creator rejected', delByOther.ok === false, JSON.stringify(delByOther));
+const delMissing = await J('POST', '/api/polls/delete', { name: A.name, token: A.token, pollId: 'no-such-poll' });
+ck('delete of a missing poll rejected', delMissing.ok === false, JSON.stringify(delMissing));
+const del = await J('POST', '/api/polls/delete', { name: A.name, token: A.token, pollId: sp.id });
+ck('creator deletes the storm poll', del.ok === true && !del.polls.some(p => p.id === sp.id), JSON.stringify(del).slice(0, 200));
+const afterDel = await J('GET', '/api/polls');
+ck('deleted poll stays gone on a fresh GET', !afterDel.polls.some(p => p.id === sp.id));
+
 // ---- anonymous read works, with no "my vote" ----
 const pub = await J('GET', '/api/polls');
-ck('public GET lists polls without myVote', pub.ok === true && pub.polls.length >= 2 && pub.polls.every(p => p.myVote === null), JSON.stringify(pub).slice(0, 200));
+ck('public GET lists polls without myVote', pub.ok === true && pub.polls.length >= 1 && pub.polls.every(p => p.myVote === null), JSON.stringify(pub).slice(0, 200));
 
 console.log(`\npolls suite: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
