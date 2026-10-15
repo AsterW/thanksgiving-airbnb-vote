@@ -24,7 +24,6 @@ function dsin(x) { // any x; Taylor series on [-π/2, π/2] after reducing
 }
 const dcos = x => dsin(x + PI / 2);
 export const DIR = Array.from({ length: DIRS }, (_, k) => [dcos(2 * PI * k / DIRS), dsin(2 * PI * k / DIRS)]);
-const SPREAD = [dcos(0.26), dsin(0.26)]; // 安琪拉's fireballs fan out about 15°
 
 // ---- seeded random (mulberry32) ----
 function rng(seed) {
@@ -45,12 +44,12 @@ const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 // goes off. They get faster, warn for less time, come more often and in
 // bigger waves as the run goes on; new ones join at `from` seconds.
 export const SKILLS = {
-  hook: { who: '钟馗', what: '钩子', from: 0, warn: 24, speed: 21, r: 20, len: 1500 },
-  fire: { who: '安琪拉', what: '火球', from: 0, warn: 24, speed: 10, r: 22, len: 2000 },
-  ice: { who: '王昭君', what: '冰', from: 6, warn: 56, r: 120, live: 8 },
-  fan: { who: '小乔', what: '扇子', from: 14, warn: 28, speed: 12.5, r: 26, len: 950 },
-  bird: { who: '后羿', what: '大鸟', from: 22, warn: 42, speed: 8, r: 58, len: 2300 },
-  beam: { who: '姜子牙', what: '激光', from: 32, warn: 64, r: 34, live: 12, len: 2400 },
+  hook: { who: '钟馗', what: '湮灭之锁', tip: '横向走位，避开出钩方向', from: 0, warn: 30, speed: 21, r: 20, len: 1500 },
+  fire: { who: '安琪拉', what: '火球术', tip: '三枚火球汇聚，及时离开瞄准点', from: 0, warn: 30, speed: 10, r: 22, len: 2000 },
+  ice: { who: '王昭君', what: '禁锢寒霜', tip: '冰圈锁定后，立即走出范围', from: 6, warn: 56, r: 120, live: 8 },
+  fan: { who: '小乔', what: '绽放之舞', tip: '扇子会折返，留意回程', from: 14, warn: 28, speed: 12.5, r: 26, len: 950 },
+  bird: { who: '后羿', what: '灼日之矢', tip: '大鸟范围宽，向两侧躲避', from: 22, warn: 42, speed: 8, r: 58, len: 2300 },
+  beam: { who: '姜子牙', what: '断罪', tip: '蓄力时离开金色长条区域', from: 32, warn: 64, r: 34, live: 12, len: 2400 },
 };
 const KINDS = Object.keys(SKILLS);
 
@@ -64,7 +63,7 @@ export function newGame(seed) {
 
 function apply(g, [, type, a, b]) {
   const h = g.hero;
-  if (type === 0) { h.mode = 'to'; h.tx = clamp(a, 0, W); h.ty = clamp(b, 0, H); }
+  if (type === 0) { h.mode = 'to'; h.tx = clamp(a, HERO.r, W - HERO.r); h.ty = clamp(b, HERO.r, H - HERO.r); }
   else if (type === 1) { if (a < 0) h.mode = null; else { h.mode = 'dir'; h.k = a; } }
   else if (type === 2 && h.cd === 0) {
     const [c, s] = a >= 0 ? DIR[a] : [h.fx, h.fy];
@@ -73,6 +72,8 @@ function apply(g, [, type, a, b]) {
     h.y = clamp(h.y + s * HERO.flash, HERO.r, H - HERO.r);
     h.fx = c; h.fy = s; h.cd = HERO.flashCd;
     h.blink = { x0, y0, t: g.tick };
+    // A previous click must not pull the hero back after a blink.
+    if (h.mode === 'to') h.mode = null;
   }
 }
 
@@ -112,12 +113,14 @@ function spawnOne(g, kind, sec) {
   const [x0, y0] = edge(g);
   const [dx, dy] = norm(h.x - x0, h.y - y0);
   if (kind === 'beam') { g.skills.push({ ...base, x0, y0, dx, dy, r: def.r, live: def.live, len: def.len }); return; }
-  const shot = (ux, uy) => g.skills.push({ ...base, x0, y0, dx: ux, dy: uy, d: 0, back: false, speed: def.speed * fast, r: def.r, len: def.len });
+  const shot = (ux, uy, ox = x0, oy = y0, leader = true) => g.skills.push({ ...base, x0: ox, y0: oy, dx: ux, dy: uy, d: 0, back: false, leader, speed: def.speed * fast, r: def.r, len: def.len });
   if (kind === 'fire') {
-    const [c, s] = SPREAD;
-    shot(dx, dy);
-    shot(dx * c - dy * s, dx * s + dy * c);
-    shot(dx * c + dy * s, -dx * s + dy * c);
+    // Three separate launch positions converge on the locked target.
+    for (let i = -1; i <= 1; i++) {
+      const ox = x0 - dy * i * 42, oy = y0 + dx * i * 42;
+      const [ux, uy] = norm(h.x - ox, h.y - oy);
+      shot(ux, uy, ox, oy, i === 0);
+    }
   } else shot(dx, dy);
 }
 
@@ -130,7 +133,14 @@ function spawn(g) {
   g.next = g.tick + Math.round(HZ * Math.max(0.32, 1.5 / (1 + sec / 25))); // …and waves come faster
 }
 
-const hits = (ax, ay, ar, h) => { const dx = ax - h.x, dy = ay - h.y, rr = ar + HERO.r; return dx * dx + dy * dy <= rr * rr; };
+// Sweep relative motion, so fast projectiles cannot jump over a moving hero.
+export function sweptHit(ax, ay, bx, by, r, from, to) {
+  const x = ax - from.x, y = ay - from.y;
+  const dx = bx - to.x - x, dy = by - to.y - y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 ? clamp(-(x * dx + y * dy) / len2, 0, 1) : 0;
+  return (x + dx * t) ** 2 + (y + dy * t) ** 2 <= (r + HERO.r) ** 2;
+}
 function nearSegment(s, h, len) { // distance from the hero to the beam's centre line
   let t = (h.x - s.x0) * s.dx + (h.y - s.y0) * s.dy;
   t = clamp(t, 0, len);
@@ -140,28 +150,32 @@ function nearSegment(s, h, len) { // distance from the hero to the beam's centre
 // Where a moving skill's head is now (for drawing too).
 export const headOf = s => [s.x0 + s.dx * s.d, s.y0 + s.dy * s.d];
 
-function updateSkills(g) {
+function updateSkills(g, previousHero) {
   const h = g.hero, keep = [];
   for (const s of g.skills) {
     const age = g.tick - s.t0;
     if (age < s.warn) { keep.push(s); continue; }
     let hit = false, done = false;
     if (s.kind === 'ice') {
+      if (age >= s.warn + s.live) continue;
       const dx = s.x - h.x, dy = s.y - h.y;
       const rr = s.r + HERO.r * 0.5;
       hit = dx * dx + dy * dy <= rr * rr;
       done = age >= s.warn + s.live;
     } else if (s.kind === 'beam') {
+      if (age >= s.warn + s.live) continue;
       hit = nearSegment(s, h, s.len) <= s.r + HERO.r;
       done = age >= s.warn + s.live;
     } else {
-      if (s.kind === 'fan' && s.back) s.d -= s.speed; else s.d += s.speed;
-      if (s.kind === 'fan' && !s.back && s.d >= s.len) s.back = true; // 小乔's fan flies back
+      const [px, py] = headOf(s);
+      const returns = s.kind === 'fan';
+      s.d = clamp(s.d + (s.back ? -s.speed : s.speed), 0, s.len);
+      if (returns && !s.back && s.d >= s.len) s.back = true;
       const [x, y] = headOf(s);
-      hit = hits(x, y, s.r, h);
-      done = s.kind === 'fan' ? s.back && s.d <= 0 : s.d >= s.len;
+      hit = sweptHit(px, py, x, y, s.r, previousHero, h);
+      done = returns ? s.back && s.d <= 0 : s.d >= s.len;
     }
-    if (hit) { g.over = true; g.by = s.kind; }
+    if (hit && !g.over) { g.over = true; g.by = s.kind; }
     if (!done) keep.push(s);
   }
   g.skills = keep;
@@ -171,9 +185,11 @@ function updateSkills(g) {
 export function step(g, events) {
   if (g.over) return;
   for (const e of events) apply(g, e);
+  // Flash is instantaneous: collision starts at its destination, not its path.
+  const previousHero = { x: g.hero.x, y: g.hero.y };
   moveHero(g);
   spawn(g);
-  updateSkills(g);
+  updateSkills(g, previousHero);
   g.tick++;
   if (g.tick >= MAX_TICKS) g.over = true;
 }

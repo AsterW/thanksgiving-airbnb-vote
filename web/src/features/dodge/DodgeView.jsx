@@ -5,8 +5,9 @@ import { load, save } from '../../lib/storage.js';
 import { useSession } from '../../session/SessionContext.jsx';
 import { confetti, CONFETTI_COLORS } from '../../lib/confetti.js';
 import { reduceMotion } from '../../lib/motion.js';
-import { HZ } from './sim.js';
+import { HZ, SKILLS } from './sim.js';
 import DodgeGame, { killedBy } from './DodgeGame.jsx';
+import DodgePreview from './DodgePreview.jsx';
 import './dodge.css';
 
 // 鲁班七号躲技能：一个人玩，活得越久越好，全时间排行榜。
@@ -131,6 +132,7 @@ export default function DodgeView({ active }) {
     <div className="dg-over">
       <div className="text-2xl font-extrabold">阵亡！存活 {secs(result.server?.ticks ?? result.ticks)} 秒</div>
       <div className="text-sm mt-1 text-slate-200">{killedBy(result.by)}</div>
+      {result.by && <div className="dg-death-tip">{SKILLS[result.by].tip}</div>}
       <div className="text-sm mt-2 min-h-[1.25rem] text-amber-200">
         {result.server ? (result.server.newBest ? `🎉 新纪录！排第 ${result.server.rank} 名` : `你的最好 ${secs(result.server.best)} 秒 · 第 ${result.server.rank} 名`)
           : result.error || '记分中…'}
@@ -165,20 +167,32 @@ export default function DodgeView({ active }) {
         <section className={run && !touch ? "lg:col-span-3" : "lg:col-span-2"}>
           {run && !touch ? <div className="dg-box">{game}</div> : (
             <div className="dg-intro rounded-2xl shadow-xl p-5 md:p-7 text-white">
-              <div className="text-2xl md:text-3xl font-extrabold">🎯 鲁班七号 · 躲技能</div>
-              <p className="mt-2 text-emerald-50/90">钟馗的钩子、安琪拉的火球、王昭君的冰、小乔的扇子、后羿的大鸟、姜子牙的激光……全冲着鲁班来。被打中一下就阵亡，活得越久越好，越往后技能越多越快。</p>
+              <DodgePreview />
+              <div className="dg-intro-content">
+              <div className="dg-eyebrow">峡谷训练场 / SURVIVAL</div>
+              <div className="dg-title">鲁班七号<span>走位，才是生存之道。</span></div>
+              <p className="dg-description">六位英雄的技能，全冲你而来。读懂前摇，躲开弹道，用一次闪现绝处逢生。</p>
+              <div className="dg-rule-tags"><span>一击阵亡</span><span>难度递增</span><span>8 秒闪现 · 训练冷却</span></div>
               <ul className="mt-3 text-sm text-emerald-50/90 space-y-1">
                 {touch
-                  ? <><li>📱 横屏全屏玩：左手摇杆走位，右手「闪现」</li><li>闪现朝摇杆方向跳一段，8 秒冷却</li></>
+                  ? <><li>横屏游玩 · 左手摇杆走位</li><li>右手拖动闪现瞄准，松手释放；拖远取消</li></>
                   : <><li>🖱️ 鼠标右键点哪走哪（按住右键会一直跟着鼠标）</li><li>⌨️ F 或 D 闪现，朝鼠标方向跳一段，8 秒冷却</li></>}
-                <li>地上先出现提示（线、圈、框），然后技能才放出来</li>
+                <li>观察地面预警，提前走位；闪现落点仍会受伤</li>
               </ul>
               {mine && <p className="mt-3 text-amber-200 font-bold">你的最好：{secs(mine.ticks)} 秒</p>}
               {homeTip && <p className="dg-tip mt-3">{HOME_TIP}</p>}
-              <button onClick={start} className="dg-btn bg-amber-400 text-slate-900 mt-4 text-lg">开始</button>
+              <button onClick={start} className="dg-btn dg-start mt-4 text-lg">进入训练 <span aria-hidden="true">→</span></button>
               {msg && <p className="mt-2 text-sm text-amber-200">{msg}</p>}
+              </div>
             </div>
           )}
+          {!run && <div className="dg-roster" aria-label="敌方技能">
+            {Object.entries(SKILLS).map(([kind, skill]) => <div key={kind} className={'dg-skill-card dg-skill-' + kind}>
+              <span className="dg-skill-seal" aria-hidden="true">{skill.who.slice(0, 1)}</span>
+              <div><strong>{skill.who}<small>{skill.from ? `${skill.from} 秒后加入` : '开局登场'}</small></strong><span>{skill.what}</span></div>
+              <p>{skill.tip}</p>
+            </div>)}
+          </div>}
         </section>
         <aside className="glass-card rounded-2xl p-5 self-start">
           <h2 className="font-bold text-lg mb-1">🏆 躲技能排行榜</h2>
