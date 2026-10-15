@@ -133,6 +133,22 @@ async function handleClose(req, env) {
   return j(view(out.doc, users, key, Date.now()));
 }
 
+async function handleDelete(req, env) {
+  let body = {};
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
+  const { users, key } = await caller(env, body.name, body.token);
+  if (!key) return j({ ok: false, error: '先登录' });
+  const out = await updatePolls(env, d => {
+    const i = d.polls.findIndex(x => x.id === body.pollId);
+    if (i < 0) return { error: '投票不存在' };
+    if (d.polls[i].byKey !== key) return { error: '只有发起人能删除' };
+    d.polls.splice(i, 1);
+    return { doc: d };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j(view(out.doc, users, key, Date.now()));
+}
+
 // Remove one person's votes everywhere (thorough user deletion,
 // users/admin.js). Polls they started stay — others have voted in
 // them, same as cards they added stay in the other features.
@@ -151,4 +167,5 @@ export const routes = {
   'POST /api/polls': handleCreate,
   'POST /api/polls/vote': handleVote,
   'POST /api/polls/close': handleClose,
+  'POST /api/polls/delete': handleDelete,
 };

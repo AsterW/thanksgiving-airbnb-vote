@@ -47,7 +47,7 @@ function OptionRow({ poll, opt, busy, onVote }) {
     : <div className={cls}>{inner}</div>;
 }
 
-function PollCard({ poll, busy, onVote, onClose, myKey }) {
+function PollCard({ poll, busy, onVote, onClose, onDelete, myKey }) {
   return (
     <div className="glass-card rounded-3xl p-4">
       {poll.img && <img src={poll.img} alt="" className="mb-3 h-36 w-full rounded-2xl object-cover" onError={e => { e.currentTarget.style.display = 'none'; }} />}
@@ -56,8 +56,13 @@ function PollCard({ poll, busy, onVote, onClose, myKey }) {
       <div className="mt-3 flex flex-col gap-2">
         {poll.options.map(o => <OptionRow key={o.id} poll={poll} opt={o} busy={busy} onVote={onVote} />)}
       </div>
-      {poll.status === 'active' && poll.byKey === myKey && (
-        <button onClick={() => onClose(poll)} className="mt-3 text-sm font-bold text-rose-500 transition hover:text-rose-600">结束这个投票</button>
+      {poll.byKey === myKey && (
+        <div className="mt-3 flex items-center gap-4">
+          {poll.status === 'active' && (
+            <button onClick={() => onClose(poll)} className="text-sm font-bold text-slate-500 transition hover:text-slate-700">结束这个投票</button>
+          )}
+          <button onClick={() => onDelete(poll)} className="text-sm font-bold text-rose-500 transition hover:text-rose-600">删除投票</button>
+        </div>
       )}
     </div>
   );
@@ -129,6 +134,16 @@ export default function PollFab() {
       const r = await api('/api/polls/close', 'POST', { name, token, pollId: poll.id });
       if (r.ok) { setPolls(r.polls); toast('投票结束了'); }
       else toast(r.error || '结束失败');
+    } catch (e) { toast('网络有点问题，稍后再试'); }
+  };
+
+  const deletePoll = async poll => {
+    const ok = await confirm({ title: '删除这个投票？', message: '「' + poll.q + '」和它的全部票数都会消失，删了就找不回来了。', confirmText: '删除', danger: true });
+    if (!ok) return;
+    try {
+      const r = await api('/api/polls/delete', 'POST', { name, token, pollId: poll.id });
+      if (r.ok) { setPolls(r.polls); toast('投票删掉了'); }
+      else toast(r.error || '删除失败');
     } catch (e) { toast('网络有点问题，稍后再试'); }
   };
 
@@ -216,7 +231,7 @@ export default function PollFab() {
                 <button onClick={() => setCreating(true)} className="btn-primary mt-4 w-full shrink-0 rounded-xl px-5 py-3 font-bold">发起投票 📣</button>
                 <div className="mt-4 flex flex-col gap-3 overflow-y-auto pr-0.5">
                   {polls.length === 0 && <p className="py-6 text-center text-sm text-slate-400">还没有人发起过投票，来发第一个吧</p>}
-                  {polls.map(p => <PollCard key={p.id} poll={p} busy={busy} onVote={vote} onClose={closePoll} myKey={myKey} />)}
+                  {polls.map(p => <PollCard key={p.id} poll={p} busy={busy} onVote={vote} onClose={closePoll} onDelete={deletePoll} myKey={myKey} />)}
                 </div>
               </>
             )}
@@ -230,7 +245,7 @@ export default function PollFab() {
           onClick={e => { if (e.target === e.currentTarget) later(); }}>
           <div className="login-pop glass-sheet w-full max-w-sm rounded-[28px] px-5 py-5" role="alertdialog" aria-modal="true" aria-label="新投票">
             <div className="mb-2 flex items-center gap-2 text-sm font-bold text-indigo-600"><span className="text-lg">📣</span>{popup.by} 发起了投票</div>
-            <PollCard poll={popup} busy={busy} onVote={vote} onClose={closePoll} myKey={myKey} />
+            <PollCard poll={popup} busy={busy} onVote={vote} onClose={closePoll} onDelete={deletePoll} myKey={myKey} />
             <button onClick={later} className="mt-3 w-full text-center text-sm font-medium text-slate-400 transition hover:text-slate-600">稍后再说（在左下角投票球里找我）</button>
           </div>
         </div>
