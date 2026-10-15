@@ -58,12 +58,17 @@ export default function DdzView({ active }) {
     const id = setTimeout(() => setRedealt(false), 3500);
     return () => clearTimeout(id);
   }, [t?.redealtAt]); // eslint-disable-line react-hooks/exhaustive-deps -- only a new redeal matters
-  const yourTurn = thinking && live && (
+  // 叫地主 / 抢地主：一条横幅（还写着超时算不叫）；出牌：按钮旁边一个会动的 🔔 就够了，最后 5 秒倒计时变红
+  const yourTurn = thinking && live && t.phase === 'bidding' && (
     <div className={'gt-yourturn' + (hurry ? ' hurry' : '')} role="status">
-      <span>{hurry ? '⏰ 快没时间了' : '🔔 轮到你了'}{t.phase === 'bidding' ? (t.bidStage === 'call' ? '：叫地主吗？' : '：抢地主吗？') : leading ? '：你先出' : '：管不管？'}</span>
+      <span>{hurry ? '⏰ 快没时间了' : '🔔 轮到你了'}{t.bidStage === 'call' ? '：叫地主吗？' : '：抢地主吗？'}</span>
       {secs != null && <b className="tabular-nums">{secs}s</b>}
-      {hurry && <small>{t.phase === 'bidding' ? (t.bidStage === 'call' ? '超时算不叫' : '超时算不抢') : '超时自动帮你出'}</small>}
+      {hurry && <small>{t.bidStage === 'call' ? '超时算不叫' : '超时算不抢'}</small>}
     </div>
+  );
+  const bell = thinking && live && t.phase === 'playing' && (
+    <span className={'gt-bell' + (hurry ? ' hurry' : '')} role="status" aria-label={(leading ? '轮到你先出' : '轮到你出牌') + (hurry ? '，快没时间了，超时自动帮你出' : '')}
+      title={hurry ? '快没时间了，超时自动帮你出' : '轮到你出牌'}>{hurry ? '⏰' : '🔔'}</span>
   );
   const status = !t ? '连接中…' : !live ? '断线了，重连中…' : '桌 ' + room + ' · ' + PHASE[t.phase];
   const odds = t ? t.multiplier * 2 ** t.bombs : 1;
@@ -98,10 +103,11 @@ export default function DdzView({ active }) {
       </>;
     }
     return <>
+      {bell}
       <button onClick={() => send({ type: 'pass' })} disabled={leading} className="gt-btn bg-white text-emerald-800">不出</button>
       <button onClick={() => send({ type: 'hint' })} className="gt-btn bg-sky-400 text-slate-900">提示</button>
       <button onClick={() => send({ type: 'play', cards: [...sel] })} disabled={!sel.size} className="gt-btn bg-amber-400 text-slate-900">出牌</button>
-      <span className="text-sm text-amber-200">{timer}</span>{auto}{stand}
+      <span className={'text-sm tabular-nums ' + (hurry ? 'gt-timer-hurry' : 'text-amber-200')}>{timer}</span>{auto}{stand}
     </>;
   }
 
