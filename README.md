@@ -45,8 +45,12 @@ works for any group picking a place together.
   The start screen shows the same generated 鲁班 on the canyon art, skill
   cards carry a hero-name seal and the 闪现 button a drawn bolt; no official
   game images are included (the two generated images are WebP, about 0.7 MB;
-  see `web/public/dodge/SOURCES.md`). The simulation has unit tests:
-  `node --test web/src/features/dodge/sim.test.js`. One all-time
+  see `web/public/dodge/SOURCES.md`). Every skill has a sound for its
+  warning and one for when it goes off, panned toward where it comes from,
+  plus 闪现, the countdown and the hit; all synthesized in the browser (no
+  audio files). 🔊 / M mutes (remembered); tapping a skill card on the start
+  screen plays its sounds. Unit tests:
+  `node --test web/src/features/dodge/*.test.js`. One all-time
   leaderboard of each person's longest survival
 - Flights: everyone enters their arrival and departure flights; a route map
   (arrivals and departures separately), an airport pickup list people can

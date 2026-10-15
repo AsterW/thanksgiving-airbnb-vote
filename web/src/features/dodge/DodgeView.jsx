@@ -8,6 +8,7 @@ import { reduceMotion } from '../../lib/motion.js';
 import { HZ, SKILLS } from './sim.js';
 import DodgeGame, { killedBy } from './DodgeGame.jsx';
 import DodgePreview from './DodgePreview.jsx';
+import * as sfx from './sfx.js';
 import './dodge.css';
 
 // 鲁班七号躲技能：一个人玩，活得越久越好，全时间排行榜。
@@ -129,6 +130,7 @@ export default function DodgeView({ active }) {
 
   function start() {
     if (touch) enterFull(); // must happen right on the tap
+    sfx.unlock();           // so must starting the sound
     setMsg('');
     ensureName(me => {
       setResult(null); setPaused(false); setStarted(false);
@@ -236,8 +238,11 @@ export default function DodgeView({ active }) {
               </div>
             </div>
           )}
+          {!run && <p className="dg-roster-hint">🔊 点技能卡可以试听音效</p>}
           {!run && <div className="dg-roster" aria-label="敌方技能">
-            {Object.entries(SKILLS).map(([kind, skill]) => <div key={kind} className={'dg-skill-card dg-skill-' + kind}>
+            {Object.entries(SKILLS).map(([kind, skill]) => <div key={kind} className={'dg-skill-card dg-skill-' + kind}
+              role="button" tabIndex={0} aria-label={`试听${skill.who}的${skill.what}`} onClick={() => sfx.preview(kind)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sfx.preview(kind); } }}>
               <span className="dg-skill-seal" aria-hidden="true">{skill.who.slice(0, 1)}</span>
               <div><strong>{skill.who}<small>{skill.from ? `${skill.from} 秒后加入` : '开局登场'}</small></strong><span>{skill.what}</span></div>
               <p>{skill.tip}</p>
