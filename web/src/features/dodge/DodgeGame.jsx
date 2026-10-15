@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { newGame, step, HZ, HERO, DIRS, SKILLS } from './sim.js';
 import { draw } from './draw.js';
 import { VIEW, pointInArena } from './viewport.js';
+import { soundEvents } from './sound-events.js';
+import * as sfx from './sfx.js';
 
 // One run. The simulation steps 60 times a second; inputs between steps are
 // queued and applied on the next one.
@@ -18,7 +20,9 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
   callbacks.current = { onDead, onPause };
   const [count, setCount] = useState(3); // 3, 2, 1, then go
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const doneRef = useRef(false), deathAt = useRef(null);
+  const [soundOff, setSoundOff] = useState(sfx.isMuted);
+  const toggleSound = () => { const m = !sfx.isMuted(); sfx.setMuted(m); setSoundOff(m); };
+  const doneRef = useRef(false), deathAt = useRef(null), beeped = useRef(null);
   if (!g.current) g.current = newGame(seed);
   inputEnabled.current = count <= 0 && !hold && !g.current.over;
 
@@ -45,9 +49,14 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
   }, []);
 
   // 3-2-1, then tell the page the run has started
+  // (this also re-runs on pause / resume: beep each number only once)
   useEffect(() => {
-    if (count <= 0) { onGo?.(); return; }
+    if (count <= 0) {
+      if (beeped.current !== 0) { beeped.current = 0; sfx.play('go'); }
+      onGo?.(); return;
+    }
     if (hold) return;
+    if (beeped.current !== count) { beeped.current = count; sfx.play('count'); }
     const id = setTimeout(() => setCount(c => c - 1), 600);
     return () => clearTimeout(id);
   }, [count, hold]); // eslint-disable-line react-hooks/exhaustive-deps -- onGo is a fresh arrow each render
@@ -73,7 +82,9 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
           if (p.dir !== undefined) ev.push([sim.tick, 1, p.dir]);
           if (p.flash !== undefined) ev.push([sim.tick, 2, p.flash]);
           pending.current = {};
+          const wasOver = sim.over;
           step(sim, ev);
+          for (const e of soundEvents(sim, wasOver)) sfx.play(e.sound, e);
           acc -= 1000 / HZ;
         }
       }
@@ -118,7 +129,10 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
   const onPointerUp = e => { if (e.button === 2) rightDown.current = false; };
   useEffect(() => {
     const key = e => {
-      if (!inputEnabled.current || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable) return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName) || e.target?.isContentEditable) return;
+      if (/^m$/i.test(e.key) && !e.repeat) { toggleSound(); return; }
+      if (!inputEnabled.current) return;
+      sfx.unlock();
       if (e.key === 'Escape') { callbacks.current.onPause(); return; }
       if (e.repeat || !/^[fd]$/i.test(e.key)) return;
       e.preventDefault();
@@ -186,7 +200,7 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
   };
 
   return (
-    <div ref={wrap} className="dg-stage">
+    <div ref={wrap} className="dg-stage" onPointerDownCapture={sfx.unlock}>
       <canvas ref={canvas} className="dg-canvas" style={{ width: size.w, height: size.h }}
         aria-label="鲁班七号躲技能训练场"
         onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
@@ -194,12 +208,13 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
       <div className="dg-hud"><span className="dg-hud-title">峡谷 · 走位训练</span><strong ref={hud}>存活 0.0 秒</strong></div>
       <div className="dg-hero-hud" aria-hidden="true"><i className="dg-hero-avatar" /><span>鲁班七号<small>机关造物</small></span></div>
       {!hold && count <= 0 && !g.current.over && <button className="dg-pause" onClick={onPause} aria-label="暂停">⏸</button>}
+      <button className="dg-sound" onClick={toggleSound} aria-pressed={!soundOff} aria-label={(soundOff ? '打开音效' : '关闭音效') + (touch ? '' : '（M）')}>{soundOff ? '🔇' : '🔊'}</button>
       {touch && <>
         <div className="dg-joy-rest" aria-hidden="true"><span /></div>
         <div className="dg-joyzone" onPointerDown={joyDown} onPointerMove={joyMove} onPointerUp={joyUp} onPointerCancel={joyUp} onLostPointerCapture={joyUp} />
         <div className="dg-joy" ref={joyEl} hidden><div className="dg-knob" /></div>
       </>}
-      <div className="dg-control-hint">{touch ? '左侧移动 · 拖动闪现瞄准 · 拖远取消' : '右键移动 · F / D 闪现 · Esc 暂停'}</div>
+      <div className="dg-control-hint">{touch ? '左侧移动 · 拖动闪现瞄准 · 拖远取消' : '右键移动 · F / D 闪现 · Esc 暂停 · M 音效'}</div>
       <button ref={cdBtn} className={'dg-flash' + (touch ? ' big' : '')}
         onPointerDown={flashDown} onPointerMove={flashMove} onPointerUp={flashUp}
         onPointerCancel={() => { aim.current = null; }} onLostPointerCapture={() => { aim.current = null; }}
