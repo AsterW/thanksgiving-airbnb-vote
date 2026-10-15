@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { newGame, step, HZ, HERO, DIRS, SKILLS } from './sim.js';
+import { planBot } from './bot.js';
 import { draw } from './draw.js';
 import { VIEW, pointInArena } from './viewport.js';
 
@@ -10,12 +11,14 @@ import { VIEW, pointInArena } from './viewport.js';
 const dirOf = (dx, dy) => ((Math.round(Math.atan2(dy, dx) / (2 * Math.PI) * DIRS) % DIRS) + DIRS) % DIRS;
 const ASPECT = VIEW.width / VIEW.height;
 
-export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, children }) {
+export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, bot, children }) {
   const wrap = useRef(null), canvas = useRef(null), hud = useRef(null), cdBtn = useRef(null), joyEl = useRef(null);
   const g = useRef(null), pending = useRef({}), mouse = useRef(null), joy = useRef(null);
   const aim = useRef(null), inputEnabled = useRef(false);
   const callbacks = useRef({ onDead, onPause });
   callbacks.current = { onDead, onPause };
+  const botRef = useRef(false); // PM 的外挂开关（bot.js）：开着时每 tick 由算法接管走位
+  botRef.current = !!bot;
   const [count, setCount] = useState(3); // 3, 2, 1, then go
   const [size, setSize] = useState({ w: 0, h: 0 });
   const doneRef = useRef(false), deathAt = useRef(null);
@@ -73,6 +76,11 @@ export default function DodgeGame({ seed, touch, hold, onGo, onDead, onPause, ch
           if (p.dir !== undefined) ev.push([sim.tick, 1, p.dir]);
           if (p.flash !== undefined) ev.push([sim.tick, 2, p.flash]);
           pending.current = {};
+          if (botRef.current) {
+            const c = planBot(sim);
+            if (c.flash !== undefined) ev.push([sim.tick, 2, c.flash]);
+            else if (c.move) ev.push([sim.tick, 0, c.move[0], c.move[1]]);
+          }
           step(sim, ev);
           acc -= 1000 / HZ;
         }
