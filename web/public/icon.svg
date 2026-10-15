@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 网站图标：深夜蓝底上一轮落日，被落基山的山脊线切开（Denver · 感恩节的秋天）。
+       改了这里之后重新生成 PNG（icon-192/512、apple-touch-icon），见 PR 说明 -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.7" y2="1">
+      <stop offset="0" stop-color="#25285e"/>
+      <stop offset="1" stop-color="#0c0d22"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#f59e6b" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#f59e6b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe3b3"/>
+      <stop offset=".55" stop-color="#f7a86c"/>
+      <stop offset="1" stop-color="#e2674f"/>
+    </linearGradient>
+    <linearGradient id="ridge" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="512" y2="0">
+      <stop offset="0" stop-color="#e9d9bd"/>
+      <stop offset=".6" stop-color="#fff8ec"/>
+      <stop offset="1" stop-color="#e9d9bd"/>
+    </linearGradient>
+    <linearGradient id="land" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#14153a"/>
+      <stop offset="1" stop-color="#090a1c"/>
+    </linearGradient>
+    <clipPath id="tile"><rect width="512" height="512" rx="114"/></clipPath>
+    <linearGradient id="edge" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity=".22"/>
+      <stop offset=".5" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="114" fill="url(#bg)"/>
+  <circle cx="256" cy="262" r="190" fill="url(#glow)"/>
+  <circle cx="262" cy="246" r="104" fill="url(#sun)"/>
+  <!-- the ridge hides the lower half of the sun -->
+  <g clip-path="url(#tile)">
+    <path d="M-20 404 L178 250 L232 300 L320 200 L532 392 V532 H-20 Z" fill="url(#land)"/>
+    <path d="M-20 404 L178 250 L232 300 L320 200 L532 392" fill="none" stroke="url(#ridge)" stroke-width="14" stroke-linejoin="round"/>
+  </g>
+  <rect x="3" y="3" width="506" height="506" rx="111" fill="none" stroke="url(#edge)" stroke-width="6"/>
+</svg>
