@@ -28,6 +28,7 @@ export function useListings(trip, token) {
   async function enrichMissing(t, list) {
     for (const l of list) {
       if (t !== tripRef.current) return;
+      if (l.kind === 'hotel') continue; // 酒店不是 Airbnb 房源，没什么可补抓的
       if (l.image && l.rating != null && l.images && l.images.length >= 2 && 'lat' in l) continue;
       try {
         const r = await api('/api/enrich', 'POST', { trip: t, id: l.id });

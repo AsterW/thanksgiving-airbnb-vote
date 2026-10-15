@@ -49,7 +49,8 @@ async function queryBookIt(roomId, checkIn, checkOut, adults) {
 // Price for the trip's dates and head count. When the group is bigger than
 // the listing allows, price it at the listing's max so there's still a number.
 async function fetchLivePrice(listing, trip) {
-  if (!listing.roomId || !trip.checkIn) return null;
+  // only Airbnb rooms (numeric ids) have Airbnb quotes; hotels (map:…, and the older bk:…) don't
+  if (!/^\d+$/.test(String(listing.roomId || '')) || !trip.checkIn) return null;
   const nights = Math.round((Date.parse(trip.checkOut) - Date.parse(trip.checkIn)) / 86400000);
   let guests = trip.people;
   let r = await queryBookIt(listing.roomId, trip.checkIn, trip.checkOut, guests);
@@ -70,7 +71,7 @@ export async function handlePrices(req, env) {
   const trip = tripOf(body.trip);
   const peek = await getState(env, trip);
   const fresh = l => l.live && l.live.at > Date.now() - PRICE_TTL_MS && l.live.checkIn === trip.checkIn && l.live.checkOut === trip.checkOut;
-  const todo = peek.listings.filter(l => (body.id ? l.id === body.id : true) && (body.force || !fresh(l))).slice(0, 12);
+  const todo = peek.listings.filter(l => /^\d+$/.test(String(l.roomId || '')) && (body.id ? l.id === body.id : true) && (body.force || !fresh(l))).slice(0, 12);
   const results = {};
   for (let i = 0; i < todo.length; i += 4) { // a few at a time, to be gentle with Airbnb
     await Promise.all(todo.slice(i, i + 4).map(async l => { const p = await fetchLivePrice(l, trip); if (p) results[l.id] = p; }));

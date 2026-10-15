@@ -17,6 +17,7 @@ export default function PlaceCard({ p, token, cardRef, pop, onVote, onRemove }) 
       </div>
       <div className="p-4 flex flex-col flex-1">
         <h3 className="font-bold leading-snug break-words">{p.name}</h3>
+        {p.address && <p className="text-sm text-slate-600 mt-0.5 break-words">📍 {p.address}</p>}
         <p className="text-xs text-slate-400 mt-0.5">
           {(p.addedBy ? p.addedBy + ' 加的 · ' : '') + ago(p.createdAt) + (p.lat == null ? ' · 地图上没有位置' : '')}
         </p>

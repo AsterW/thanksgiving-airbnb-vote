@@ -13,6 +13,12 @@ works for any group picking a place together.
 
 - Paste any Airbnb listing link → title, photo, bedrooms/beds/baths, capacity,
   and rating are auto-filled
+- Hotels: paste a hotel's Google Maps (or Apple Maps) link instead. Name,
+  street address and location come from the link (so it lands in its area and
+  on the map); the price is Google's reference rate per room per night (for a
+  night Google picks, shown with it), or whatever you type — when adding or on
+  the card. Cards show it per room per night plus a group estimate (rooms of 4
+  × nights). Hotels added earlier from Booking.com keep their pulled totals.
 - One-tap voting with voter names, toggle to unvote — casting a vote sets off a
   confetti celebration (banner only for people who prefer reduced motion)
 - Separate tabs (and separate lists) for each leg of the trip — Nov 25–26 for
@@ -22,10 +28,13 @@ works for any group picking a place together.
 - Anyone with the link can remove a listing (with a confirm dialog)
 - Manual-add fallback when auto-scrape fails
 - Restaurants: paste a link copied from Google Maps to add a place to the
-  trip's list (name and pin come from the link; if it doesn't point to one
-  place, you get "not found"); each card shows up to 10 photos from the place
+  trip's list (name, street address and location come from the link — a share
+  link from the Maps app carries the address but no coordinates, so the
+  address is looked up; if it doesn't point to one place, you get "not
+  found"); each card shows its address and up to 10 photos from the place
   page, like the Airbnb cards. Vote for the ones you want to try, open each in
-  Google Maps or get directions
+  Google Maps or get directions. The link reading lives in
+  `worker/lib/maplink.js`, shared with hotels and activities
 - Gameroom: live Blackjack (one table, up to 6 seats), 斗地主 (叫地主 /
   抢地主), 掼蛋 (full 升级 with 进贡 / 还贡) and 川麻 (血战到底 with 换三张,
   no 番 cap), each with three tables and bots in empty seats, joined from

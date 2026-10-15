@@ -1,8 +1,60 @@
+import { useState } from 'react';
 import { ago } from '../../lib/format.js';
-import { liveOf, UNAVAILABLE } from './price.js';
+import { hotelTotal, liveOf, roomsFor, ROOM_SLEEPS, UNAVAILABLE } from './price.js';
 import { perPerson } from './deadline.js';
 
-export default function PriceBlock({ l, T }) {
+// 酒店的价格：每间每晚（Google 参考价，或有人手填的），加上按间数和晚数估的整趟总价。
+// Google 的参考价是它自己挑的那一晚（显示出来），不是行程日期，所以谁都可以改成真实价格。
+function HotelPrice({ l, T, closed, onSetRate }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState('');
+  const r = l.rate;
+  const total = hotelTotal(l, T);
+  async function save() {
+    if (await onSetRate(l, val.trim())) setEditing(false);
+  }
+  const edit = !closed && onSetRate && (editing
+    ? <span className="inline-flex items-center gap-1 mt-1">
+        <span className="text-sm text-slate-500">$</span>
+        <input autoFocus type="number" min="1" value={val} onChange={e => setVal(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()}
+          placeholder="每间每晚" className="w-24 border rounded-lg px-2 py-0.5 text-sm" aria-label="每间每晚的价格（美元）" />
+        <button onClick={save} className="text-xs font-bold text-indigo-600 px-1">保存</button>
+        <button onClick={() => setEditing(false)} className="text-xs text-slate-400 px-1">取消</button>
+      </span>
+    : <button onClick={() => { setVal(r ? String(r.nightly) : ''); setEditing(true); }} className="text-xs text-indigo-600 hover:underline mt-0.5">✏️ {r ? '改价格' : '填价格'}</button>);
+  if (r && r.nightly) {
+    const pp = perPerson(total, T);
+    return (
+      <>
+        <div className="text-lg font-bold text-slate-800">${r.nightly.toLocaleString()} <span className="text-xs font-normal text-slate-500">/ 间 / 晚</span></div>
+        <div className="text-sm font-bold text-indigo-700 mt-0.5">
+          约 {roomsFor(T)} 间 × {T.nights} 晚 ≈ ${total.toLocaleString()} · 每人约 ${pp.each.toLocaleString()}
+          <span className="font-normal text-xs text-slate-500">（按每间住 {ROOM_SLEEPS} 人估）</span>
+        </div>
+        <div className="text-xs text-sky-700 mt-0.5">
+          {r.source === 'google' ? `🏨 Google 参考价 · ${r.dates} 那晚的，不是行程日期 · ${ago(r.at)}` : `🏨 ${r.by ? r.by + ' ' : ''}手填的价格 · ${ago(r.at)}`}
+        </div>
+        {edit}
+      </>
+    );
+  }
+  // 之前从 Booking.com 拉过价格的酒店：存的是整趟总价
+  if (l.priceUSD && l.priceNights) {
+    const pp = perPerson(l.priceUSD, T);
+    return (
+      <>
+        <div className="text-lg font-bold text-slate-800">${Number(l.priceUSD).toLocaleString()} <span className="text-xs font-normal text-slate-500">/ {l.priceNights}晚总价</span></div>
+        <div className="text-sm font-bold text-indigo-700 mt-0.5">每人约 ${pp.each.toLocaleString()} <span className="font-normal text-xs text-slate-500">（{T.people} 人分）</span></div>
+        <div className="text-xs text-sky-700 mt-0.5">🏨 之前从 Booking.com 拉的价格{l.priceAt ? ' · ' + ago(l.priceAt) : ''}</div>
+        {edit}
+      </>
+    );
+  }
+  return <><div className="text-sm text-slate-500">🏨 还没有价格（Google 上没查到）</div>{edit}</>;
+}
+
+export default function PriceBlock({ l, T, closed, onSetRate }) {
+  if (l.kind === 'hotel') return <HotelPrice l={l} T={T} closed={closed} onSetRate={onSetRate} />;
   const v = liveOf(l, T);
   if (v && !v.available) return (
     <>
