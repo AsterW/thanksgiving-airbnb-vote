@@ -11,7 +11,14 @@
 @keyframes gt-call { 0% { box-shadow:0 0 0 0 rgba(250,204,21,.7); } 100% { box-shadow:0 0 0 14px rgba(250,204,21,0); } }
 @keyframes gt-hurry { from { transform:scale(1); box-shadow:0 0 0 0 rgba(239,68,68,.8); } to { transform:scale(1.04); box-shadow:0 0 0 10px rgba(239,68,68,0); } }
 .gt-full .gt-yourturn { margin-top:.3rem; padding:.25rem .8rem; font-size:.85rem; }
-@media (prefers-reduced-motion: reduce) { .gt-yourturn, .gt-yourturn.hurry { animation:none; } }
+/* the small version: a 🔔 that rings beside your buttons (斗地主 出牌); ⏰ and a red countdown in the last 5 seconds */
+.gt-bell { display:inline-flex; align-items:center; justify-content:center; width:2.3rem; height:2.3rem; border-radius:9999px; background:#facc15;
+  font-size:1.2rem; line-height:1; box-shadow:0 0 0 0 rgba(250,204,21,.7); animation:gt-call 1.4s ease-out infinite, gt-ring 1.4s ease-in-out infinite; }
+.gt-bell.hurry { background:#ef4444; animation:gt-hurry .5s ease-out infinite alternate; }
+@keyframes gt-ring { 0%, 60%, 100% { transform:rotate(0); } 10% { transform:rotate(14deg); } 20% { transform:rotate(-12deg); } 30% { transform:rotate(8deg); } 40% { transform:rotate(-5deg); } }
+.gt-timer-hurry { color:#fecaca; font-weight:900; }
+.gt-full .gt-bell { width:2rem; height:2rem; font-size:1.05rem; }
+@media (prefers-reduced-motion: reduce) { .gt-yourturn, .gt-yourturn.hurry, .gt-bell, .gt-bell.hurry { animation:none; } }
 .gt-btn { border-radius:.8rem; padding:.55rem 1.1rem; font-weight:800; box-shadow:0 3px 8px rgba(0,0,0,.25); }
 .gt-btn:disabled { opacity:.4; }
 .gt-seat { position:relative; background:rgba(0,0,0,.22); border:2px solid transparent; border-radius:.9rem; padding:.45rem .6rem; min-width:8.5rem; transition:border-color .2s, box-shadow .2s; }
