@@ -3,6 +3,7 @@
 import { j, uid } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
 import { fetchListingInfo, roomIdFrom } from './scrape.js';
+import { isMapLink, parseMapLink, hotelRoomId } from './maplink.js';
 import { getState, updateState } from './state.js';
 import { handlePrices } from './prices.js';
 import { needsArea, pickArea, routes as zoneRoutes } from './zones.js';
@@ -17,7 +18,8 @@ async function handleAdd(req, env) {
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const url = String(body.url || '').trim();
   const roomId = roomIdFrom(url);
-  if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源链接（需要形如 airbnb.com/rooms/123… 的链接）' });
+  if (!roomId && isMapLink(url)) return handleAddHotel(env, url, body);
+  if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源链接（需要形如 airbnb.com/rooms/123… 的链接）；酒店可以粘贴 Google 地图 / Apple 地图的分享链接' });
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
   // Fast-path dedupe check only — do NOT hold this snapshot across the scrape.
@@ -51,6 +53,46 @@ async function handleAdd(req, env) {
   });
   if (out.deduped) return j({ ok: true, listing: out.listing, deduped: true });
   return j({ ok: true, listing: out.listing, fetched: info.ok });
+}
+
+// Adding a hotel from a map share link (see maplink.js). No rooms
+// or price to scrape — the card carries the name, a photo when the
+// place page offers one, and the coordinates, so it votes, maps and
+// area-groups exactly like a listing. Dedupe is by place identity
+// (a synthetic roomId), inside the transaction like handleAdd.
+async function handleAddHotel(env, url, body) {
+  const trip = tripOf(body.trip);
+  if (!votingOpen(trip)) return closedError();
+  const info = await parseMapLink(url);
+  if (!info.ok) return j({ ok: false, error: '这个地图链接没读出酒店信息，试试在地图里点「分享」重新复制一条链接' });
+  const preState = await getState(env, trip);
+  const { area } = await pickArea(trip, preState.listings, { lat: info.lat, lng: info.lng });
+  const roomId = hotelRoomId(info);
+  // Price features stay: when the map page advertises offers, keep
+  // the cheapest nightly rate as a trip-total estimate in the same
+  // priceUSD/priceNights shape manual adds use, so the card displays
+  // it and price sorting includes the hotel. It is labelled a
+  // reference price in the UI — not a quote for the trip's dates.
+  const nights = Math.max(1, Math.round((Date.parse(trip.checkOut) - Date.parse(trip.checkIn)) / 86400000) || 1);
+  const listing = {
+    id: uid(), roomId, url: info.url || url, kind: 'hotel',
+    title: info.title || '未命名酒店',
+    image: info.image || '', images: info.image ? [info.image] : [], area: area || '',
+    priceUSD: info.rate ? info.rate.nightly * nights : null,
+    priceNights: info.rate ? nights : null,
+    rateProvider: info.rate ? info.rate.provider : null,
+    lat: info.lat, lng: info.lng,
+    sleeps: null, bedrooms: null, beds: null, bathrooms: null,
+    rating: null, reviews: null, note: '', addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: []
+  };
+  const out = await updateState(env, trip, state => {
+    const existing = state.listings.find(l => l.roomId === roomId);
+    if (existing) return { deduped: true, listing: existing };
+    state.listings.unshift(listing);
+    return { listing };
+  });
+  if (out.deduped) return j({ ok: true, listing: out.listing, deduped: true });
+  return j({ ok: true, listing: out.listing, fetched: true });
 }
 
 async function handleAddManual(req, env) {
