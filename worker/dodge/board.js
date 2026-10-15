@@ -11,8 +11,9 @@
 //   POST /api/dodge/score { name, token, ticket, events }  -> { ticks, by, best, newBest, rank, board, bot, react }
 //   GET  /api/dodge/board                                  -> { board }
 //   GET  /api/dodge/replay?name=                           -> { name, seed, v, events, ticks, by, stats, bot }
+//   POST /api/dodge/scrub-user { target, byName, byToken }  (PM only; user deletion reaches in)
 // Times are in ticks: 60 a second.
-import { getUsers, sameName, cleanName } from '../users/users.js';
+import { getUsers, sameName, cleanName, USER_ADMIN } from '../users/users.js';
 import { j } from '../lib/http.js';
 import { HZ, SIM_VERSION } from '../../web/src/features/dodge/sim.js';
 import { badEvents, replay } from '../../web/src/features/dodge/verify.js';
@@ -66,7 +67,24 @@ export class DodgeBoard {
     const body = parsed && typeof parsed === 'object' ? parsed : {};
     if (request.method === 'POST' && path === '/api/dodge/start') return this.start(body);
     if (request.method === 'POST' && path === '/api/dodge/score') return this.score(body);
+    if (request.method === 'POST' && path === '/api/dodge/scrub-user') return this.scrubUser(body);
     return j({ ok: false, error: '这个版本旧了，刷新一下页面' }, 404);
+  }
+
+  // User deletion reaches in: drop the person's board record and saved
+  // replay. Called by admin.js through the binding, but this prefix is
+  // publicly routed too, so the caller has to prove it is PM here.
+  async scrubUser({ target, byName, byToken }) {
+    const users = await getUsers(this.env);
+    const by = users.find(u => sameName(u.name, cleanName(byName)));
+    if (!by || !byToken || by.token !== byToken || !sameName(by.name, USER_ADMIN)) {
+      return j({ ok: false, error: '只有 PM 能清排行榜' }, 403);
+    }
+    const key = cleanName(target).toLowerCase();
+    if (!key) return j({ ok: true, removed: 0 });
+    const removed = this.best.delete(key) ? 1 : 0;
+    await this.state.storage.delete(['p:' + key, 'r:' + key]);
+    return j({ ok: true, removed });
   }
 
   // The account behind a name + token, or null.
