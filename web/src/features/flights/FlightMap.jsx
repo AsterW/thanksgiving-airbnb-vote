@@ -114,7 +114,7 @@ function animate(m, group, drawn, instant, phases) {
 }
 
 // 大家的航线：到达 / 离开分开看。同一条航线的人合成一条线，线越粗人越多
-export default function FlightMap({ people, mode }) {
+export default function FlightMap({ people, mode, visible }) {
   const box = useRef(null), map = useRef(null), layer = useRef(null);
   const shownMode = useRef(null); // 画线动画只在第一次看这个模式时播，之后的数据刷新直接到位
   const phases = useRef(new Map()); // 每条航线的飞机进度，跨重画保留
@@ -129,7 +129,11 @@ export default function FlightMap({ people, mode }) {
     return f ? [p.name, f.flight, f.from.iata, f.to.iata, f.depUtc, f.arrUtc].join(':') : p.name + ':-';
   }).join('|');
 
+  // 第一次看得见的时候才建地图（和房源/餐厅/活动地图同一套规矩）：
+  // 所有页面都是挂着藏起来的，藏着建图 Leaflet 量到的尺寸是 0，之后
+  // 瓦片按错尺寸铺、取景也算错 — 进航班页有时候整张图灰着错位就是它。
   useEffect(() => {
+    if (!visible || map.current) return;
     // 视图中心锁死：不许拖动平移（dragging 关掉后手机上滑过地图也不会被地图抢走滚动），
     // 方向键平移也关掉；缩放保留（滚轮/双指都是绕中心缩，中心不会跑）
     const m = L.map(box.current, { scrollWheelZoom: false, worldCopyJump: true, zoomSnap: 0.25, dragging: false, keyboard: false });
@@ -141,12 +145,15 @@ export default function FlightMap({ people, mode }) {
     addHomeButton(m, () => { if (homeBounds.current.length) m.fitBounds(homeBounds.current, { padding: [30, 30], maxZoom: 6 }); });
     layer.current = L.layerGroup().addTo(m);
     map.current = m;
-    return () => { m.remove(); map.current = null; };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+  useEffect(() => () => { map.current?.remove(); map.current = null; }, []);
 
   useEffect(() => {
     const m = map.current;
-    if (!m) return;
+    // 藏着的时候不画：尺寸是错的，画了也白画。等页面亮出来，这一轮会
+    // 以真实尺寸重跑（visible 在依赖里），取景和瓦片一次到位。
+    if (!m || !visible) return;
     const { people, mode } = latest.current;
     layer.current.clearLayers();
     const legs = people.map(p => ({ name: p.name, f: mode === 'arrival' ? p.arrival : p.departure })).filter(x => x.f);
@@ -195,10 +202,11 @@ export default function FlightMap({ people, mode }) {
     const instant = shownMode.current === mode;
     shownMode.current = mode;
     return animate(m, layer.current, drawn, instant, phases.current);
-    // 只认内容签名：people 数组身份变了但内容没变时，这个 effect 根本不重跑，
-    // 地图不重 fit、飞机不重启。数据真变了才重画（且飞机接着原来的进度飞）。
+    // 内容签名之外还认 visible：签名不变时数组身份变化不会重跑（地图不
+    // 重 fit、飞机不重启）；但页面从藏到亮必须重跑一轮，把建图时错过的
+    // 正确尺寸补回来。重画时飞机接着原来的进度飞（phases 还在）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sig]);
+  }, [sig, visible]);
 
   return <div ref={box} className="flight-map"></div>;
 }

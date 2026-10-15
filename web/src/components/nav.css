@@ -45,7 +45,11 @@
 .bnav-strip.more-r { -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 2.5rem), transparent); }
 .bnav-strip.more-l { -webkit-mask-image:linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to left, #000 calc(100% - 2.5rem), transparent); }
 .bnav-strip.more-l.more-r { -webkit-mask-image:linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); mask-image:linear-gradient(to right, transparent, #000 2.5rem, #000 calc(100% - 2.5rem), transparent); }
-.bnav-item { flex:1 0 4.6rem; display:flex; flex-direction:column; align-items:center; gap:2px; margin:5px 3px; border-radius:999px; padding:.55rem .25rem .5rem; font-size:.72rem; font-weight:600; color:#64748b; white-space:nowrap; transition: background .2s, color .2s, box-shadow .2s; }
+/* 宽度按文字来，不定死：标签全是英文长词（AirBnb hunting / Secret Angel /
+   Split that bill），定死 4.6rem 时字比格子宽，选中项的白胶囊包不住字，
+   文字溢出到胶囊外（用户截图里第一格最明显）。min-width 保住短标签的
+   节奏，长标签自然撑宽，反正整条本来就能横着滑。 */
+.bnav-item { flex:0 0 auto; min-width:4.6rem; display:flex; flex-direction:column; align-items:center; gap:2px; margin:5px 3px; border-radius:999px; padding:.55rem .7rem .5rem; font-size:.72rem; font-weight:600; color:#64748b; white-space:nowrap; transition: background .2s, color .2s, box-shadow .2s; }
 .bnav-item .nav-ico { font-size:1.3rem; transition: transform .2s; }
 /* 选中项同样是亮玻璃透镜，和桌面侧栏一个语言 */
 .bnav-item.active { background:linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.62)); color:#4f46e5; box-shadow:0 4px 12px rgba(30,50,110,.2), inset 0 1px 0 #fff; }

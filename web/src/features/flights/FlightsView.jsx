@@ -55,7 +55,7 @@ export default function FlightsView({ active }) {
               className="w-full border rounded-xl p-3 text-sm font-mono bg-slate-50" onBlur={() => setManualCopy('')} />
           </div>
         )}
-        <div className="map-box"><FlightMap people={travelers} mode={mode} /></div>
+        <div className="map-box"><FlightMap people={travelers} mode={mode} visible={active} /></div>
       </section>
 
       <FlightForm people={people} onSaved={r => setPeople(r.people)} />
