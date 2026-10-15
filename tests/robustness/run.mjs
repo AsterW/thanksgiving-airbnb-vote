@@ -86,11 +86,8 @@ try {
     // And the quick-polls suite.
     const pollsPath = new URL('polls.mjs', import.meta.url).pathname;
     const polls = existsSync(pollsPath) ? await runSuite('polls.mjs') : true;
-    // And the Booking-hotels suite.
-    const hotelsPath = new URL('hotels.mjs', import.meta.url).pathname;
-    const hotels = existsSync(hotelsPath) ? await runSuite('hotels.mjs') : true;
     const storms = await runSuite('storms.mjs');
-    ok = fuzz && email && users && polls && hotels && storms;
+    ok = fuzz && email && users && polls && storms;
   }
 } finally {
   stopServer();

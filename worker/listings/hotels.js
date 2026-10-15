@@ -1,82 +1,145 @@
-// Hotels sourced from Booking.com. Booking walls off server-side
-// scraping (its pages answer non-browser clients with a challenge), so
-// hotel data is pulled elsewhere — a real browser session — and posted
-// here in structured form. Posting the same hotel again refreshes it:
-// that is the pull-price path, the price and its pull time are replaced
-// while the card, its votes and its position stay.
+// Hotels in the hunt, added from a Google Maps / Apple Maps link (the add
+// box takes those besides Airbnb rooms). The link gives the hotel's name,
+// street address and location (worker/lib/maplink.js) — so it lands in the
+// right area and on the map — and Google's place data gives photos.
+//
+// Price: a hotel prices a room per night. Google's hotel search, as a server
+// sees it, is a page focused on the hotel searched for, whose price reads
+// "$79 for dates Nov 24 – 25, Hyatt House Denver/Downtown". Google picks
+// those dates itself (dates in the URL are ignored), so this is a reference
+// rate for one night, kept with its dates and shown as such — not a quote for
+// the trip. Anyone can type the real rate instead (POST /api/hotel-rate).
+// Stored as rate: { nightly, source: 'google' | 'manual', dates?, at }.
 import { j, uid } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
+import { locatePlace } from '../lib/maplink.js';
+import { placePhotos } from '../food/photos.js';
+import { cleanName } from '../users/users.js';
 import { getState, updateState } from './state.js';
 import { pickArea } from './zones.js';
 import { closedError, votingOpen } from './decision.js';
-import { cleanName } from '../users/users.js';
 
-// booking.com/hotel/<cc>/<slug>.html → slug ('hyatt-place-denver-downtown')
-export function bookingSlug(url) {
-  const m = String(url || '').match(/booking\.com\/hotel\/[a-z]{2}\/([a-z0-9-]+?)(?:\.html)?(?:[/?#]|$)/i);
-  return m ? m[1].toLowerCase() : null;
+const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+const MAX_PAGE = 4e6; // the price shows up about 2 MB into the page; give up after this
+
+// Words that say nothing about which hotel it is.
+const FILLER = new Set(['the', 'a', 'an', 'by', 'and', 'at', 'of', 'hotel']);
+const words = s => new Set((String(s).toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter(w => !FILLER.has(w)));
+// Same hotel? Most of the words shared, both ways (Hyatt House vs Hyatt Place is not).
+export function sameHotel(a, b) {
+  const A = words(a), B = words(b);
+  if (!A.size || !B.size) return false;
+  let both = 0;
+  for (const w of A) if (B.has(w)) both++;
+  return both / (A.size + B.size - both) >= 0.75;
 }
 
-const num = v => (v === null || v === undefined || v === '' || isNaN(Number(v))) ? null : Number(v);
-const str = (v, n) => String(v || '').trim().slice(0, n);
+const unescape = s => s.replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+// One aria-label: "$79 for dates Nov 24 – 25, Hyatt House Denver/Downtown DEAL 23% less than usual"
+export function readRateLabel(label) {
+  const m = unescape(label).match(/^\$([\d,]+) for dates ([^,]+), (.+)$/);
+  if (!m) return null;
+  const nightly = Number(m[1].replace(/,/g, ''));
+  if (!(nightly >= 20 && nightly <= 5000)) return null;
+  return { nightly, dates: m[2].trim(), hotel: m[3].replace(/\s+(?:(?:GREAT|GOOD)\s+)?DEAL\b.*$/, '').trim() };
+}
+// Every price label in a piece of the page, in order.
+export function rateLabels(html) {
+  const out = [];
+  for (const m of html.matchAll(/aria-label="(\$[\d,]+ for dates [^"]+)"/g)) { const r = readRateLabel(m[1]); if (r) out.push(r); }
+  return out;
+}
 
-async function handleAddHotel(req, env) {
-  let body = {};
-  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
-  const url = str(body.url, 500);
-  const slug = bookingSlug(url);
-  if (!slug) return j({ ok: false, error: '看起来不是 Booking.com 酒店链接（需要形如 booking.com/hotel/us/… 的链接）' });
-  const title = str(body.title, 120);
-  if (!title) return j({ ok: false, error: '酒店名是必填的' });
+// Google's reference rate for this hotel, or null. The page is large, so it's
+// read as it streams in and dropped once the hotel's price has gone by.
+export async function googleRate(name, address) {
+  const q = encodeURIComponent([name, address].filter(Boolean).join(', '));
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 15000);
+  try {
+    const r = await fetch('https://www.google.com/travel/search?q=' + q + '&hl=en-US&gl=us&curr=USD',
+      { signal: ctrl.signal, headers: { 'User-Agent': DESKTOP_UA, 'Accept-Language': 'en-US,en;q=0.9' } });
+    if (!r.ok || !r.body) return null;
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = '', seen = 0;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      seen += value.length;
+      buf += dec.decode(value, { stream: true });
+      const cut = buf.lastIndexOf('aria-label="'); // a label may be cut off at the end: keep it for the next piece
+      const ready = cut > buf.length - 400 ? buf.slice(0, cut) : buf;
+      const hit = rateLabels(ready).find(x => sameHotel(x.hotel, name));
+      if (hit) { reader.cancel().catch(() => {}); return { nightly: hit.nightly, dates: hit.dates, source: 'google', at: Date.now() }; }
+      buf = buf.slice(ready.length);
+      if (seen > MAX_PAGE) { reader.cancel().catch(() => {}); break; }
+    }
+    return null;
+  } catch (e) { return null; }
+  finally { clearTimeout(t); }
+}
+
+// A hotel's identity: Google's place id when the link has one, else name + rounded spot,
+// so the same hotel shared through different links lands on one card.
+function hotelId(p) {
+  if (p.placeId) return 'map:' + p.placeId;
+  const raw = p.name.toLowerCase() + '|' + (p.lat != null ? p.lat.toFixed(4) + ',' + p.lng.toFixed(4) : p.url);
+  let h = 5381;
+  for (let i = 0; i < raw.length; i++) h = ((h << 5) + h + raw.charCodeAt(i)) >>> 0;
+  return 'map:' + h.toString(36);
+}
+const nightlyOf = v => { const n = Math.round(Number(v)); return n >= 1 && n <= 20000 ? n : null; };
+
+// POST /api/add with a maps link lands here (routes.js).
+export async function addHotel(body, env) {
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
-  const roomId = 'bk:' + slug;
-  const lat = num(body.lat), lng = num(body.lng);
-  // A hotel card can carry a whole gallery (the card carousel swipes
-  // through it): accept images[], cover image = the first photo.
-  const gallery = Array.isArray(body.images)
-    ? [...new Set(body.images.map(u => str(u, 500)).filter(Boolean))].slice(0, 8)
-    : [];
-  const fields = {
-    title, url,
-    image: str(body.image, 500) || gallery[0] || '',
-    ...(gallery.length ? { images: gallery } : {}),
-    rating: num(body.rating), reviews: num(body.reviews),
-    priceUSD: num(body.priceUSD), priceNights: num(body.priceNights),
-    note: str(body.note, 300),
+  // Slow work (link, lookups, Google) before reading the list, like Airbnb adds.
+  const p = await locatePlace(body.url, trip.zones);
+  if (!p.ok) return j({ ok: false, error: '读不出这个地图链接是哪家。在地图里打开那家酒店，点「分享」复制链接再试' });
+  const roomId = hotelId(p);
+  const pre = await getState(env, trip);
+  const preExisting = pre.listings.find(l => l.roomId === roomId);
+  if (preExisting) return j({ ok: true, listing: preExisting, deduped: true });
+  const typed = nightlyOf(body.nightly);
+  const [rate, images, zone] = await Promise.all([
+    typed ? { nightly: typed, source: 'manual', at: Date.now() } : googleRate(p.name, p.address),
+    placePhotos(p.url).catch(() => []),
+    pickArea(trip, pre.listings, p),
+  ]);
+  const listing = {
+    id: uid(), roomId, kind: 'hotel', url: p.url, title: p.name, address: p.address,
+    ...(p.lat != null ? { lat: p.lat, lng: p.lng } : {}),
+    image: images[0] || '', images, area: zone.area || '', priceUSD: null, rate: rate || null,
+    rating: null, reviews: null, note: '', addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: [],
   };
-  if (fields.priceUSD) fields.priceAt = Date.now();
-  // Zone the hotel the same way Airbnb listings are zoned, when located.
-  let area = '';
-  if (lat != null && lng != null) {
-    const pre = await getState(env, trip);
-    area = (await pickArea(trip, pre.listings, { lat, lng })).area || '';
-  }
   const out = await updateState(env, trip, state => {
     const existing = state.listings.find(l => l.roomId === roomId);
-    if (existing) {
-      // A re-pull: refresh the data, keep the id, votes and who added it.
-      for (const k of ['title', 'url', 'note']) if (fields[k]) existing[k] = fields[k];
-      for (const k of ['image', 'rating', 'reviews', 'priceUSD', 'priceNights', 'priceAt']) {
-        if (fields[k] != null && fields[k] !== '') existing[k] = fields[k];
-      }
-      if (fields.images) existing.images = fields.images;
-      else if (fields.image) existing.images = [fields.image];
-      if (lat != null && lng != null) { existing.lat = lat; existing.lng = lng; }
-      if (area && !existing.area) existing.area = area;
-      return { listing: existing, updated: true };
-    }
-    const listing = {
-      id: uid(), roomId, kind: 'hotel', ...fields,
-      ...(lat != null && lng != null ? { lat, lng } : {}),
-      area, images: fields.images || (fields.image ? [fields.image] : []),
-      sleeps: null, bedrooms: null, beds: null, bathrooms: null,
-      addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: [],
-    };
+    if (existing) return { deduped: true, listing: existing };
     state.listings.unshift(listing);
     return { listing };
   });
-  return j({ ok: true, listing: out.listing, ...(out.updated ? { updated: true } : {}) });
+  return j({ ok: true, listing: out.listing, ...(out.deduped ? { deduped: true } : {}) });
 }
 
-export const routes = { 'POST /api/add-hotel': handleAddHotel };
+// Type in a hotel's real nightly rate (or clear it with an empty value).
+async function handleRate(req, env) {
+  let body = {};
+  try { body = await req.json() || {}; } catch (e) { /* ignore */ }
+  const trip = tripOf(body.trip);
+  if (!votingOpen(trip)) return closedError();
+  const nightly = nightlyOf(body.nightly);
+  if (body.nightly !== '' && body.nightly != null && !nightly) return j({ ok: false, error: '价格要是 1 到 20000 之间的数字' });
+  const out = await updateState(env, trip, state => {
+    const l = state.listings.find(x => x.id === body.id);
+    if (!l || l.kind !== 'hotel') return { error: '酒店不存在' };
+    l.rate = nightly ? { nightly, source: 'manual', by: cleanName(body.name), at: Date.now() } : null;
+    return { listing: l };
+  });
+  if (out.error) return j({ ok: false, error: out.error });
+  return j({ ok: true, listing: out.listing });
+}
+
+export const routes = {
+  'POST /api/hotel-rate': handleRate,
+};

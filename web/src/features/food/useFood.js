@@ -22,6 +22,17 @@ export function useFood(trip, active) {
       if (t !== tripRef.current) return;
       if (x.ok) setPlaces(ps => ps && ps.map(q => (q.id === p.id ? { ...q, images: x.images } : q)));
     }
+    // 地址功能之前加的店：用现在的读法把链接重读一次（名字里带的地址拆出来、补上位置），每家只做一次
+    for (const p of r.places) {
+      if (p.located) continue;
+      let x;
+      try { x = await api('/api/food/locate', 'POST', { trip: t, id: p.id }); } catch (e) { continue; }
+      if (t !== tripRef.current) return;
+      if (x.ok && x.place) {
+        const { name, address, lat, lng, placeId, located } = x.place;
+        setPlaces(ps => ps && ps.map(q => (q.id === p.id ? { ...q, name, address, lat, lng, placeId, located } : q)));
+      }
+    }
   }, [trip]);
 
   useEffect(() => { setPlaces(null); }, [trip]);

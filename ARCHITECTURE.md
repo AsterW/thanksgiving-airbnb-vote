@@ -10,7 +10,7 @@
   - `nov25`（11/25–26 · 9人 · 1晚）→ `state:nov25:v1`
   - `nov26`（11/26–29 · 14人 · 3晚）→ `state:v1`（沿用原来的 key，之前的房源和投票都在这里）
   - 全员共用、不分行程：`users:v1`（登录时选的名字，也是分账的成员名单）、`split:v1`（分账，全员一本账）。分账原来按行程存在上面两个 key 里，第一次读 `split:v1` 时自动合并过来（旧数据留在原处不删）
-  - 餐厅：每段行程一份，`food:nov25:v1` / `food:nov26:v1`（`{ places: [...] }`，每家有名字、Google 地图链接、坐标、备注、想去的人）
+  - 餐厅：每段行程一份，`food:nov25:v1` / `food:nov26:v1`（`{ places: [...] }`，每家有名字、Google 地图链接、地址、坐标、Google 地点 id、备注、想去的人）
 - **Secret Angel**：`angel:v1`（全员一份）。`prefs` 按名字（小写）存每人的礼物偏好（分类 id → `love` / `nope`，加一句备注）；`excluded` 是管理员排除的人；`draw` 是抽签结果（天使 → 要送礼的人）。管理员是名字为 Aster 的用户（`worker/angel/routes.js` 的 `ADMIN`）。抽签把所有参加的人随机排成一个圈，每人送给下一个（`worker/angel/draw.js`），所以不会抽到自己、也不会两人互送。接口只返回调用者自己的那一对。和投票一样，身份靠用户列表里的名字 + token，不是真正的密码登录
 - **21 点**：不走 KV，是一个 Durable Object（`BlackjackTable`，SQLite 存储，免费计划只能用这种）。整张桌子的状态在它的内存里，玩家用 WebSocket（`/api/bj`）连上来，每次有变化就把整桌推给所有人。规则和流程在 `BlackjackGame` 里（6 副牌、庄家软 17 停、Blackjack 3:2、头两张可加倍、不分牌不保险；15 秒下注、30 秒一手）。筹码只在玩家站起来或断线时存进它自己的存储（`p:<名字>`），不按局存。坐下要用登录名单里的名字和 token。不在 21 点页面又没坐下的人会断开连接，10 分钟没下注会被站起来，免得白占免费的运行时长
 - **斗地主**：和 21 点一样是 Durable Object（`DdzHall`，WebSocket `/api/ddz`），一个对象管 3 张桌（`ROOMS`），每桌 3 个座位，一个人同时只能坐一张桌。规则在 `worker/ddz/cards.js`（牌型识别、比大小：单、对、三带、顺子、连对、飞机带翅膀、四带二、炸弹、王炸），机器人在 `bot.js`（按牌力叫/抢地主，出牌先出小的、不拆王炸、不压队友、对手快走完了才炸），一桌的流程在 `game.js`（`DdzGame`：叫地主 → 抢地主（每抢一次 ×2，叫的人最后还能抢回来；三家都不叫就重发）→ 地主拿 3 张底牌 → 出牌 → 结算。结果一直留在桌上，桌上的人点「再来一局」才发下一局，不会自己开）。空位开局时由机器人补上；叫地主 15 秒、出牌 30 秒，超时由机器人代打一手，连续超时两次或掉线就托管，局中站起来也是托管打完这局再走；局中来的人排队，下一局坐下。底分 10 豆，倍数 = 叫抢倍数 × 2^炸弹数（春天 / 反春再 ×2），地主一人对两家。豆子和 21 点筹码分开，存在 `DdzHall` 自己的存储里（`p:<名字>`，豆子、局数、胜局、补豆次数），同样只在站起来或断线时写；输光了下一局自动补到 1000。每个人只收到自己的牌，结算时才亮所有人的牌。没人连着时这局直接让机器人打完、记分，桌子空出来
@@ -51,10 +51,11 @@
 | 路由 | 作用 |
 |---|---|
 | `GET /api/state?trip=…` | 读该行程的 KV；没有就初始化（`nov26` 用 10 间预置房源 seed，`nov25` 从空清单开始） |
-| `POST /api/add` | 正则从链接提 roomId（`/rooms/(\d+)`）→ 查重（重复返回 `deduped`）→ 调抓取 → 新房源 `unshift` 到数组头 → 写回 KV |
+| `POST /api/add` | 正则从链接提 roomId（`/rooms/(\d+)`）→ 查重（重复返回 `deduped`）→ 调抓取 → 新房源 `unshift` 到数组头 → 写回 KV。地图链接（Google / Apple 地图）走酒店（`worker/listings/hotels.js`）：名字、地址、坐标、Google 地点 id 从链接读（`worker/lib/maplink.js`，见下面餐厅那行），区域按坐标自动分，照片用餐厅同一套（`food/photos.js`）；`kind: 'hotel'`，`roomId` 是 `map:<地点 id>`（没有 id 就用名字+坐标），同一家换个链接贴也只会有一张卡。价格 `rate: { nightly, source, dates?, at }` 是每间每晚：可以加的时候填（`nightly`），不填就读 Google 酒店搜索的页面（`/travel/search?q=<名字, 地址>`，桌面浏览器 UA）——服务器拿到的页面就停在这家酒店上，价格写在 `aria-label="$79 for dates Nov 24 – 25, <酒店名>"` 里（名字要对得上才算，防止拿到隔壁酒店的价）；日期是 Google 自己挑的（URL 里的日期它不理），所以存下日期、页面上写明是哪一晚的参考价。页面很大，边下边找，找到就断开。前端按每间住 4 人估间数，乘晚数得整趟估价，排序也用它。之前从 Booking.com 拉的酒店（`bk:…`，`priceUSD` 是整趟总价）照旧显示 |
+| `POST /api/hotel-rate` | 酒店手填每间每晚的价格（`nightly`，空的就清掉），记下谁填的 |
 | `POST /api/add-manual` | 手动表单，走同样入库 |
 | `POST /api/vote` / `/api/remove` / `/api/enrich` | 投票、删除、补抓 |
-| `GET /api/food?trip=…`、`POST /api/food/add` / `vote` / `remove` | 餐厅（`worker/food/`）。只接受从 Google 地图复制的链接：店名和坐标从链接本身读（`/maps/place/<店名>/…!3d<纬度>!4d<经度>`，或带店铺 id 的 `?q=` 链接），`maps.app.goo.gl` 短链接只跟着跳转展开，不抓 Google 的页面、不按店名搜索；读不出店名就回“找不到这家餐厅”。加店时顺便取最多 10 张照片（`worker/food/photos.js`）：打开链接指向的店铺页，找到 Google 地图自己用的店铺详情请求（`/maps/preview/place?…`），只留类型是照片的（不要街景全景、视频和头像）；取不到就没有照片，店照样加上。之前加的店，页面打开时会补取一次（`POST /api/food/photos`） |
+| `GET /api/food?trip=…`、`POST /api/food/add` / `vote` / `remove` / `locate` | 餐厅（`worker/food/`）。只接受从 Google 地图复制的链接，读法在 `worker/lib/maplink.js`（酒店、活动也用它）：店名从 `/maps/place/<店名>/` 或带店铺 id 的 `?q=` 读，Maps app 分享出来的链接在店名后面接着街道地址（`<店名>, 1550 Court Pl, Denver, CO 80202`），从第一个「逗号+门牌号」处拆成店名和地址；坐标先用地点的钉子 `!3d<纬度>!4d<经度>`，再用 `@纬度,经度` 但只在放大到 15 级以上时（缩小的地图视野中心可能离店好几公里），都没有（app 分享的链接就只带地点 id）就用 OpenStreetMap 查地址的坐标，连地址也没有就按名字在这段行程的区域里查；有坐标没地址的反过来查出街道地址，卡片上显示。`maps.app.goo.gl` 短链接只跟着跳转展开（先用普通客户端，读不出来再用手机 UA）；Google 自己的地点页拿不到坐标（给服务器的页面是请求方所在地的地图）。读不出店名就回“找不到这家餐厅”。地址功能之前加的店（没有 `located`），页面打开时用现在的读法把链接重读一次（`POST /api/food/locate`）：名字里带着的地址拆掉、补上地址、坐标以钉子/地址为准，每家只做一次。加店时顺便取最多 10 张照片（`worker/food/photos.js`）：打开链接指向的店铺页，找到 Google 地图自己用的店铺详情请求（`/maps/preview/place?…`），只留类型是照片的（不要街景全景、视频和头像）；取不到就没有照片，店照样加上。之前加的店，页面打开时会补取一次（`POST /api/food/photos`） |
 | 其他路径 | `env.ASSETS.fetch(request)` 返回构建好的页面（`dist/`） |
 
 ⚠️ 踩过的坑：`wrangler.toml` 的 `[assets]` 必须声明 `binding = "ASSETS"`，否则 `env.ASSETS` 是 `undefined`，首页报 Error 1101 而 `/api/*` 还正常。

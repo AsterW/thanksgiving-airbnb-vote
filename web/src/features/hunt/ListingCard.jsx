@@ -7,9 +7,12 @@ import { useSession } from '../../session/SessionContext.jsx';
 
 // 按当前行程的日期和人数打开 Airbnb，直接看到实时总价
 const airbnbLink = (l, T) => 'https://www.airbnb.com/rooms/' + l.roomId + '?adults=' + T.people + '&check_in=' + T.checkIn + '&check_out=' + T.checkOut;
+// 酒店（从地图链接加的，或者之前从 Booking.com 加的）：打开原来的链接
+const isMapUrl = u => /(^https?:\/\/)?((www|maps)\.google\.|maps\.app\.goo\.gl|maps\.apple\.com)/i.test(String(u || ''));
 
 // closed：投票已截止（不能投、不能删）；chosen：大家选定的这间；onChoose：管理员截止后改选（不是管理员时没有）
-export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, closed, chosen, onChoose, onVote, onRemove, onSetArea }) {
+export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, closed, chosen, onChoose, onVote, onRemove, onSetArea, onSetRate }) {
+  const hotel = l.kind === 'hotel';
   const votes = l.votes || [];
   const { name: myName } = useSession();
   // A vote is mine by token OR by account name — tokens rotate (email bind).
@@ -25,10 +28,11 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
         {chosen && <span className="absolute top-3 right-3 bg-amber-400 text-amber-950 text-xs font-black px-2 py-1 rounded-full shadow">🏆 我们选了这间</span>}
       </div>
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-bold leading-snug mb-1">{l.kind === 'hotel' ? '🏨 ' : ''}{l.title || '未命名房源'}</h3>
-        <p className="text-sm text-slate-500 mb-2">{statsLine(l)}{l.addedBy ? ' · 由 ' + l.addedBy + ' 添加' : ''}</p>
+        <h3 className="font-bold leading-snug mb-1">{hotel ? '🏨 ' : ''}{l.title || '未命名房源'}</h3>
+        {hotel && l.address && <p className="text-sm text-slate-600 mb-1">📍 {l.address}</p>}
+        <p className="text-sm text-slate-500 mb-2">{hotel ? '酒店' : statsLine(l)}{l.addedBy ? ' · 由 ' + l.addedBy + ' 添加' : ''}</p>
         {l.sleeps && l.sleeps < T.people ? <p className="text-sm text-amber-600 mb-2">⚠️ 最多住 {l.sleeps} 人，不够 {T.people} 人</p> : null}
-        <div className="mb-1"><PriceBlock l={l} T={T} /></div>
+        <div className="mb-1"><PriceBlock l={l} T={T} closed={closed} onSetRate={onSetRate} /></div>
         <div className="mb-2">{l.rating ? <span className="text-sm">⭐ {l.rating}{l.reviews ? '（' + l.reviews + '条评价）' : ''}</span> : null}</div>
         {l.note && <p className="text-sm text-slate-600 mb-2">💡 {l.note}</p>}
         {votes.length
@@ -40,9 +44,9 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
             : <button onClick={e => onVote(l, e.currentTarget)} className={'vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2' + (voted ? ' voted' : '') + (pop ? ' vote-pop' : '')}>
                 {(voted ? '❤️ 已投 · ' : '🤍 投票 · ') + votes.length}
               </button>}
-          {l.kind === 'hotel'
-            ? <a href={l.url} target="_blank" rel="noopener" title="在 Booking.com 打开这家酒店"
-                className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-sky-400">去 Booking ↗</a>
+          {hotel
+            ? <a href={l.url} target="_blank" rel="noopener" title="打开原来的链接，看位置、价格和预订"
+                className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">{isMapUrl(l.url) ? '看地图 ↗' : /booking\.com/i.test(l.url) ? '去 Booking ↗' : '打开链接 ↗'}</a>
             : <a href={airbnbLink(l, T)} target="_blank" rel="noopener" title={'按 ' + T.date + ' · ' + T.people + '人查看实时价格'}
                 className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>}
         </div>

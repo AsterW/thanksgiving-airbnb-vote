@@ -5,12 +5,16 @@ import { useToast } from '../../components/Toast.jsx';
 
 const EMPTY = { url: '', title: '', image: '', price: '', bedrooms: '', beds: '', baths: '', sleeps: '', area: '', note: '' };
 const num = v => (v ? Number(v) : null);
+// 酒店：Google 地图（或 Apple 地图）里那家酒店的分享链接
+const isMapLink = u => /^https?:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|((www|maps)\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.apple\.com)/i.test(u.trim());
 
-// 加房源：贴链接自动抓取；抓不到就展开手动表单（链接已预填）
+// 加房源：贴 Airbnb 链接自动抓取，或贴酒店的地图链接（名字、地址、位置从链接读，价格自动查 Google 参考价，
+// 也可以自己填每间每晚的价格）；抓不到就展开手动表单（链接已预填）
 export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
   const { name } = useSession();
   const toast = useToast();
   const [url, setUrl] = useState('');
+  const [nightly, setNightly] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState({ text: '', tone: 'text-slate-500' });
   const [manualOpen, setManualOpen] = useState(false);
@@ -23,34 +27,22 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
   async function add() {
     const u = url.trim();
     if (!u) return;
+    const map = isMapLink(u);
     setBusy(true);
-    // Booking.com 酒店链接：Booking 挡服务器抓取，页面读不到，先用链接里的
-    // 酒店名建卡；评分/照片/价格由后续从 Booking 拉取时补齐刷新。
-    const bk = u.match(/booking\.com\/hotel\/[a-z]{2}\/([a-z0-9-]+)/i);
-    if (bk) {
-      const stop = new Set(['by', 'the', 'a', 'an', 'at', 'of', 'in', 'on', 'and']);
-      const title = bk[1].split('-').map((w, i) => (i && stop.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
-      setMsg({ text: '正在加入酒店…', tone: 'text-slate-500' });
-      try {
-        const r = await api('/api/add-hotel', 'POST', { trip, url: u, title, addedBy: name });
-        if (r.ok) {
-          setUrl('');
-          setMsg({ text: r.updated ? '这家酒店已更新 🏨' : '酒店已加入清单 🏨 价格拉取后会自动显示', tone: 'text-green-600' });
-          await onAdded();
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else setMsg({ text: '加入失败：' + (r.error || '未知错误'), tone: 'text-amber-600' });
-      } catch (e) { setMsg({ text: '网络有点问题，稍后再试', tone: 'text-red-500' }); }
-      setBusy(false);
-      return;
-    }
-    setMsg({ text: '正在读取 Airbnb 房源信息…', tone: 'text-slate-500' });
+    setMsg({ text: map ? '正在读取地图链接、查 Google 上的价格…' : '正在读取 Airbnb 房源信息…', tone: 'text-slate-500' });
     try {
-      const r = await api('/api/add', 'POST', { trip, url: u, addedBy: name });
+      const r = await api('/api/add', 'POST', { trip, url: u, addedBy: name, ...(map && nightly.trim() ? { nightly: nightly.trim() } : {}) });
       if (r.ok) {
-        setUrl('');
-        setMsg({ text: r.deduped ? '这间已经在清单里了' : '已加入清单 🎉', tone: 'text-green-600' });
+        setUrl(''); setNightly('');
+        const l = r.listing || {};
+        const found = map && !r.deduped
+          ? '：' + l.title + (l.address ? ' · ' + l.address : '') + (l.rate ? ' · $' + l.rate.nightly + '/间/晚' + (l.rate.source === 'google' ? '（Google 参考价）' : '') : ' · 没查到价格，可以在卡片上填')
+          : '';
+        setMsg({ text: (r.deduped ? '这间已经在清单里了' : '已加入清单 🎉') + found, tone: 'text-green-600' });
         await onAdded();
         window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (map) {
+        setMsg({ text: r.error || '没读出来这个地图链接', tone: 'text-amber-600' });
       } else {
         setMsg({ text: '自动抓取失败：' + (r.error || '未知错误') + '，可以用下面的手动添加', tone: 'text-amber-600' });
         setM({ ...m, url: u });
@@ -78,10 +70,14 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
       <h2 className="font-bold text-lg mb-3">➕ 添加候选房源</h2>
       <div className="flex flex-col md:flex-row gap-3">
         <input type="url" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="粘贴 Airbnb 房源链接，或 Booking.com 酒店链接"
+          placeholder="粘贴 Airbnb 房源链接，或者酒店在 Google 地图里的分享链接"
           className="flex-1 border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        {isMapLink(url) && <input type="number" min="1" value={nightly} onChange={e => setNightly(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
+          placeholder="每间每晚 $（可不填）" aria-label="每间每晚的价格，美元，可不填（不填就查 Google 参考价）"
+          className="md:w-44 border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" />}
         <button onClick={add} disabled={busy} className="btn-primary font-bold rounded-xl px-6 py-3">{busy ? '抓取中…' : '加入清单'}</button>
       </div>
+      {isMapLink(url) && <p className="text-xs text-slate-500 mt-1">🏨 地图链接按酒店加：名字、地址、位置从链接读；价格不填就查 Google 的参考价（那是 Google 自己挑的某一晚，不一定是行程那几天）</p>}
       <p className={'text-sm mt-2 ' + msg.tone}>{msg.text}</p>
       <details open={manualOpen} onToggle={e => setManualOpen(e.currentTarget.open)} className="mt-3 text-sm">
         <summary className="cursor-pointer text-indigo-600 font-medium">自动抓取失败？点这里手动添加</summary>

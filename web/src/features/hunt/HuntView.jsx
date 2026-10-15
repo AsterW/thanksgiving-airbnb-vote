@@ -76,6 +76,12 @@ export default function HuntView({ trip, active }) {
     const r = await api('/api/area', 'POST', { trip, id: l.id, area });
     if (r.ok) patch(l.id, () => r.listing); else toast('改区域失败：' + (r.error || ''));
   }
+  // 酒店：手填每间每晚的价格（空着就是清掉）
+  async function setRate(l, nightly) {
+    const r = await api('/api/hotel-rate', 'POST', { trip, id: l.id, nightly, name });
+    if (r.ok) patch(l.id, () => r.listing); else toast('改价格失败：' + (r.error || ''));
+    return r.ok;
+  }
 
   function afterVote(id, votes) {
     if (sortBy === 'votes') setFrozen(f => f || items.map(l => l.id));
@@ -168,9 +174,9 @@ export default function HuntView({ trip, active }) {
       {showMap && <div className="trip-fade"><ListingMap items={visible} T={T} token={token} fitKey={fitKey} visible={active} hotId={hotId} onFocus={focusCard} /></div>}
       <div ref={gridBox} className="trip-fade">
         <ListingGrid items={items} T={T} token={token} glowId={glowId} popId={popId} anchorId={anchorId}
-          emptyText={(filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 链接进来吧 👆'}
+          emptyText={(filter === 'all' ? '还没有候选' : '这个区域还没有候选') + '，贴个 Airbnb 或 Google 地图酒店链接进来吧 👆'}
           zones={zoneNames} closed={closed} chosenId={voteInfo?.chosenId} onChoose={closed && isAdmin ? choose : null}
-          onVote={vote} onRemove={remove} onSetArea={setArea} onHover={setHotId} />
+          onVote={vote} onRemove={remove} onSetArea={setArea} onSetRate={setRate} onHover={setHotId} />
       </div>
     </>
   );

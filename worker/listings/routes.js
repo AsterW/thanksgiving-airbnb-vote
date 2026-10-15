@@ -1,11 +1,13 @@
-// Listing routes: the trip's shortlist, adding (scraped or manual), voting,
-// removing, and filling in details the first scrape missed.
+// Listing routes: the trip's shortlist, adding (scraped or manual; Airbnb
+// rooms, or hotels from a maps link — hotels.js), voting, removing, and
+// filling in details the first scrape missed.
 import { j, uid } from '../lib/http.js';
 import { tripOf } from '../config/trips.js';
+import { isMapLink } from '../lib/maplink.js';
 import { fetchListingInfo, roomIdFrom } from './scrape.js';
 import { getState, updateState } from './state.js';
 import { handlePrices } from './prices.js';
-import { routes as hotelRoutes } from './hotels.js';
+import { addHotel, routes as hotelRoutes } from './hotels.js';
 import { needsArea, pickArea, routes as zoneRoutes } from './zones.js';
 import { closedError, voteView, votingOpen, routes as decisionRoutes } from './decision.js';
 import { cleanName, getUsers } from '../users/users.js';
@@ -17,8 +19,9 @@ async function handleAdd(req, env) {
   let body = {};
   try { body = await req.json() || {}; } catch (e) { /* ignore */ }
   const url = String(body.url || '').trim();
+  if (isMapLink(url)) return addHotel({ ...body, url }, env); // a hotel from a Google / Apple Maps link
   const roomId = roomIdFrom(url);
-  if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源链接（需要形如 airbnb.com/rooms/123… 的链接）' });
+  if (!roomId) return j({ ok: false, error: '看起来不是 Airbnb 房源或地图链接（要 airbnb.com/rooms/123…，或者酒店在 Google 地图里的分享链接）' });
   const trip = tripOf(body.trip);
   if (!votingOpen(trip)) return closedError();
   // Fast-path dedupe check only — do NOT hold this snapshot across the scrape.
@@ -129,7 +132,7 @@ async function handleEnrich(req, env) {
   // saving a stale snapshot would clobber concurrent changes).
   const peekState = await getState(env, trip);
   const peek = peekState.listings.find(l => l.id === body.id);
-  if (!peek) return j({ ok: false });
+  if (!peek || peek.kind === 'hotel') return j({ ok: false }); // hotels aren't Airbnb rooms: nothing to scrape
   const info = await fetchListingInfo(peek.url);
   if (!info.ok) return j({ ok: false });
   const located = { ...peek, lat: peek.lat ?? info.lat, lng: peek.lng ?? info.lng };
