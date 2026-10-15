@@ -24,7 +24,7 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
     const u = url.trim();
     if (!u) return;
     setBusy(true);
-    setMsg({ text: '正在读取 Airbnb 房源信息…', tone: 'text-slate-500' });
+    setMsg({ text: '正在读取链接信息…', tone: 'text-slate-500' });
     try {
       const r = await api('/api/add', 'POST', { trip, url: u, addedBy: name });
       if (r.ok) {
@@ -59,11 +59,11 @@ export default function AddListingForm({ trip, T, zones, closed, onAdded }) {
       <h2 className="font-bold text-lg mb-3">➕ 添加候选房源</h2>
       <div className="flex flex-col md:flex-row gap-3">
         <input type="url" value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="粘贴 Airbnb 房源链接，例如 https://www.airbnb.com/rooms/123456…"
+          placeholder="粘贴 Airbnb 房源链接，或酒店的地图分享链接（Google 地图 / Apple 地图）"
           className="flex-1 border rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         <button onClick={add} disabled={busy} className="btn-primary font-bold rounded-xl px-6 py-3">{busy ? '抓取中…' : '加入清单'}</button>
       </div>
-      <p className={'text-sm mt-2 ' + msg.tone}>{msg.text}</p>
+      <p className={'text-sm mt-2 ' + msg.tone}>{msg.text || '酒店：在地图里打开酒店 → 点「分享」复制链接，粘贴到这里就能加进来一起投票。'}</p>
       <details open={manualOpen} onToggle={e => setManualOpen(e.currentTarget.open)} className="mt-3 text-sm">
         <summary className="cursor-pointer text-indigo-600 font-medium">自动抓取失败？点这里手动添加</summary>
         <div className="grid md:grid-cols-2 gap-3 mt-3">

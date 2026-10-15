@@ -21,6 +21,16 @@ export default function PriceBlock({ l, T }) {
       <div className="text-xs text-emerald-700 mt-0.5">✓ Airbnb 实时价{v.guests < T.people ? ' · 按 ' + v.guests + ' 人计' : ''} · {ago(v.at)}</div>
     </>
   );
+  // 酒店没有 Airbnb 实时价：显示从地图页解析到的最低价（参考价）
+  if (l.kind === 'hotel') {
+    if (l.priceUSD && l.priceNights) return (
+      <>
+        <div className="text-lg font-bold text-slate-800">约 ${Number(l.priceUSD).toLocaleString()} <span className="text-xs font-normal text-slate-500">/ {l.priceNights}晚总价（估算）</span></div>
+        <div className="text-xs text-slate-400 mt-0.5">Google 地图上的最低价{l.rateProvider ? ' · ' + l.rateProvider : ''} · 参考价，以预订页为准</div>
+      </>
+    );
+    return <div className="text-sm text-slate-500">价格见「看地图」里的预订页</div>;
+  }
   // 还没查到实时价：手动添加时填过价格的先显示那个
   if (l.priceUSD && l.priceNights) return (
     <>

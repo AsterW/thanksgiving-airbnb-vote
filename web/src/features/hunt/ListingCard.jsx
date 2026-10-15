@@ -25,7 +25,7 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
         {chosen && <span className="absolute top-3 right-3 bg-amber-400 text-amber-950 text-xs font-black px-2 py-1 rounded-full shadow">🏆 我们选了这间</span>}
       </div>
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-bold leading-snug mb-1">{l.title || '未命名房源'}</h3>
+        <h3 className="font-bold leading-snug mb-1">{l.kind === 'hotel' ? '🏨 ' : ''}{l.title || '未命名房源'}</h3>
         <p className="text-sm text-slate-500 mb-2">{statsLine(l)}{l.addedBy ? ' · 由 ' + l.addedBy + ' 添加' : ''}</p>
         {l.sleeps && l.sleeps < T.people ? <p className="text-sm text-amber-600 mb-2">⚠️ 最多住 {l.sleeps} 人，不够 {T.people} 人</p> : null}
         <div className="mb-1"><PriceBlock l={l} T={T} /></div>
@@ -40,8 +40,11 @@ export default function ListingCard({ l, T, token, glow, pop, cardRef, zones, cl
             : <button onClick={e => onVote(l, e.currentTarget)} className={'vote-btn flex-1 border-2 border-rose-500 text-rose-600 font-bold rounded-xl py-2' + (voted ? ' voted' : '') + (pop ? ' vote-pop' : '')}>
                 {(voted ? '❤️ 已投 · ' : '🤍 投票 · ') + votes.length}
               </button>}
-          <a href={airbnbLink(l, T)} target="_blank" rel="noopener" title={'按 ' + T.date + ' · ' + T.people + '人查看实时价格'}
-            className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>
+          {l.kind === 'hotel'
+            ? <a href={l.url} target="_blank" rel="noopener" title="在地图里打开这家酒店"
+                className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">看地图 ↗</a>
+            : <a href={airbnbLink(l, T)} target="_blank" rel="noopener" title={'按 ' + T.date + ' · ' + T.people + '人查看实时价格'}
+                className="border-2 border-slate-200 rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:border-indigo-400">去 Airbnb ↗</a>}
         </div>
         {onChoose && !chosen && <button onClick={() => onChoose(l)} className="mt-2 text-sm font-bold text-amber-700 border-2 border-amber-200 hover:border-amber-400 rounded-xl py-1.5">👑 改选这间（管理员）</button>}
       </div>
