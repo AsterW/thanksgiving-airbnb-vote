@@ -32,9 +32,15 @@ async function handleAddHotel(req, env) {
   if (!votingOpen(trip)) return closedError();
   const roomId = 'bk:' + slug;
   const lat = num(body.lat), lng = num(body.lng);
+  // A hotel card can carry a whole gallery (the card carousel swipes
+  // through it): accept images[], cover image = the first photo.
+  const gallery = Array.isArray(body.images)
+    ? [...new Set(body.images.map(u => str(u, 500)).filter(Boolean))].slice(0, 8)
+    : [];
   const fields = {
     title, url,
-    image: str(body.image, 500),
+    image: str(body.image, 500) || gallery[0] || '',
+    ...(gallery.length ? { images: gallery } : {}),
     rating: num(body.rating), reviews: num(body.reviews),
     priceUSD: num(body.priceUSD), priceNights: num(body.priceNights),
     note: str(body.note, 300),
@@ -54,6 +60,8 @@ async function handleAddHotel(req, env) {
       for (const k of ['image', 'rating', 'reviews', 'priceUSD', 'priceNights', 'priceAt']) {
         if (fields[k] != null && fields[k] !== '') existing[k] = fields[k];
       }
+      if (fields.images) existing.images = fields.images;
+      else if (fields.image) existing.images = [fields.image];
       if (lat != null && lng != null) { existing.lat = lat; existing.lng = lng; }
       if (area && !existing.area) existing.area = area;
       return { listing: existing, updated: true };
@@ -61,7 +69,7 @@ async function handleAddHotel(req, env) {
     const listing = {
       id: uid(), roomId, kind: 'hotel', ...fields,
       ...(lat != null && lng != null ? { lat, lng } : {}),
-      area, images: fields.image ? [fields.image] : [],
+      area, images: fields.images || (fields.image ? [fields.image] : []),
       sleeps: null, bedrooms: null, beds: null, bathrooms: null,
       addedBy: cleanName(body.addedBy), createdAt: Date.now(), votes: [],
     };
