@@ -1,5 +1,6 @@
 import { BlackjackGame } from './game.js';
 import { cleanName, getUsers, sameName } from '../users/users.js';
+import { noteReaction, freshReactions } from '../games/reactions.js';
 
 // The Durable Object: WebSockets in, game state out. Every client gets the
 // whole table after each change. Saved chips live in this object's storage
@@ -8,6 +9,7 @@ export class BlackjackTable {
   constructor(state, env) {
     this.state = state; this.env = env;
     this.sockets = new Map(); // socket -> seat key, or null while just watching
+    this.reactions = new Map(); // seat key -> { v, at } — emoji/taunt popups, see games/reactions.js
     this.board = new Map();   // saved chips by key
     this.loaded = null; this.sweeper = null;
     this.game = new BlackjackGame({
@@ -58,6 +60,7 @@ export class BlackjackTable {
         this.sockets.set(ws, err ? null : k);
       }
     } else if (!key) err = '先坐下';
+    else if (m.type === 'react') noteReaction(this.reactions, key, m.value, Date.now());
     else if (m.type === 'bet') err = this.game.bet(key, m.amount);
     else if (m.type === 'hit' || m.type === 'stand' || m.type === 'double') err = this.game.act(key, m.type);
     else if (m.type === 'leave') { this.game.leave(key); this.sockets.set(ws, null); }
@@ -89,7 +92,7 @@ export class BlackjackTable {
     return [...rows.values()].sort((a, b) => b.chips - a.chips).slice(0, 30);
   }
   send(ws, extra) {
-    try { ws.send(JSON.stringify({ type: 'state', table: this.game.view(), you: this.sockets.get(ws), board: this.leaderboard(), ...extra })); }
+    try { ws.send(JSON.stringify({ type: 'state', table: this.game.view(), you: this.sockets.get(ws), reactions: freshReactions(this.reactions, Date.now()), board: this.leaderboard(), ...extra })); }
     catch (e) { /* socket already gone; its close handler cleans up */ }
   }
   broadcast(skip) { for (const ws of this.sockets.keys()) if (ws !== skip) this.send(ws); }

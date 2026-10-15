@@ -6,6 +6,7 @@ import TableFrame, { useFullTable, RoomPicker, PointsBoard } from '../games/Tabl
 import PlayingCard from '../games/PlayingCard.jsx';
 import CardHand from '../games/CardHand.jsx';
 import SeatBox, { Said } from './SeatBox.jsx';
+import { ReactionBar } from '../games/Reactions.jsx';
 import './ddz.css';
 
 const PHASE = { waiting: '等人开始', bidding: '叫地主中', playing: '对局中', result: '这局结束' };
@@ -95,12 +96,12 @@ export default function DdzView({ active }) {
             <>
               <div className="gt-mid">
                 <div className="dz-top">
-                  <div className="dz-side"><SeatBox s={t.seats[left]} idx={left} t={t} timer={timer} compact /><Said said={t.said[left]} /></div>
+                  <div className="dz-side"><SeatBox s={t.seats[left]} idx={left} t={t} timer={timer} compact react={st?.reactions?.[t.seats[left]?.name?.toLowerCase()]} /><Said said={t.said[left]} /></div>
                   <div className="dz-center">
                     <div className="text-[11px] tracking-widest text-emerald-200 mb-1">底牌</div>
                     <div className="flex justify-center gap-1">{(t.bottom.length ? t.bottom : [null, null, null]).map((c, i) => <PlayingCard key={i + ':' + c} card={c} size="sm" />)}</div>
                   </div>
-                  <div className="dz-side right"><SeatBox s={t.seats[right]} idx={right} t={t} timer={timer} compact /><Said said={t.said[right]} /></div>
+                  <div className="dz-side right"><SeatBox s={t.seats[right]} idx={right} t={t} timer={timer} compact react={st?.reactions?.[t.seats[right]?.name?.toLowerCase()]} /><Said said={t.said[right]} /></div>
                 </div>
                 {result && (
                   <div className="gt-result">
@@ -117,7 +118,7 @@ export default function DdzView({ active }) {
                 )}
                 <div className="mt-2 dz-mine"><Said said={t.said[bottom]} /></div>
               </div>
-              {!full && <div className="mt-2"><SeatBox s={t.seats[bottom]} idx={bottom} t={t} timer={timer} /></div>}
+              {!full && <div className="mt-2"><SeatBox s={t.seats[bottom]} idx={bottom} t={t} timer={timer} react={st?.reactions?.[t.seats[bottom]?.name?.toLowerCase()]} /></div>}
               <CardHand cards={t.seats[bottom]?.cards || Array.from({ length: t.seats[bottom]?.count || 0 }, () => null)}
                 sel={sel} onToggle={flip} pickable={me >= 0 && t.phase === 'playing'} />
             </>
@@ -125,6 +126,7 @@ export default function DdzView({ active }) {
           <div className="flex flex-wrap items-center gap-2 mt-4 dz-controls">{controls()}</div>
           <p className="text-sm mt-2 min-h-[1.25rem] text-amber-200 dz-msg">{msg}</p>
         </TableFrame>
+        <ReactionBar send={send} seated={!!st?.you} />
         <PointsBoard title="斗地主豆子榜" rows={st?.board || []}>
           规则：一副牌 54 张，三人各 17 张，留 3 张底牌。叫地主 / 抢地主，每抢一次 ×2；炸弹、王炸各 ×2；春天 / 反春 ×2。底分 10 豆，地主一人对两家，输赢都算两份。
           空位由机器人补上；掉线或连着两次没出牌会自动托管。豆子只是好玩，和分账无关。
